@@ -1,17 +1,19 @@
 # fmeta
 
-OpenMM をエンジンとする funnel metadynamics（fun-metaD）フレームワークです。タンパク質と、結合ポーズの決まったリガンドを渡すと、ファネルの定義・系の構築（水溶液または脂質二重膜）・平衡化・本計算・絶対結合自由エネルギーの算出までを既定設定で実行します。バイアスも拘束も OpenMM の Custom Force として定義しているので、GPU プラットフォーム（CUDA / OpenCL）上でそのまま動きます。
+OpenMM をエンジンとする funnel metadynamics（fun-metaD）フレームワークです。**タンパク質の PDB と、結合ポーズに置かれたリガンドの SDF の 2 つ**を渡すと、ファネルの定義・系の構築（水溶液または脂質二重膜）・平衡化・本計算・絶対結合自由エネルギーの算出までを既定設定で実行します。系の構築も計算も OpenMM だけで行い、バイアスと拘束は OpenMM の Custom Force なので GPU プラットフォーム（CUDA / OpenCL）上でそのまま動きます。
 
 ```bash
 # 可溶性タンパク質
 fmeta auto --protein protein.pdb --ligand ligand.sdf -o run1
 
-# PDB の複合体からそのまま（リガンドを切り出し、SMILES から水素を付加）
-fmeta auto --complex 3ptb.pdb --ligand-resname BEN --ligand-smiles "NC(=[NH2+])c1ccccc1" -o run1
-
 # 膜タンパク質（GPCR など）: OpenMM の Modeller.addMembrane で POPC 膜に埋め込む
 fmeta auto --protein gpcr_oriented.pdb --ligand ligand.sdf --membrane POPC -o run1
 ```
+
+2 つのファイルに対して、次の前処理を自動で行います（行った内容は `fmeta funnel` のレポートに出ます）。
+
+- **タンパク質の PDB**: アミノ酸残基以外（水、イオン、ほかのリガンド、補因子）を取り除く。PDBFixer があれば非標準残基を標準残基に置き換え、欠けた重原子を補う。水素は力場に合わせて補完する（名前が合わない水素は付け直す）。PDB からダウンロードしたままのファイルでも構いません。
+- **リガンドの SDF**: 座標はタンパク質と同じ座標系で、結合ポケットに入っていることが前提です。タンパク質と接していなければ構築前に止めます。水素がなければ RDKit で付加します（SDF に描かれた形式電荷どおり。プロトン化状態は確認してください）。力場は OpenFF で自動生成します。
 
 ## インストール
 
@@ -25,9 +27,9 @@ pip install -e .
 
 | パッケージ | 使う機能 |
 |---|---|
-| `openmmforcefields` + `openff-toolkit`（conda-forge） | OpenFF / GAFF によるリガンドの自動パラメータ化 |
-| `rdkit` | 複合体 PDB のリガンドに SMILES から水素と結合次数を付ける |
-| `pdbfixer` | タンパク質の欠損原子・非標準残基の修復（`system.fix_protein: true`） |
+| `openmmforcefields` + `openff-toolkit` + `ambertools`（conda-forge） | SDF からのリガンド力場の自動生成（OpenFF / GAFF）。**PDB と SDF だけで実行するには必要**です。ない場合はリガンドの ffxml を `--ligand-xml` で渡します |
+| `pdbfixer` | タンパク質の欠損原子・非標準残基の修復（入っていれば自動で使う） |
+| `rdkit` | 水素のない SDF への水素付加、`fmeta split` |
 | `matplotlib` | 図の出力（`fmeta analyze --plot`） |
 
 ## GPU マシンでの確認
@@ -46,7 +48,7 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 | `forces` | ファネルの壁とバイアスの力・エネルギー・集団変数が Reference プラットフォームと一致（周期像を含む 7 配置） |
 | `toy_restart` | トイ系での実行とチェックポイントからの再開 |
 | `toy_free_energy` | 結合定数が厳密に求まるトイ系で、10 ns の fun-metaD が厳密な ΔG° を 2 kJ/mol 以内で再現 |
-| `ligand_openff`, `ligand_gaff` | OpenFF / GAFF によるリガンドのパラメータ化（未インストールなら SKIP） |
+| `pdb_sdf_openff`, `pdb_sdf_gaff` | PDB と SDF だけの既定経路: OpenFF / GAFF でリガンド力場を自動生成して系を構築（未インストールなら SKIP） |
 | `prepare` | 溶媒和とファネルの自動配置・検証 |
 | `periodic_images` | 溶媒和した実系で、系全体やリガンドを別の周期像に置いても集団変数が変わらない |
 | `equilibrate` | 段階的平衡化と、ファネルが結合状態に仕事をしていないこと |
@@ -75,14 +77,12 @@ fmeta analyze run1 --plot          # ΔG°、収束診断、図
 
 ### 入力
 
-| 入力 | 設定 |
-|---|---|
-| タンパク質 (PDB / mmCIF) + ポーズ済みリガンド (SDF / MOL / MOL2、水素つき、タンパク質と同じ座標系) | `input: {protein:, ligand:}` |
-| 複合体 (PDB / mmCIF) + リガンドの残基名 + SMILES | `input: {complex:, ligand_resname:, ligand_smiles:}`（`fmeta split` で切り出しだけもできる） |
+必要なのはタンパク質の PDB（mmCIF も可）とリガンドの SDF（MOL、MOL2 も可）だけです。設定ファイルなしで `fmeta auto --protein … --ligand …` と実行でき、細かく指定したいときだけ `fmeta init` のひな形を使います。
 
-- 複合体入力では、SMILES に書いたプロトン化状態どおりにリガンドの水素を付けます（結晶構造の重原子座標はそのまま）。
-- すでに OpenMM の `System` と `Topology` として組み上がった系には、Python から `fmeta.system.builder.prepare_from_system()` でファネルだけを付けられます（折り返された座標は分子をつなぎ直してから扱います）。他の MD プログラムの入力形式は扱いません。
+- 取り除きたくない非タンパク質成分（金属イオンなど）は `system.keep_hetero: [ZN]` のように残基名で指定し、それを扱える力場ファイルを `system.forcefields` に加えます。結晶水を残すなら `system.keep_water: true`。
 - リガンドの力場は `system.ligand_method` で選びます: `openff`（既定）、`gaff`、`xml`（自分の ffxml を `ligand_xml` に指定）。
+- リガンドの SDF が手元になく PDB エントリの中にあるだけなら、`fmeta split entry.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1"` で `protein.pdb` と `ligand.sdf` に切り出せます（SMILES に書いたプロトン化状態どおりに水素を付けます。重原子座標はそのまま）。`input: {complex:, ligand_resname:, ligand_smiles:}` と書けば構築時に同じ処理をします。
+- すでに OpenMM の `System` と `Topology` として組み上がった系には、Python から `fmeta.system.builder.prepare_from_system()` でファネルだけを付けられます。他の MD プログラム（GROMACS、AMBER、CHARMM）の入力形式は扱いません。
 
 ### 膜タンパク質
 
@@ -173,7 +173,7 @@ K_b = ∫_site ds exp(−W(s)/kT)  /  ⟨ exp(−W(s_u)/kT) / A_eff(s_u) ⟩_unb
 
 ```
 run1/config.yaml
-run1/inputs/     protein.pdb  ligand.sdf        （複合体入力のとき）
+run1/inputs/     水素を付加した SDF、切り出した protein.pdb / ligand.sdf（該当するとき）
 run1/prepared/   system.xml  topology.cif  funnel.yaml  funnel.pdb  report.json
 run1/equil/      state.xml  equil.json  equilibrated.cif
 run1/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  result.json  fes.npz  analysis.png
@@ -193,7 +193,7 @@ GPU のない環境（OpenMM 8.6.1、Reference / CPU プラットフォーム）
 - 自由エネルギー: 解析的に結合定数が求まるトイ系（ガウス型井戸、深さ 14 kJ/mol）で、fun-metaD の結果が厳密値を再現。40 ns × 4 本で `dG_plateau` の誤差は −0.15〜+0.50 kJ/mol、20 ns × 4 本で `dG_reweighted` の誤差は −0.12〜−0.27 kJ/mol。井戸をなくしたトイ系では空のファネルの値を返し、「結合なし」と表示する。hill の鏡映あり／なしの平均誤差は +0.17 ± 0.15 ／ −0.33 ± 0.21 kJ/mol で、この系でははっきりした優劣は出ていません（既定は鏡映あり）。
 - 複数ウォーカー: 各ウォーカーの格子が全 HILLS の和に一致、再開後も一致、2 ウォーカー × 10 ns でトイ系の厳密値を再現。実系でもサブプロセス 2 本で実行。
 - ファネル自動配置: 出口の分かっている合成ポケット（直線チャネル、埋没部位、膜スラブつき）で方向誤差 10° 未満、膜があると水側を選ぶ。
-- 入力: 複合体 PDB + SMILES、PDBFixer による修復、折り返された座標のつなぎ直しを、それぞれ構築段階まで通して確認。
+- 入力: ダウンロードしたままの PDB を模したファイル（水・イオン・別のリガンドつき、水素あり／なし）と SDF だけからの構築、名前の合わない水素の付け直し、PDBFixer による欠損原子の修復、水素のない SDF への水素付加、タンパク質から離れたリガンドの拒否、`fmeta split`。
 - 実系の通し実行（CPU、35 残基タンパク質 + ベンゼン）: 構築 → 平衡化 → 本計算 → 再開 → 解析 → 図。
 - 膜: `Modeller.addMembrane` による POPC 膜の構築、ファネルから決めた Z ボックス、脂質の認識、膜表面からの距離とファネル内脂質の検証、半等方バロスタットでの平衡化と短い本計算。
 - 膜面の推定: 合成の膜貫通ヘリックスバンドルで傾き誤差 12° 未満・位置誤差 0.3 nm 未満、可溶性タンパク質では「疎水帯なし」と判定。
@@ -201,12 +201,12 @@ GPU のない環境（OpenMM 8.6.1、Reference / CPU プラットフォーム）
 **GPU マシンで確認する項目**（`fmeta check` が実行する）
 
 - GPU プラットフォームでの力の一致、周期像の扱い、トイ系の ΔG°、通し実行、スループット。
-- OpenFF / GAFF によるリガンドのパラメータ化。開発環境には conda 専用の `openmmforcefields` を入れられなかったため、実物では未実行です。fmeta 側の呼び出しは代役のモジュールでテストしてあります。
+- OpenFF / GAFF によるリガンド力場の自動生成（`pdb_sdf_openff`, `pdb_sdf_gaff`）。開発環境には conda 専用の `openmmforcefields` を入れられなかったため、実物では未実行です。fmeta 側の呼び出しは代役のモジュールでテストし、通し実行はリガンドの ffxml を渡す経路で確認しています。
 
 **この環境では確認できなかったもの**（外部データが必要）
 
 - 実在の結合系での ΔG°（数百 ns × 複数レプリカの GPU 計算が必要）。`examples/` に設定があります。
-- PDB の実エントリでの複合体入力、実在の膜タンパク質での膜面推定。構造データベースに接続できなかったため、OpenMM 同梱のタンパク質と合成データで確認しています。
+- PDB の実エントリを入力にした実行、実在の膜タンパク質での膜面推定。構造データベースに接続できなかったため、OpenMM 同梱のタンパク質と合成データで確認しています。
 - `HILLS` を PLUMED 本体で読むこと（書式は PLUMED に合わせていますが、PLUMED は `ρ = 0` の鏡映を知らないので、`metad: {reflect: false}` の実行でのみ意味が合います）。
 
 ## 注意点
@@ -215,7 +215,7 @@ GPU のない環境（OpenMM 8.6.1、Reference / CPU プラットフォーム）
 - 強く結合するリガンド（nM 以下）は μs 規模の計算と大きめの bias factor が必要です。
 - 電荷をもつリガンドは非結合領域が平らになりにくいので、ファネルを自動で長くし、レポートに警告を出します。解析で `W(s)` が平らでなければ `funnel_overrides: {upper: ...}` でさらに延ばしてください。
 - 膜系では、脱離したリガンドが脂質頭部に分配しないよう、非結合領域を膜表面から 1 nm 以上離しています（検証で確認）。
-- `system.fix_protein: true` は水以外のヘテロ原子（金属イオンや補因子）を取り除きます。必要なものは自分で用意した構造と力場ファイルで与えてください。未解像のループは作りません。
+- タンパク質ファイルの非タンパク質成分は既定ですべて取り除きます。金属イオンや補因子が結合に関わる系では `system.keep_hetero` と対応する力場ファイルを指定してください。未解像のループは作りません。
 
 ## 参考文献
 

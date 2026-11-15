@@ -9,7 +9,8 @@ OpenMM plus a benzene molecule), and prints PASS / FAIL / SKIP per item:
 * funnel metadynamics on a solvable toy system against its exact binding free energy;
 * the whole pipeline (build, equilibrate, replicas, restart, walkers, analysis);
 * a membrane build with ``Modeller.addMembrane`` and a short membrane run;
-* OpenFF and GAFF ligand parameterisation, when those packages are installed;
+* the default route from a protein PDB and a ligand SDF alone, with OpenFF and with GAFF
+  ligand parameters, when those packages are installed;
 * throughput with and without the bias.
 
 On a machine with a GPU this is the acceptance test. ``--platform CPU --quick``
@@ -37,8 +38,7 @@ from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
 from .funnel.geometry import compute_cvs
-from .system.builder import SystemSettings, add_barostat, build_complex, ligand_net_charge
-from .system.ligand import register_ligand
+from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
 from .testing.systems import BENZENE_XML, write_complex_inputs, write_membrane_inputs
 from .testing.toy import make_simulation, make_toy
 from .workflow import (analyze_stage, equilibrate_stage, load_prepared, prepare_stage,
@@ -227,28 +227,33 @@ class Checker:
         return text
 
     def _check_ligand(self, method: str) -> str:
+        """The default user path with nothing but a protein PDB and a ligand SDF:
+        the ligand force field is generated on the fly (OpenFF or GAFF)."""
         try:
             import openmmforcefields  # noqa: F401
             from openff.toolkit import Molecule  # noqa: F401
         except ImportError:
-            raise Skip("openmmforcefields / openff-toolkit not installed; automatic ligand "
-                       "parameters are unavailable (ligand ffxml or pre-parameterised input still work)")
+            raise Skip("openmmforcefields / openff-toolkit not installed: without them a ligand "
+                       "needs its own ffxml (system.ligand_xml). Install the conda environment "
+                       "to run from a PDB and an SDF alone")
         directory = self.workdir / "inputs"
         directory.mkdir(exist_ok=True)
         protein, ligand = write_complex_inputs(directory)
-        forcefield = app.ForceField("amber14-all.xml", "amber14/tip3p.xml")
-        register_ligand(forcefield, ligand, method)
-        settings = SystemSettings(ligand_method=method, ligand_resname="BNZ")
-        modeller, ligand_atoms, _ = build_complex(protein, ligand, forcefield, settings)
-        system = forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff)
-        context = mm.Context(system, mm.VerletIntegrator(0.001), mm.Platform.getPlatformByName("Reference"))
-        context.setPositions(modeller.positions)
-        energy = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-        charge = ligand_net_charge(system, ligand_atoms)
-        if not np.isfinite(energy) or abs(charge) > 0.01:
-            raise AssertionError(f"energy {energy}, benzene net charge {charge:+.3f} e")
-        return (f"benzene parameterised with {method}: {len(ligand_atoms)} atoms, net charge "
-                f"{charge:+.3f} e, complex energy {energy:.0f} kJ/mol")
+        settings = SystemSettings(ligand_method=method)
+        prepared = prepare(protein, ligand, settings, scratch_dir=self.workdir / f"ligand_{method}")
+        charge = ligand_net_charge(prepared.system, prepared.selection.ligand)
+        context = mm.Context(prepared.system, mm.VerletIntegrator(0.001), self.platform,
+                             self.properties)
+        context.setPeriodicBoxVectors(*(mm.Vec3(*row) for row in prepared.box_vectors))
+        context.setPositions(prepared.positions)
+        energy = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+            unit.kilojoule_per_mole)
+        if not np.isfinite(energy) or abs(charge) > 0.01 or not prepared.report.ok:
+            raise AssertionError(f"energy {energy}, benzene net charge {charge:+.3f} e, "
+                                 f"funnel checks ok = {prepared.report.ok}")
+        return (f"protein PDB + ligand SDF only, ligand parameters from {method}: "
+                f"{prepared.topology.getNumAtoms()} atoms built, ligand net charge {charge:+.3f} e, "
+                f"energy {energy:.0f} kJ/mol")
 
     def check_prepare(self) -> str:
         directory = self.workdir / "inputs"
@@ -448,8 +453,8 @@ class Checker:
         self.run("forces", self.check_forces, needs=("platform",))
         self.run("toy_restart", self.check_toy_restart, needs=("platform",))
         self.run("toy_free_energy", self.check_toy_free_energy, needs=("platform",))
-        self.run("ligand_openff", lambda: self._check_ligand("openff"))
-        self.run("ligand_gaff", lambda: self._check_ligand("gaff"))
+        self.run("pdb_sdf_openff", lambda: self._check_ligand("openff"), needs=("platform",))
+        self.run("pdb_sdf_gaff", lambda: self._check_ligand("gaff"), needs=("platform",))
         self.run("prepare", self.check_prepare, needs=("platform",))
         self.run("periodic_images", self.check_pbc, needs=("prepare",))
         self.run("equilibrate", self.check_equilibrate, needs=("prepare",))

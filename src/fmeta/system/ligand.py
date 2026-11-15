@@ -37,9 +37,10 @@ def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "open
         from openmmforcefields.generators import GAFFTemplateGenerator, SMIRNOFFTemplateGenerator
     except ImportError as error:
         raise ImportError(
-            f"ligand method {method!r} needs openmmforcefields and openff-toolkit "
-            "(conda install -c conda-forge openmmforcefields). Alternatively supply an ffxml "
-            "file for the ligand (method 'xml') or a pre-parameterised system.") from error
+            f"generating ligand parameters ({method}) needs openmmforcefields and openff-toolkit, "
+            "which are conda packages: create the environment from environment.yml, or run "
+            "'conda install -c conda-forge openmmforcefields'. Without them, supply an OpenMM "
+            "ffxml file for the ligand (--ligand-xml, system.ligand_xml).") from error
     molecule = Molecule.from_file(str(ligand_path), allow_undefined_stereo=True)
     if isinstance(molecule, list):       # multi-record file: the pose is the first record
         molecule = molecule[0]

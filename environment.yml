@@ -10,8 +10,9 @@ dependencies:
   - scipy
   - pyyaml
   - pdbfixer
-  - openmmforcefields    # GAFF / OpenFF template generators
+  - openmmforcefields    # GAFF / OpenFF template generators: ligand parameters from an SDF
   - openff-toolkit
+  - ambertools           # AM1-BCC charges and GAFF atom typing for the two generators
   - rdkit
   - matplotlib
   - pytest

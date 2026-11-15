@@ -1,24 +1,27 @@
 # Trypsin-benzamidine, the classic funnel metadynamics test case (PDB entry 3PTB).
 #
-#   1. Download 3ptb.pdb from the PDB into this directory.
-#   2. fmeta prepare fmeta.yaml -o run && fmeta funnel run     # look at the funnel first:
-#      load run/prepared/funnel.pdb together with run/prepared/topology.cif
-#   3. fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run --plot
+# Two files are needed, nothing else:
+#   3ptb.pdb         - the entry as downloaded. Waters, the calcium ion and the crystal
+#                      ligand are removed, missing atoms are rebuilt (if PDBFixer is
+#                      installed) and hydrogens are added automatically.
+#   benzamidine.sdf  - benzamidine in its bound pose, in the frame of 3ptb.pdb.
+#                      To cut it out of the entry itself, with hydrogens for the charged
+#                      (amidinium) form:
+#                        fmeta split 3ptb.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1" -o .
+#                        mv ligand.sdf benzamidine.sdf
 #
-# The ligand (residue BEN) is cut out of the entry and protonated from the SMILES
-# below (benzamidinium, charge +1); needs RDKit. fix_protein removes the crystal
-# waters and the calcium ion and rebuilds any missing side-chain atoms (PDBFixer).
-# This configuration has not been run against the real entry in development
-# (no access to the PDB from there); the same route is tested on a small fixture.
+#   fmeta prepare fmeta.yaml -o run && fmeta funnel run     # look at the funnel first:
+#      load run/prepared/funnel.pdb together with run/prepared/topology.cif
+#   fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run --plot
+#
+# Not run against the real entry during development (no access to the PDB from there);
+# the same steps are tested on a small bundled system.
 input:
-  complex: 3ptb.pdb
-  ligand_resname: BEN
-  ligand_smiles: "NC(=[NH2+])c1ccccc1"
+  protein: 3ptb.pdb
+  ligand: benzamidine.sdf
 
 system:
-  fix_protein: true
-  ligand_method: openff        # needs openmmforcefields (see environment.yml)
-  temperature: 300.0
+  temperature: 300.0           # ligand parameters: OpenFF by default (conda environment)
 
 metad:
   bias_factor: 10.0

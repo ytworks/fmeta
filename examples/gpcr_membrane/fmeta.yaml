@@ -1,12 +1,10 @@
 # A GPCR with a ligand in the orthosteric site, embedded in POPC.
 #
-# Inputs (prepare them yourself):
-#   protein.pdb  - the receptor, protonated or at least complete. Best taken from the OPM
-#                  database, where structures are already oriented: membrane normal along z,
-#                  midplane at z = 0. Remove OPM's dummy membrane atoms (residue DUM), or set
-#                  system.fix_protein: true, which drops all hetero groups.
-#   ligand.sdf   - the ligand pose with all hydrogens, in the same frame as the protein
-#   (or use input.complex / ligand_resname / ligand_smiles, as in the trypsin example)
+# Two files are needed:
+#   protein.pdb  - the receptor. Best taken from the OPM database, where structures are
+#                  already oriented: membrane normal along z, midplane at z = 0. OPM's dummy
+#                  membrane atoms, waters and other hetero groups are removed automatically.
+#   ligand.sdf   - the ligand in its bound pose, in the same frame as the protein
 #
 # The funnel is placed before the membrane is built and treats the bilayer as a slab, so
 # it points into the extracellular or intracellular water. Check it before running:
