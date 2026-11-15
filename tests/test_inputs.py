@@ -15,6 +15,7 @@ from fmeta.funnel.geometry import compute_cvs
 from fmeta.system.builder import SystemSettings, prepare
 from fmeta.system.imaging import make_whole
 from fmeta.system.inputs import (
+    complete_hydrogens,
     ensure_ligand_hydrogens,
     pdbfixer_available,
     read_ligand,
@@ -301,3 +302,183 @@ def test_command_line_reports_input_problems_plainly(inputs, tmp_path, monkeypat
         cli(["prepare", "--protein", str(tmp_path / "missing.pdb"), "--ligand", inputs[1],
              "--ligand-xml", BENZENE_XML, "-o", str(tmp_path / "b")])
     assert "fmeta: error:" in str(stop.value)
+
+
+# ---- the protein model itself: chain gaps, caps, protonation states, disulfides and
+#      alternate locations. Structures are cut from the 35-residue test protein, whose
+#      net charge is +2 with HIE 27 (index 26), ASP 3 (2), GLU 4 (3) and LYS 7 (6). ------
+
+@pytest.fixture(scope="module")
+def amber():
+    return app.ForceField("amber14-all.xml")
+
+
+def edited(path, source, skip=lambda atom: False, residues=None, atoms=None, extra=()):
+    """Write a copy of the structure ``source`` without the atoms ``skip`` selects, with
+    residues renamed (index -> name), atoms renamed ((residue index, name) -> name) and
+    atoms added (residue index, name, element, position in nm)."""
+    topology, positions = read_structure(source)
+    new, coordinates = app.Topology(), []
+    chain = new.addChain("A")
+    for residue in topology.residues():
+        target = new.addResidue((residues or {}).get(residue.index, residue.name), chain, residue.id)
+        for atom in residue.atoms():
+            if not skip(atom):
+                new.addAtom((atoms or {}).get((residue.index, atom.name), atom.name), atom.element, target)
+                coordinates.append(positions[atom.index])
+        for index, name, symbol, position in extra:
+            if index == residue.index:
+                new.addAtom(name, app.Element.getBySymbol(symbol), target)
+                coordinates.append(position)
+    with open(path, "w") as handle:
+        app.PDBFile.writeFile(new, np.array(coordinates) * unit.nanometer, handle, keepIds=True)
+    return path
+
+
+def modelled(path, forcefield, fix=False):
+    """The protein model ``build_complex`` makes of a file: reduced, repaired, with hydrogens."""
+    topology, positions, notes = read_protein(path, fix=fix)
+    modeller = app.Modeller(topology, positions * unit.nanometer)
+    notes += complete_hydrogens(modeller, forcefield, 7.0)
+    return modeller.topology, np.array(modeller.positions.value_in_unit(unit.nanometer)), notes
+
+
+def net_charge(forcefield, topology):
+    system = forcefield.createSystem(topology)
+    nonbonded = next(f for f in system.getForces() if f.getName() == "NonbondedForce")
+    return sum(nonbonded.getParticleParameters(i)[0].value_in_unit(unit.elementary_charge)
+               for i in range(system.getNumParticles()))
+
+
+def names_of(topology, index):
+    return {atom.name for atom in list(topology.residues())[index].atoms()}
+
+
+def capped_fragment(path, source, style="amber"):
+    """Residues 6-12 of the test protein between an acetyl and an N-methyl group cut from
+    their neighbours. ``style="amber"``: residues ACE and NME in place. ``"unk"``: as a
+    preparation program writes them, residues UNK with atoms C1, O1, C2 / N1, C1 after the
+    chain."""
+    def skip(atom):
+        index, name = atom.residue.index, atom.name
+        return (index < 4 or index > 12 or (index == 4 and name not in ("CA", "C", "O"))
+                or (index == 12 and name not in ("N", "CA")))
+    if style == "amber":
+        return edited(path, source, skip, residues={4: "ACE", 12: "NME"},
+                      atoms={(4, "CA"): "CH3", (12, "CA"): "C"})
+    edited(path, source, skip, residues={4: "UNK", 12: "UNK"},
+           atoms={(4, "CA"): "C2", (4, "C"): "C1", (4, "O"): "O1", (12, "N"): "N1", (12, "CA"): "C1"})
+    lines = [line for line in open(path).read().splitlines() if line.startswith(("ATOM", "HETATM"))]
+    caps = ["HETATM" + line[6:21] + " " + line[22:] for line in lines if line[17:20] == "UNK"]
+    chain = [line for line in lines if line[17:20] != "UNK"]
+    path.write_text("\n".join(chain + ["TER"] + caps + ["END"]) + "\n")
+    return path
+
+
+def protonated(path, source, foreign=False):
+    """The test protein with HIP 27, ASH 3, GLH 4 and a neutral LYS 7 written in its hydrogens
+    (net charge +4); ``foreign`` gives one hydrogen a name the force field does not know."""
+    topology, positions = read_structure(source)
+    at = {(a.residue.index, a.name): positions[a.index] for a in topology.atoms()}
+
+    def hydrogen(residue, parent, *others):
+        away = at[residue, parent] - np.mean([at[residue, name] for name in others], axis=0)
+        return at[residue, parent] + 0.1 * away / np.linalg.norm(away)
+
+    extra = [(26, "HD1", "H", hydrogen(26, "ND1", "CG", "CE1")),
+             (2, "HD2", "H", hydrogen(2, "OD2", "CG")), (3, "HE2", "H", hydrogen(3, "OE2", "CD"))]
+    return edited(path, source, skip=lambda atom: (atom.residue.index, atom.name) == (6, "HZ1"),
+                  atoms={(0, "HB2"): "XB2"} if foreign else None, extra=extra)
+
+
+def with_cysteines(path, source, separation):
+    """PRO 21 and LYS 24 of the test protein turned into cysteines (no HG) whose sulfur
+    atoms are ``separation`` nm apart; the net charge without the lysine is +1."""
+    topology, positions = read_structure(source)
+    at = {(a.residue.index, a.name): positions[a.index] for a in topology.atoms()}
+    axis = at[23, "CB"] - at[20, "CB"]
+    half = (np.linalg.norm(axis) - separation) / 2.0
+    axis /= np.linalg.norm(axis)
+    out = 0.5 * (at[20, "CB"] + at[23, "CB"] - at[20, "CA"] - at[23, "CA"])
+    out -= (out @ axis) * axis
+    out *= np.sqrt(0.181 ** 2 - half ** 2) / np.linalg.norm(out)
+    backbone = ("N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3")
+    return edited(path, source, residues={20: "CYS", 23: "CYS"},
+                  skip=lambda atom: atom.residue.index in (20, 23) and atom.name not in backbone,
+                  extra=[(20, "SG", "S", at[20, "CB"] + half * axis + out),
+                         (23, "SG", "S", at[23, "CB"] - half * axis + out)])
+
+
+def test_gap_in_the_chain_is_bonded_across(inputs, tmp_path, amber):
+    """Characterisation: OpenMM bonds consecutive residues of a chain whatever their distance,
+    and the force field accepts the result, so three missing residues go unnoticed."""
+    path = edited(tmp_path / "gap.pdb", inputs[0], skip=lambda atom: atom.residue.index in (14, 15, 16))
+    topology, positions, notes = modelled(path, amber)
+    lengths = [np.linalg.norm(positions[a.index] - positions[b.index])
+               for a, b in topology.bonds() if a.residue is not b.residue]
+    assert topology.getNumChains() == 1 and topology.getNumResidues() == 32
+    assert max(lengths) == pytest.approx(0.447, abs=1e-3)              # ARG 14 C - ALA 18 N
+    amber.createSystem(topology)
+    assert notes == []
+
+
+@pytest.mark.parametrize("fix", [False, True])
+def test_caps_in_the_input_are_lost(inputs, tmp_path, amber, fix):
+    """Characterisation: ACE and NME have no backbone, so they are removed with the hetero
+    components. Without PDBFixer the uncapped ends then fit no template; with it they are
+    completed as charged termini."""
+    path = capped_fragment(tmp_path / "capped.pdb", inputs[0])
+    if not fix:
+        with pytest.raises(ValueError, match="does not fit the force field"):
+            modelled(path, amber, fix=False)
+        return
+    pytest.importorskip("pdbfixer")
+    topology, _, notes = modelled(path, amber, fix=True)
+    assert [r.name for r in topology.residues()] == ["PHE", "LYS", "ALA", "VAL", "PHE", "GLY", "MET"]
+    assert "removed from the protein file: ACE x1, NME x1" in notes
+    assert {"H2", "H3"} <= names_of(topology, 0) and "OXT" in names_of(topology, 6)
+
+
+def test_protonation_states_of_the_input(inputs, tmp_path, amber):
+    """Characterisation: hydrogens that fit the force field keep the states of histidine and
+    of the acids, but a neutral lysine is completed to the charged one (+5, not +4); once
+    the hydrogens are rebuilt every state of the input is lost (+2)."""
+    topology, _, notes = modelled(protonated(tmp_path / "states.pdb", inputs[0]), amber)
+    assert {"HD1", "HE2"} <= names_of(topology, 26) and "HD2" in names_of(topology, 2)
+    assert "HE2" in names_of(topology, 3) and {"HZ1", "HZ2", "HZ3"} <= names_of(topology, 6)
+    assert net_charge(amber, topology) == pytest.approx(5.0, abs=1e-6)
+
+    topology, _, notes = modelled(protonated(tmp_path / "foreign.pdb", inputs[0], foreign=True), amber)
+    assert any("did not match the force field and were rebuilt" in note for note in notes)
+    assert net_charge(amber, topology) == pytest.approx(2.0, abs=1e-6)
+
+
+def test_cysteines_of_the_input(inputs, tmp_path, amber):
+    """Characterisation: sulfur atoms 0.204 nm apart are bonded on reading and stay without
+    HG (CYX); further apart they are free cysteines, which get their HG back even when the
+    file has hydrogens and none on the sulfur."""
+    topology, _, _ = modelled(with_cysteines(tmp_path / "bridge.pdb", inputs[0], 0.204), amber)
+    assert sum(a.name == "SG" and b.name == "SG" for a, b in topology.bonds()) == 1
+    assert "HG" not in names_of(topology, 20) | names_of(topology, 23)
+    assert net_charge(amber, topology) == pytest.approx(1.0, abs=1e-6)
+
+    topology, _, _ = modelled(with_cysteines(tmp_path / "free.pdb", inputs[0], 0.35), amber)
+    assert sum(a.name == "SG" and b.name == "SG" for a, b in topology.bonds()) == 0
+    assert "HG" in names_of(topology, 20) and "HG" in names_of(topology, 23)
+    assert net_charge(amber, topology) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_first_listed_alternate_location_is_taken(inputs, tmp_path):
+    """Characterisation: of the alternate locations of an atom OpenMM keeps the one listed
+    first, whatever its letter or occupancy."""
+    lines = []
+    for line in open(inputs[0]).read().splitlines():
+        if line.startswith("ATOM") and line[22:26].strip() == "5" and line[12:16].strip() in ("CB", "CG"):
+            moved = f"{float(line[30:38]) + 1.0:8.3f}"
+            lines += [line[:16] + "B" + line[17:54] + "  0.40" + line[60:],
+                      line[:16] + "A" + line[17:30] + moved + line[38:54] + "  0.60" + line[60:]]
+        else:
+            lines.append(line)
+    (tmp_path / "altloc.pdb").write_text("\n".join(lines) + "\n")
+    topology, positions, notes = read_protein(tmp_path / "altloc.pdb", fix=False)
+    assert np.abs(positions - read_structure(inputs[0])[1]).max() < 1e-6 and notes == []
