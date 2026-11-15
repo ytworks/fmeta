@@ -25,7 +25,7 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4,
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D14 Accepted; FM-D2, D4,
 D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
@@ -42,29 +42,45 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
-| GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
+| GPU plan M1: run modes and the scheduler (R7, FM-D14) | Implemented; `pytest` 102 passed; GPU gates (now 18) not run yet on this code |
+| GPU plan M2–M7: real inputs, presets, examples, benchmarks (R2, R3, R8–R10) | Not started |
 
 - GPU gates: **all 16 passed** on clean 2c4ad4e (CUDA, mixed precision, 2 GPUs, in the image):
-  `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` (dated in UTC). The commits after
-  2c4ad4e change no gated path (documents and evidence only).
-- CPU evidence, in the image (lock d061e45a…, the source of 2c4ad4e): `ruff check .` passes;
-  `pytest` 81 passed; `pytest -m slow` 6 passed. CI has not run on the commits after aadd0ad
-  (see Blockers); it was green on 171220a.
+  `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` (dated in UTC). The run modes (FM-D14)
+  change gated paths (runner, platform handling) and add the items `replicas_sequential` and
+  `replicas_parallel`: not run yet on that code.
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 102 passed on
+  the code of FM-D14. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+  FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
+  source of 2c4ad4e and are not rerun.
+- CI: green on 171220a. The commits up to c5fc36c were pushed on 2026-11-16; the result of CI
+  on them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
+  - `docker stop` of a parallel run on GPUs and its continuation (FM-D14);
   - reading HILLS with PLUMED itself;
-  - the CI job `docker` and the publish workflow (never run).
+  - the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
   must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare, and
   about 1 run in 30 of its 10 ns misses the criterion on every platform (FM-D12), so a change
   of the toy trajectory (another GPU, another OpenMM) can fail it without a defect.
-- Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
-  commits after aadd0ad are local: CI and PR #1 do not see them.
+- Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
+  machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D12 (owner): operation on a CPU platform is not guaranteed and not confirmed
+- What: from FM-D14 on, the pipeline and the run modes are verified by the GPU gates alone. `fmeta check --platform CPU` and the pipeline runs of `pytest -m slow` are not rerun as verification (last run on the source of 2c4ad4e), and a new feature gets no test that runs dynamics on a CPU platform. The default `pytest` stays the test of logic and numerics. Unchanged until the owner decides: item 3 of the test policy in `CLAUDE.md` (the default `pytest` passes on a CPU-only machine) and the `cpu` job of CI.
+- Why: owner instruction of 2026-11-16: operation on a CPU need not be guaranteed, and the time spent on confirming it is wasted. Production runs on GPUs only.
+- Refs: FM-D12 (amendment), FM-D14.
+
+### 2026-11-16 — [design] FM-D14: run modes `auto` / `parallel` / `sequential`, and one scheduler for the child processes of a run
+- What: `run.mode` and `--mode`; `run.gpus` is a list or `all`. `src/fmeta/scheduler.py` starts every replica and walker as a child process in its own process group, gives out the devices in list order, ends the children on SIGINT / SIGTERM (kill after 5 s or at a second signal) and writes every decision to `schedule.jsonl`, which `verify_schedule` checks. A work directory and a replica directory are held with `flock`; `device.json` records the device a run asked for, the device the platform reports and the memory in use before and after; `fmeta status` lists state, time reached and device per replica; preparation and equilibration use the first device. New gate items `replicas_sequential` and `replicas_parallel` (a record needs two GPUs). `ruff` passes; `pytest` 102 passed (21 new, on the order of the scheduler's decisions). GPU gates not run yet on this code.
+- Why: owner request of 2026-11-15 for both modes. The code before handled no signal, so a stopped run or container could leave replicas on the GPUs, and the gates ran replicas in the calling process, so the launch of the children was outside them. `auto` keeps the behaviour before (one device unless `gpus` is given). Not added: a key for several replicas per GPU (effect not measured; a key cannot be withdrawn later).
+- Refs: FM-D14; roadmap R7; `docs/gpu-runbook.md`; `src/fmeta/scheduler.py`, `src/fmeta/workflow.py`, `src/fmeta/engine/platform.py`, `src/fmeta/check.py`, `src/fmeta/cli.py`; `tests/test_scheduler.py`.
 
 ### 2026-11-16 — [amendment] FM-D12: the scatter of the toy gate is on record, criteria unchanged; GPU plan M0 complete
 - What: the 10 ns run of the gate `toy_free_energy` was repeated with 48 other seeds, and a 40 ns run with 12, on CUDA mixed, CUDA double and Reference (diagnostic in the image, not evidence). Error of the reweighted estimate at 10 ns, mean ± sd: +0.48 ± 0.83, +0.51 ± 0.83, +0.46 ± 0.83 kJ/mol; beyond the criterion of 2.0 in 2, 2 and 1 of 48 runs; the plateau estimate never beyond 3.0 (largest 2.62). At 40 ns (36 runs): reweighted +0.12 ± 0.33, plateau +0.40 ± 0.50. The gate's seed gave the same numbers in both full gate runs. M0 closed with the fmeta inside the image, without the mounted source (image b08f577e…, built from b19deff): `fmeta doctor` found CUDA; `fmeta check --quick` on CUDA 15 passed, 0 failed, 0 skipped; all 116 files it wrote belong to the caller (quick mode on a GPU shared with the diagnostic: not evidence).

@@ -19,6 +19,7 @@ import openmm.app as app
 import openmm.unit as unit
 from scipy.spatial import cKDTree
 
+from ..engine.platform import platform_defaults
 from ..funnel.autodetect import AutoFunnelSettings, auto_funnel
 from ..funnel.forces import add_funnel_restraint
 from ..funnel.geometry import Funnel, funnel_frame
@@ -302,7 +303,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
             membrane: Optional[MembraneSettings] = None,
             funnel_settings: Optional[AutoFunnelSettings] = None,
             funnel_overrides: Optional[dict] = None, funnel: Optional[Funnel] = None,
-            platform: Optional[mm.Platform] = None, scratch_dir=None) -> Prepared:
+            platform: Optional[mm.Platform] = None, scratch_dir=None,
+            platform_properties: Optional[dict] = None) -> Prepared:
     """From a protein file and a posed ligand to a solvated (or membrane-embedded)
     system with its funnel.
 
@@ -310,6 +312,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     ``Modeller.addMembrane``; the protein must already be oriented with the
     membrane normal along z. ``funnel`` skips the automatic placement (its atom
     indices must refer to the dry complex: protein atoms first, then the ligand).
+    ``platform`` and ``platform_properties`` (device, precision) are those of the membrane
+    build, the only step here that runs dynamics.
     """
     settings = settings or SystemSettings()
     if membrane is not None and settings.temperature < GEL_TRANSITION_K.get(membrane.lipid.upper(), 0) + 10:
@@ -370,10 +374,13 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
         modeller.topology.setPeriodicBoxVectors(
             [mm.Vec3(preset, 0, 0), mm.Vec3(0, preset, 0), mm.Vec3(0, 0, preset)] * unit.nanometer)
         lipid = app.PDBFile(membrane.patch) if membrane.patch else membrane.lipid
-        modeller.addMembrane(forcefield, lipidType=lipid,
-                             membraneCenterZ=membrane.center_z * unit.nanometer,
-                             minimumPadding=settings.padding * unit.nanometer,
-                             platform=platform, **ions)
+        # addMembrane takes a platform but no properties: the device and the precision reach
+        # its contexts as the defaults of the platform.
+        with platform_defaults(platform, platform_properties or {}):
+            modeller.addMembrane(forcefield, lipidType=lipid,
+                                 membraneCenterZ=membrane.center_z * unit.nanometer,
+                                 minimumPadding=settings.padding * unit.nanometer,
+                                 platform=platform, **ions)
 
     topology = modeller.topology
     positions = np.array(modeller.positions.value_in_unit(unit.nanometer))

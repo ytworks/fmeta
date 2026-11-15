@@ -3,7 +3,8 @@
     workdir/config.yaml
     workdir/prepared/   system.xml  topology.cif  funnel.yaml  funnel.pdb  report.json  meta.json
     workdir/equil/      state.xml  equil.json
-    workdir/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  result.json
+    workdir/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  device.json  result.json
+    workdir/schedule.jsonl  rep0.log ...
     workdir/summary.json
 
 Every stage reads what the previous one wrote, so a calculation can be resumed
@@ -12,11 +13,11 @@ or re-analysed from any point.
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
-import subprocess
+import re
 import sys
-import threading
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -29,11 +30,12 @@ from .analysis import analyze_replicas, walker_directories
 from .config import Config
 from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
-from .engine.platform import select_platform
+from .engine.platform import GPU_PLATFORMS, device_record, resolve_devices, select_platform, visible_gpus
 from .engine.runner import MetadynamicsRun, RunSettings, rollback_to_checkpoint
 from .funnel.geometry import KB, Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
+from .scheduler import DONE, FAILED, Job, Task, directory_lock, is_locked, run_jobs
 from .system import inputs
 from .system.builder import Prepared, add_barostat, prepare
 from .system.selection import classify
@@ -43,13 +45,13 @@ log = logging.getLogger(__name__)
 
 # ---- prepare ----------------------------------------------------------------
 
-def prepare_stage(config: Config, workdir) -> Prepared:
+def prepare_stage(config: Config, workdir, device: Optional[int] = None) -> Prepared:
     workdir = Path(workdir)
     out = workdir / "prepared"
     out.mkdir(parents=True, exist_ok=True)
     config.save(workdir / "config.yaml")
     source = config.input
-    platform, _ = select_platform(config.run.platform, config.run.precision)
+    platform, properties = select_platform(config.run.platform, config.run.precision, device)
 
     if source.complex:
         if not source.ligand_resname:
@@ -63,7 +65,7 @@ def prepare_stage(config: Config, workdir) -> Prepared:
         raise ValueError("config.input needs protein + ligand (or complex + ligand_resname)")
     prepared = prepare(source.protein, source.ligand, config.system, config.membrane,
                        config.funnel, config.funnel_overrides, platform=platform,
-                       scratch_dir=workdir / "inputs")
+                       scratch_dir=workdir / "inputs", platform_properties=properties)
     save_prepared(prepared, out)
     log.info("prepared system: %d atoms\n%s", prepared.topology.getNumAtoms(), prepared.report)
     return prepared
@@ -153,11 +155,20 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
 
     With ``config.run.walkers > 1`` every walker of a replica must be running
     at the same time for the bias to be shared; :func:`run_replicas` does that.
+    The directory is held while the run lasts: a second run of it is refused.
     """
     workdir = Path(workdir)
-    run_cfg, temperature = config.run, config.system.temperature
-    if (walker is None) != (run_cfg.walkers <= 1):
+    if (walker is None) != (config.run.walkers <= 1):
         raise ValueError("pass walker=<index> exactly when config.run.walkers > 1")
+    directory = replica_directory(workdir, replica, walker)
+    with directory_lock(directory):
+        _run(config, workdir, directory, replica, device, length_ns, walker)
+    return directory
+
+
+def _run(config: Config, workdir: Path, directory: Path, replica: int, device: Optional[int],
+         length_ns: Optional[float], walker: Optional[int]) -> None:
+    run_cfg, temperature = config.run, config.system.temperature
     prepared = load_prepared(workdir, config)
     with open(workdir / "equil" / "state.xml") as handle:
         state = mm.XmlSerializer.deserialize(handle.read())
@@ -165,6 +176,8 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
 
     system = prepared.system
     add_barostat(system, temperature, config.system.pressure, prepared.membrane)
+    # asked before the first context of this process, for the memory that the run adds
+    gpus_before = visible_gpus() if run_cfg.platform == "auto" or run_cfg.platform in GPU_PLATFORMS else None
     platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
     bias = FunnelBias(system, prepared.funnel, config.metad, platform=platform.getName())
     integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin,
@@ -174,6 +187,8 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     if seed:
         integrator.setRandomNumberSeed(seed)
     simulation = app.Simulation(prepared.topology, system, integrator, platform, properties)
+    with open(directory / "device.json", "w") as handle:
+        json.dump(device_record(simulation.context, device, gpus_before), handle, indent=2)
     simulation.context.setState(state)
     # fresh velocities decorrelate replicas and walkers (a restart overwrites them again)
     if seed:
@@ -192,94 +207,161 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
         trajectory_hills=round(run_cfg.trajectory_ps / hill_ps) if run_cfg.trajectory_ps else 0,
         trajectory_atoms=[int(i) for i in solute] if run_cfg.trajectory_solute_only else None,
         walker_dirs=walker_dirs, sync_hills=run_cfg.walker_sync_hills)
-    directory = replica_directory(workdir, replica, walker)
     run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings)
     length = run_cfg.length_ns if length_ns is None else length_ns
     run.run(round(length * 1000.0 / hill_ps))
     run.close()
-    return directory
 
 
-class _DevicePool:
-    """Hands out GPU device indices to replicas, blocking while all are busy."""
-
-    def __init__(self, devices: Sequence):
-        self._free = list(devices)
-        self._condition = threading.Condition()
-
-    def acquire(self, count: int) -> list:
-        with self._condition:
-            self._condition.wait_for(lambda: len(self._free) >= count)
-            taken, self._free = self._free[:count], self._free[count:]
-            return taken
-
-    def release(self, devices: list) -> None:
-        with self._condition:
-            self._free.extend(devices)
-            self._condition.notify_all()
+def _rollback_walkers(directories: Sequence[Path]) -> None:
+    """Roll every walker of a replica back to its checkpoint, before any of them starts and
+    reads the hills of the others."""
+    for directory in directories:
+        if is_locked(directory):
+            raise RuntimeError(f"{directory} is in use by another fmeta process")
+    for directory in directories:
+        if (directory / "checkpoint.zip").exists():
+            rollback_to_checkpoint(directory)
 
 
-def run_replicas(config: Config, workdir, gpus: Optional[Sequence[int]] = None,
-                 length_ns: Optional[float] = None) -> list[Path]:
-    """Run all replicas (and their walkers).
+def replica_jobs(config: Config, workdir, length_ns: Optional[float] = None) -> list[Job]:
+    """The replicas of ``workdir`` as jobs for :func:`fmeta.scheduler.run_jobs`.
 
-    Without ``gpus`` and with a single walker, replicas run one after another in
-    this process. Otherwise every replica (or walker) is a subprocess: each
-    replica takes as many devices as it has walkers (or all of them, if there are
-    fewer), replicas run side by side while devices are free, and the walkers of
-    one replica always run together so that they can share their bias.
+    A replica is one child process (``fmeta run WORKDIR --replica I``). With walkers it is one
+    child process per walker: they start together, because they share their bias, and the
+    replica takes as many devices as it has walkers (or all of them, if there are fewer)."""
+    workdir = Path(workdir)
+    n_walkers = max(1, config.run.walkers)
+    jobs = []
+    for replica in range(config.run.replicas):
+        walkers = list(range(n_walkers)) if n_walkers > 1 else [None]
+        tasks = []
+        for walker in walkers:
+            name = f"rep{replica}" if walker is None else f"rep{replica}_w{walker}"
+            command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir), "--replica", str(replica)]
+            if walker is not None:
+                command += ["--walker", str(walker)]
+            if length_ns is not None:
+                command += ["--length-ns", str(length_ns)]
+            tasks.append(Task(name, command, workdir / f"{name}.log"))
+        before_start = None
+        if n_walkers > 1:
+            before_start = functools.partial(
+                _rollback_walkers, [replica_directory(workdir, replica, walker) for walker in walkers])
+        jobs.append(Job(f"rep{replica}", tasks, devices=n_walkers, before_start=before_start))
+    return jobs
+
+
+def _last_line(path: Path) -> str:
+    try:
+        lines = path.read_text(errors="replace").strip().splitlines()
+    except OSError:
+        return ""
+    return lines[-1].strip().removeprefix("fmeta: error: ") if lines else ""
+
+
+def unfinished_jobs(status: dict, record: Sequence[dict], workdir) -> Optional[str]:
+    """What kept the jobs of a :func:`fmeta.scheduler.run_jobs` call from finishing, as one
+    message for the user (None when all of them finished). ``record`` holds the events of the
+    call; the log of a task is ``workdir/<task>.log``."""
+    workdir = Path(workdir)
+    problems = []
+    for event in record:
+        if event["event"] == "end" and event["status"] == FAILED:
+            # in the order of their end: the first task that failed is the one that failed by itself
+            name = next(name for name, code in event["returncodes"].items() if code != 0)
+            logfile = workdir / f"{name}.log"
+            problems.append(f"{name} failed: {_last_line(logfile) or 'no output'} (see {logfile})")
+        elif event["event"] == "skip" and status.get(event["job"]) == FAILED:
+            problems.append(f"{event['job']} {event['reason']}")
+    if problems:
+        return "; ".join(problems)
+    unfinished = [key for key, value in status.items() if value != DONE]
+    if unfinished:
+        reason = next((event["reason"] for event in record if event["event"] == "stop"), "stop requested")
+        return (f"stopped ({reason}) before {', '.join(unfinished)} finished; "
+                "run the same command again to continue")
+    return None
+
+
+def run_replicas(config: Config, workdir, gpus=None, length_ns: Optional[float] = None,
+                 mode: Optional[str] = None, launcher=None) -> list[Path]:
+    """Run all replicas (and their walkers) as child processes on the devices of the run.
+
+    ``gpus`` and ``mode`` stand in for ``run.gpus`` and ``run.mode`` in this call (see
+    :func:`fmeta.engine.platform.resolve_devices`). On one device the replicas run one after
+    another; on several they run side by side, and the next replica starts on the device that
+    becomes free. Every decision is appended to ``workdir/schedule.jsonl`` (see
+    :mod:`fmeta.scheduler`), the output of a child to ``workdir/rep0.log`` and so on.
+
+    SIGINT and SIGTERM end the children before the call returns. A replica that failed or was
+    stopped is a ``RuntimeError``; the same call again continues from the checkpoints.
+    ``launcher`` replaces the start of a child process (for tests).
     """
     workdir = Path(workdir)
-    replicas = list(range(config.run.replicas))
+    devices = resolve_devices(mode or config.run.mode, gpus if gpus is not None else config.run.gpus,
+                              config.run.platform)
+    record: list = []
+    with directory_lock(workdir):
+        status = run_jobs(replica_jobs(config, workdir, length_ns), devices, launcher,
+                          log=workdir / "schedule.jsonl", events=record.append)
+    problem = unfinished_jobs(status, record, workdir)
+    if problem:
+        raise RuntimeError(problem)
+    return [replica_directory(workdir, i) for i in range(config.run.replicas)]
+
+
+_PROGRESS = re.compile(r"hills (\d+)/(\d+)\s+time ([\d.]+) ns\s+speed ([\d.]+) ns/day")
+
+
+def status_table(workdir) -> list[dict]:
+    """Where the production of ``workdir`` stands: one row per replica, or per walker.
+
+    ``state`` is ``running`` (a process holds the directory), ``done`` (the target of its last
+    run is reached), ``stopped`` (it ran and is neither) or ``not started``. Hills, time and
+    speed are those of its last checkpoint; the target is that of the last run, or the
+    configured length when nothing ran yet."""
+    workdir = Path(workdir)
+    config = Config.load(workdir / "config.yaml")
+    hill_ps = config.metad.pace * config.run.timestep_fs / 1000.0
     n_walkers = max(1, config.run.walkers)
-    gpus = gpus if gpus is not None else config.run.gpus
-    if n_walkers == 1 and not gpus:
-        return [run_stage(config, workdir, i, None, length_ns) for i in replicas]
+    rows = []
+    for replica in range(config.run.replicas):
+        for walker in (range(n_walkers) if n_walkers > 1 else [None]):
+            directory = replica_directory(workdir, replica, walker)
+            row = dict(name=f"rep{replica}" if walker is None else f"rep{replica}/w{walker}",
+                       hills=0, target_hills=round(config.run.length_ns * 1000.0 / hill_ps),
+                       time_ns=0.0, speed_ns_day=None, device=None)
+            progress = None
+            if (directory / "run.log").exists():
+                progress = _PROGRESS.search(_last_line(directory / "run.log"))
+            if progress:
+                row.update(hills=int(progress[1]), target_hills=int(progress[2]),
+                           time_ns=float(progress[3]), speed_ns_day=float(progress[4]))
+            row["target_ns"] = row["target_hills"] * hill_ps / 1000.0
+            if (directory / "device.json").exists():
+                with open(directory / "device.json") as handle:
+                    device = json.load(handle)
+                row["device"] = " ".join(filter(None, [device["platform"], device.get("device_index")]))
+            if is_locked(directory):
+                row["state"] = "running"
+            elif progress and row["hills"] >= row["target_hills"]:
+                row["state"] = "done"
+            elif (directory / "run.log").exists() or (directory / "HILLS").exists():
+                row["state"] = "stopped"
+            else:
+                row["state"] = "not started"
+            rows.append(row)
+    return rows
 
-    devices = list(gpus) if gpus else [None]        # None: whatever the platform picks
-    pool = _DevicePool(devices)
-    failures = []
 
-    def work(replica: int) -> None:
-        mine = pool.acquire(min(n_walkers, len(devices)))
-        try:
-            walkers = list(range(n_walkers)) if n_walkers > 1 else [None]
-            # roll every walker back to its checkpoint before any of them reads the others
-            for walker in walkers:
-                directory = replica_directory(workdir, replica, walker)
-                if walker is not None and (directory / "checkpoint.zip").exists():
-                    rollback_to_checkpoint(directory)
-            processes = []
-            for index, walker in enumerate(walkers):
-                command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir),
-                           "--replica", str(replica)]
-                name = f"rep{replica}"
-                if walker is not None:
-                    command += ["--walker", str(walker)]
-                    name += f"_w{walker}"
-                device = mine[index % len(mine)]
-                if device is not None:
-                    command += ["--device", str(device)]
-                if length_ns is not None:
-                    command += ["--length-ns", str(length_ns)]
-                logfile = open(workdir / f"{name}.log", "a")
-                processes.append((name, logfile, subprocess.Popen(
-                    command, stdout=logfile, stderr=subprocess.STDOUT)))
-            for name, logfile, process in processes:
-                if process.wait() != 0:
-                    failures.append(name)
-                logfile.close()
-        finally:
-            pool.release(mine)
-
-    threads = [threading.Thread(target=work, args=(replica,)) for replica in replicas]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-    if failures:
-        raise RuntimeError(f"{', '.join(sorted(failures))} failed; see the .log files in {workdir}")
-    return [replica_directory(workdir, i) for i in replicas]
+def format_status(rows: Sequence[dict]) -> str:
+    lines = [f"{'replica':10s} {'state':12s} {'time / target (ns)':>22s} {'ns/day':>9s}  device"]
+    for row in rows:
+        speed = "" if row["speed_ns_day"] is None else f"{row['speed_ns_day']:.1f}"
+        progress = f"{row['time_ns']:.3f} / {row['target_ns']:.3f}"
+        lines.append(f"{row['name']:10s} {row['state']:12s} {progress:>22s} {speed:>9s}  {row['device'] or ''}")
+    return "\n".join(lines)
 
 
 # ---- analysis ---------------------------------------------------------------
@@ -320,7 +402,9 @@ def format_summary(summary: dict) -> str:
 
 
 def run_all(config: Config, workdir) -> dict:
-    prepare_stage(config, workdir)
-    equilibrate_stage(config, workdir)
+    # the membrane build and the equilibration use the first device of the run
+    device = resolve_devices(config.run.mode, config.run.gpus, config.run.platform)[0]
+    prepare_stage(config, workdir, device)
+    equilibrate_stage(config, workdir, device)
     run_replicas(config, workdir)
     return analyze_stage(workdir)

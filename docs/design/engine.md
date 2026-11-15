@@ -3,7 +3,9 @@
 Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
 (2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
 FM-D2, FM-D4, FM-D5, FM-D6 and FM-D7 amended (2026-11-15 and 16: the first runs on a GPU);
-FM-D12 amended (2026-11-16: the scatter of the toy gate is on record, criteria unchanged).
+FM-D12 amended (2026-11-16: the scatter of the toy gate is on record, criteria unchanged; and by
+the owner: operation on a CPU platform is not guaranteed); FM-D14 added (2026-11-16: run modes
+and the scheduler).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -210,6 +212,15 @@ value, and about one 10 ns run in 30 misses the criterion with a correct impleme
 the item fails after such a change, repeat the run over seeds and compare with this table
 first. The tolerance is not widened for a run; another form of the criterion (the mean over
 several seeds, say) would be a new amendment.
+Amendment (2026-11-16, owner): operation on a CPU platform is not guaranteed, and no time is
+spent on confirming it. From FM-D14 on, the pipeline (prepare, equilibrate, run, analyze, the
+run modes) is verified by the GPU gates alone: `fmeta check --platform CPU` and the pipeline
+runs of `pytest -m slow` are not rerun as verification, and a new feature gets no test that
+runs dynamics on a CPU platform. The default `pytest` stays what it is, the test of logic and
+numerics (toy system, numpy references, Reference platform, the order of the scheduler's
+decisions). Not decided by this amendment, and unchanged until the owner decides: the sentence
+of the test policy that the default `pytest` passes on a CPU-only machine, and the `cpu` job
+of CI.
 Why: the development machine has no GPU; correctness has to be established where it can be
 (exact answers on CPU) and the rest gated on the machine that runs production.
 
@@ -229,3 +240,38 @@ Why: owner rule of 2026-11-15 (execution and tests run on Docker, except CI). `e
 pins nothing, so it resolves differently over time: evidence taken in a conda environment does
 not describe the environment a later user gets. With one locked image, the environment that is
 verified is the one that is distributed, and a record says which one it was.
+
+### FM-D14 — Run modes, and one scheduler for the child processes of a run
+`run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by
+side, one per GPU of `run.gpus` (every GPU that `nvidia-smi` lists when none is named, or with
+`gpus: all`); with more replicas than GPUs the next one starts on the GPU that becomes free.
+`sequential`: one after another on one GPU. `auto` (default): `parallel` when GPUs are named,
+one device otherwise, which is what fmeta did before. A sequential run with several GPUs, a GPU
+named twice and a GPU that is not there are errors (`resolve_devices`, `engine/platform.py`).
+"All GPUs" are those the container sees.
+One scheduler (`src/fmeta/scheduler.py`) runs the jobs of a call. A job is the child processes
+that must run together: a replica, or the walkers of one replica. Its rules: a device is used
+by one job at a time; a job takes as many devices as it asks for (all of them, if there are
+fewer); jobs start in list order and free devices are handed out in list order, by one loop in
+the calling thread, so the same jobs on the same devices are always assigned the same way; a
+task that fails stops the other tasks of its job, and the other jobs go on; after SIGINT or
+SIGTERM nothing starts, every child is terminated with its process group (killed after 5 s or
+at a second signal) and the call returns when the last one has ended. Every decision is
+appended to `schedule.jsonl`; `verify_schedule` checks such a record against the rules.
+A replica is always a child process (`fmeta run WORKDIR --replica I`) that reads the saved
+`config.yaml`; mode, GPUs and length are passed per call. `run_stage` holds the directory of
+its run with `flock` (a second run of it is refused; a process that dies leaves no lock) and
+writes `device.json`: the device asked for, the device the platform reports, and the memory in
+use on that GPU before and after the context was made. Preparation and equilibration use the
+first device of the run. `fmeta status WORKDIR` shows state, time reached and device per replica.
+Gate items `replicas_sequential` and `replicas_parallel`: the record of a real run breaks no
+rule, each replica reaches its hills, its `device.json` names the assigned device and the
+memory in use on that GPU grew. `replicas_parallel` needs two GPUs, so evidence is no longer
+recorded on a machine with one. Both items are skipped off a GPU platform.
+Not done: extending the device pool of `run_replicas` (one pool per call and no signal
+handling: `docker stop` left child processes behind, and a benchmark could not share GPUs over
+its ligands); starting a replica in the calling process (the gates then never exercised the
+launcher); a key for several replicas on one GPU (its effect is not measured, and a saved
+configuration with a key that is later withdrawn no longer loads).
+Why: owner request of 2026-11-15 for both modes. A stopped container must leave nothing on a
+GPU, and what was run where has to be checkable afterwards from a record, on the GPU machine.

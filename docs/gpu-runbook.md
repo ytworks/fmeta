@@ -13,8 +13,11 @@ PROGRESS.md budget, evidence index, CPU tests, the image build). Criteria:
   6 GB: the CUDA build of OpenMM, the ligand-parameter generators `openmmforcefields`,
   `openff-toolkit` and `ambertools`, and the test tools). It refuses an image that was built
   from another lock; `scripts/in_docker.sh --build ...` rebuilds.
-- The GPUs must be free: `nvidia-smi --query-compute-apps=pid,process_name --format=csv` shows
-  no other jobs on the GPUs you pass.
+- Two GPUs, and both free: `nvidia-smi --query-compute-apps=pid,process_name --format=csv` shows
+  no other jobs on the GPUs you pass. The items `replicas_sequential` and `replicas_parallel`
+  compare the memory in use on a GPU before and after a replica starts there: another process
+  that frees memory on it in that moment fails them. With one GPU `replicas_parallel` is
+  skipped, and nothing is recorded.
 
 ## GPU numbers
 
@@ -28,14 +31,16 @@ record stores the UUIDs, which identify the physical GPUs.
 1. Commit the change (the gates record the commit). The record is flagged dirty when `src/`,
    `tests/`, `scripts/`, `examples/`, `docker/`, `pyproject.toml`, `environment.yml`,
    `conda-linux-64.lock`, `Dockerfile` or `.dockerignore` differ from it.
-2. `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1` (two GPUs exercise
-   the multi-GPU launcher):
+2. `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`:
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
      `forces`, `toy_restart`, `toy_free_energy`, `pdb_sdf_openff`, `pdb_sdf_gaff`, `prepare`,
-     `equilibrate`, `periodic_images`, `production`, `walkers`, `analysis`, `benchmark`,
-     `membrane_build`, `membrane_run`.
-   A skipped item is not a pass.
+     `equilibrate`, `periodic_images`, `production`, `walkers`, `replicas_sequential`,
+     `replicas_parallel`, `analysis`, `benchmark`, `membrane_build`, `membrane_run`.
+   A skipped item is not a pass. The two `replicas_*` items (FM-D14) run real child processes
+   and check their record `schedule.jsonl`, their hills and their `device.json`; they are
+   skipped when `nvidia-smi` reports no memory in use for the GPU (then the device of a replica
+   cannot be confirmed), and off a GPU platform.
    While iterating use `fmeta check --quick` or `scripts/gpu_gates.py --quick` (not recorded).
 3. On ALL PASSED the script writes `bench/results/<date>-<commit>-gpu-gates.json` and updates
    `bench/results/index.json`. The record names the image, the hash of the lock and the UUIDs of
@@ -85,12 +90,19 @@ long stage as a detached container:
 scripts/in_docker.sh --gpus 0 fmeta prepare examples/trypsin_benzamidine/fmeta.yaml -o runs/tb
 scripts/in_docker.sh fmeta funnel runs/tb
 scripts/in_docker.sh --gpus 0 fmeta equilibrate runs/tb
-scripts/in_docker.sh --gpus 0,1,2,3 --detach --name tb fmeta run runs/tb --gpus 0,1,2,3
+scripts/in_docker.sh --gpus 0,1,2,3 --detach --name tb fmeta run runs/tb --mode parallel
 docker logs -f tb                                # `docker stop tb` stops the run
+scripts/in_docker.sh fmeta status runs/tb        # state, time reached and device per replica
 scripts/in_docker.sh fmeta analyze runs/tb --plot
 ```
 
-Running the same `fmeta run` command again continues from the last checkpoints. Look at
+`--mode parallel` puts one replica on each GPU of the container, and the next one on the GPU
+that becomes free; `--gpus 0,1` names the GPUs instead (container numbers), and
+`--mode sequential --gpus 0` runs the replicas one after another on one GPU (`run.mode` and
+`run.gpus` in the configuration do the same). `docker stop` ends the replicas with the run:
+the scheduler terminates its child processes before it returns, and `runs/tb/schedule.jsonl`
+records what ran where. Running the same `fmeta run` command again continues from the last
+checkpoints. Look at
 `runs/tb/prepared/funnel.pdb` with the structure before spending GPU time. Record the outcome
 (`summary.json`, the commit, the image, what converged and what did not) in the example's
 README and in `PROGRESS.md`.

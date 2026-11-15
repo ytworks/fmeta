@@ -9,6 +9,8 @@ OpenMM plus a benzene molecule), and prints PASS / FAIL / SKIP per item:
   between periodic images;
 * funnel metadynamics on a solvable toy system against its exact binding free energy;
 * the whole pipeline (build, equilibrate, replicas, restart, walkers, analysis);
+* the two run modes: replicas one after another on one device, and side by side on two with
+  the next replica on the device that becomes free;
 * a membrane build with ``Modeller.addMembrane`` and a short membrane run;
 * the default route from a protein PDB and a ligand SDF alone, with OpenFF and with GAFF
   ligand parameters, when those packages are installed;
@@ -39,6 +41,7 @@ from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
 from .funnel.geometry import compute_cvs, funnel_frame
+from .scheduler import read_schedule, verify_schedule
 from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
 from .testing.systems import BENZENE_XML, write_complex_inputs, write_membrane_inputs
 from .testing.toy import make_simulation, make_toy
@@ -79,6 +82,14 @@ CRITERIA = {
                   "checkpoints without changing earlier hills; CVs finite, inside the funnel, "
                   "no jump above 1 nm between samples",
     "walkers": "2 walkers deposit the requested hills each and the analysis merges them",
+    "replicas_sequential": "mode sequential: 2 replicas run one after another on the last device given; "
+                           "schedule.jsonl has no violation of the scheduler's rules; each replica "
+                           "reaches the requested number of hills; its device.json names the assigned "
+                           "device, and the memory in use on that GPU (nvidia-smi) grew with the run",
+    "replicas_parallel": "mode parallel: 3 replicas on 2 GPUs; the first two start side by side on "
+                         "different GPUs and the third on the GPU that the first ended replica "
+                         "released; schedule.jsonl, hills, device.json and GPU memory as for "
+                         "replicas_sequential",
     "analysis": "analysis of the replicas produces a finite result and summary.json",
     "benchmark": "throughput with and without the bias is measured (diagnostic: decides nothing)",
     "membrane_build": "POPC bilayer built with Modeller.addMembrane; funnel and membrane checks pass",
@@ -107,7 +118,7 @@ class Checker:
         self.requested = platform
         self.precision = precision
         self.device = device if device is not None else (gpus[0] if gpus else None)
-        # with an explicit device, replicas go through the subprocess launcher on that device
+        # the devices of the replicas: those given, or the one device given, or the default one
         self.gpus = gpus if gpus else ([device] if device is not None else None)
         self.profile = PROFILES["quick" if quick else "full"]
         self.items: list[Item] = []
@@ -296,7 +307,7 @@ class Checker:
         protein, ligand = write_complex_inputs(directory)
         work = self.workdir / "soluble"
         shutil.rmtree(work, ignore_errors=True)
-        prepared = prepare_stage(self.config(input={"protein": protein, "ligand": ligand}), work)
+        prepared = prepare_stage(self.config(input={"protein": protein, "ligand": ligand}), work, self.device)
         problems = [c.name for c in prepared.report.errors]
         if problems:
             raise AssertionError(f"funnel checks failed: {problems}")
@@ -426,15 +437,21 @@ class Checker:
         return (f"2 replicas x {self.n_hills} hills, then continued to {longer} from their "
                 f"checkpoints; {speeds[0]}")
 
-    def check_walkers(self) -> str:
-        source, work = self.workdir / "soluble", self.workdir / "walkers"
+    def _fresh_copy(self, name: str, **run) -> tuple[Config, Path]:
+        """A new work directory ``name`` with the prepared and equilibrated system of ``soluble``."""
+        source, work = self.workdir / "soluble", self.workdir / name
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir()
         for stage in ("prepared", "equil"):
             shutil.copytree(source / stage, work / stage)
         config = Config.load(source / "config.yaml")
-        config.run.walkers, config.run.replicas = 2, 1
+        for key, value in run.items():
+            setattr(config.run, key, value)
         config.save(work / "config.yaml")
+        return config, work
+
+    def check_walkers(self) -> str:
+        config, work = self._fresh_copy("walkers", walkers=2, replicas=1)
         run_replicas(config, work, self.gpus)
         funnel = load_prepared(work).funnel
         for walker in ("w0", "w1"):
@@ -447,6 +464,73 @@ class Checker:
             raise AssertionError("the analysis did not merge the two walkers")
         return (f"2 walkers sharing one bias ({result['n_hills']} hills in total; walker 0 "
                 f"deposited {len(own)} and feels a bias of {seen:.1f} kJ/mol)")
+
+    def _verify_device(self, directory: Path, device) -> int:
+        """Compare the ``device.json`` of a run with the device the scheduler gave it. Returns by
+        how many MiB the memory in use on that GPU grew."""
+        with open(directory / "device.json") as handle:
+            record = json.load(handle)
+        name = self.platform.getName()
+        if record["platform"] != name or record["requested_device"] != device:
+            raise AssertionError(f"{directory.name} was given {name} and device {device}; its device.json "
+                                 f"names {record['platform']} and device {record['requested_device']}")
+        if device is not None and record.get("device_index") != str(device):
+            raise AssertionError(f"{directory.name} was given device {device}; the platform reports "
+                                 f"device {record.get('device_index')}")
+        before, after = record.get("memory_before_mib"), record.get("memory_after_mib")
+        if before is None or after is None:
+            raise Skip("the device of a replica cannot be confirmed: nvidia-smi does not report the "
+                       f"memory in use on device {record.get('device_index')}")
+        if after <= before:
+            raise AssertionError(
+                f"{directory.name}: the memory in use on GPU {record['device_index']} of nvidia-smi went "
+                f"from {before} to {after} MiB when the run started there. The run is on another GPU, "
+                "or another process freed memory on this one (the check needs GPUs that are idle)")
+        return after - before
+
+    def _run_mode(self, name: str, mode: str, devices: Optional[list], replicas: int) -> tuple[list, str]:
+        """Run ``replicas`` replicas in ``mode`` and verify the record, the hills and the devices.
+        Returns the start and end events as ``(event, job, device)`` and a text on the devices."""
+        if self.platform.getName() not in GPU_PLATFORMS:
+            raise Skip("needs a GPU platform: the item checks the device of each replica")
+        config, work = self._fresh_copy(name, replicas=replicas)
+        run_replicas(config, work, gpus=devices, mode=mode)
+        events = read_schedule(work / "schedule.jsonl")[-1]
+        problems = verify_schedule(events)
+        if problems:
+            raise AssertionError("schedule.jsonl: " + "; ".join(problems))
+        funnel = load_prepared(work).funnel
+        steps = [(event["event"], event["job"], event["devices"][0]) for event in events
+                 if event["event"] in ("start", "end")]
+        growth = []
+        for kind, job, device in steps:
+            if kind == "start":
+                self._verify_run(work / job, self.n_hills, funnel)
+                growth.append(self._verify_device(work / job, device))
+        return steps, ("device.json agrees with the assignment; the memory in use on the assigned GPU "
+                       "grew by " + ", ".join(str(value) for value in growth) + " MiB")
+
+    def check_replicas_sequential(self) -> str:
+        # the last device, not the default one: a run that ignores its device shows here
+        device = self.gpus[-1] if self.gpus else None
+        steps, devices = self._run_mode("sequential", "sequential", None if device is None else [device], 2)
+        if steps != [(kind, f"rep{i}", device) for i in range(2) for kind in ("start", "end")]:
+            raise AssertionError(f"the replicas did not run one after another on device {device}: {steps}")
+        where = "the default device" if device is None else f"device {device}"
+        return f"2 replicas x {self.n_hills} hills one after another on {where}; {devices}"
+
+    def check_replicas_parallel(self) -> str:
+        pair = (self.gpus or [])[:2]
+        if len(pair) < 2 or self.platform.getName() not in GPU_PLATFORMS:
+            raise Skip("needs two GPUs: give them with --gpus, such as --gpus 0,1")
+        steps, devices = self._run_mode("parallel", "parallel", pair, 3)
+        freed = steps[2][2]
+        if (steps[:2] != [("start", "rep0", pair[0]), ("start", "rep1", pair[1])] or steps[2][0] != "end"
+                or steps[3] != ("start", "rep2", freed) or [step[0] for step in steps[4:]] != ["end", "end"]):
+            raise AssertionError("the replicas did not run two at a time, with the third on the device "
+                                 f"that became free: {steps}")
+        return (f"3 replicas x {self.n_hills} hills on devices {pair[0]} and {pair[1]}: rep0 and rep1 side "
+                f"by side, rep2 on device {freed} after {steps[2][1]} ended there; {devices}")
 
     def check_analysis(self) -> str:
         work = self.workdir / "soluble"
@@ -525,7 +609,7 @@ class Checker:
         shutil.rmtree(work, ignore_errors=True)
         config = self.config(input={"protein": protein, "ligand": ligand},
                              membrane={"lipid": "POPC"}, run={"replicas": 1})
-        prepared = prepare_stage(config, work)
+        prepared = prepare_stage(config, work, self.device)
         checks = {c.name: c.status for c in prepared.report.checks}
         if prepared.report.errors or checks.get("membrane") != "ok":
             raise AssertionError(f"funnel checks: {checks}")
@@ -561,6 +645,8 @@ class Checker:
         self.run("periodic_images", self.check_pbc, needs=("equilibrate",))
         self.run("production", self.check_production, needs=("equilibrate",))
         self.run("walkers", self.check_walkers, needs=("equilibrate",))
+        self.run("replicas_sequential", self.check_replicas_sequential, needs=("equilibrate",))
+        self.run("replicas_parallel", self.check_replicas_parallel, needs=("equilibrate",))
         self.run("analysis", self.check_analysis, needs=("production",))
         self.run("benchmark", self.check_benchmark, needs=("equilibrate",))
         self.run("membrane_build", self.check_membrane_build, needs=("platform",))

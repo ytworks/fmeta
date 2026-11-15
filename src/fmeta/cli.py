@@ -10,6 +10,24 @@ import time
 from pathlib import Path
 
 from .config import TEMPLATE, Config
+from .engine.platform import MODES, check_devices, resolve_devices
+
+
+def _gpus(text: str):
+    """The value of ``--gpus``: device numbers such as ``0,1``, or ``all``."""
+    if text.strip() == "all":
+        return "all"
+    try:
+        return [int(part) for part in text.split(",")]
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"give device numbers such as 0,1, or all (not {text!r})") from None
+
+
+def _first_device(config: Config, device=None):
+    """The device of a stage that uses one: the one given, or the first device of the run."""
+    if device is not None:
+        return device
+    return resolve_devices(config.run.mode, config.run.gpus, config.run.platform)[0]
 
 
 def _config_from_args(args) -> Config:
@@ -36,10 +54,13 @@ def _config_from_args(args) -> Config:
         config.run.length_ns = args.length_ns
     if args.replicas is not None:
         config.run.replicas = args.replicas
-    if args.gpus:
-        config.run.gpus = [int(g) for g in args.gpus.split(",")]
+    if args.gpus is not None:
+        config.run.gpus = args.gpus
+    if args.mode:
+        config.run.mode = args.mode
     if args.platform:
         config.run.platform = args.platform
+    check_devices(config.run.mode, config.run.gpus)
     return config
 
 
@@ -57,7 +78,10 @@ def _add_setup_options(parser) -> None:
     parser.add_argument("-o", "--out", default="fmeta_run", help="work directory")
     parser.add_argument("--length-ns", type=float, help="production length per replica")
     parser.add_argument("--replicas", type=int)
-    parser.add_argument("--gpus", help="comma-separated device indices, e.g. 0,1")
+    parser.add_argument("--gpus", type=_gpus, help="the GPUs of the run: device numbers such as 0,1, or all")
+    parser.add_argument("--mode", choices=MODES,
+                        help="parallel: one replica per GPU, side by side; sequential: one replica after "
+                             "another on one GPU; auto (default): parallel if GPUs are given")
     parser.add_argument("--platform", help="OpenMM platform (default: auto)")
 
 
@@ -78,7 +102,8 @@ def cmd_split(args) -> None:
 
 def cmd_prepare(args) -> None:
     from .workflow import prepare_stage
-    prepared = prepare_stage(_config_from_args(args), args.out)
+    config = _config_from_args(args)
+    prepared = prepare_stage(config, args.out, _first_device(config))
     print(prepared.report)
     print(f"\n{prepared.topology.getNumAtoms()} atoms; files in {Path(args.out) / 'prepared'}")
 
@@ -93,8 +118,8 @@ def cmd_funnel(args) -> None:
 
 def cmd_equilibrate(args) -> None:
     from .workflow import equilibrate_stage
-    summary = equilibrate_stage(Config.load(Path(args.workdir) / "config.yaml"), args.workdir,
-                                args.device)
+    config = Config.load(Path(args.workdir) / "config.yaml")
+    summary = equilibrate_stage(config, args.workdir, _first_device(config, args.device))
     print(f"funnel wall energy during the free stage: mean {summary['wall_energy_mean']:.3f} kJ/mol"
           f" ({'ok' if summary['wall_ok'] else 'TOO HIGH: widen the funnel'})")
 
@@ -105,8 +130,12 @@ def cmd_run(args) -> None:
     if args.replica is not None:
         run_stage(config, args.workdir, args.replica, args.device, args.length_ns, args.walker)
     else:
-        gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else None
-        run_replicas(config, args.workdir, gpus, args.length_ns)
+        run_replicas(config, args.workdir, args.gpus, args.length_ns, args.mode)
+
+
+def cmd_status(args) -> None:
+    from .workflow import format_status, status_table
+    print(format_status(status_table(args.workdir)))
 
 
 def cmd_analyze(args) -> None:
@@ -123,7 +152,9 @@ def cmd_auto(args) -> None:
 
 def cmd_check(args) -> None:
     from .check import Checker
-    gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else None
+    gpus = args.gpus
+    if gpus == "all":
+        gpus = resolve_devices("parallel", "all", args.platform or "auto")
     checker = Checker(args.out, args.platform or "auto", args.precision, args.device, gpus,
                       args.quick)
     if not checker.run_all():
@@ -210,9 +241,17 @@ def main(argv=None) -> None:
     sub.add_argument("--replica", type=int, help="run only this replica")
     sub.add_argument("--walker", type=int, help="with --replica: run only this walker of it")
     sub.add_argument("--device", type=int, help="GPU device index for --replica")
-    sub.add_argument("--gpus", help="comma-separated device indices for all replicas")
+    sub.add_argument("--gpus", type=_gpus,
+                     help="the GPUs for this run: device numbers such as 0,1, or all (default: run.gpus)")
+    sub.add_argument("--mode", choices=MODES,
+                     help="for this run: parallel (one replica per GPU, side by side), sequential (one "
+                          "replica after another on one GPU) or auto (default: run.mode)")
     sub.add_argument("--length-ns", type=float, help="total length per replica")
     sub.set_defaults(func=cmd_run)
+
+    sub = commands.add_parser("status", help="how far every replica is, and on which device")
+    sub.add_argument("workdir")
+    sub.set_defaults(func=cmd_status)
 
     sub = commands.add_parser("analyze", help="binding free energy and convergence")
     sub.add_argument("workdir")
@@ -230,7 +269,8 @@ def main(argv=None) -> None:
     sub.add_argument("--platform", help="OpenMM platform (default: the GPU platform found)")
     sub.add_argument("--precision", default="mixed")
     sub.add_argument("--device", type=int, help="GPU device index")
-    sub.add_argument("--gpus", help="comma-separated device indices, to test the multi-GPU launcher")
+    sub.add_argument("--gpus", type=_gpus,
+                     help="device numbers such as 0,1, or all: two or more also test replicas side by side")
     sub.add_argument("--quick", action="store_true",
                      help="minimal run lengths (a dry run of the steps, not a validation)")
     sub.set_defaults(func=cmd_check)

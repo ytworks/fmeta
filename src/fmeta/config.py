@@ -11,6 +11,7 @@ import yaml
 
 from .engine.equilibration import EquilibrationSettings
 from .engine.grid import BiasSettings
+from .engine.platform import check_devices
 from .funnel.autodetect import AutoFunnelSettings
 from .system.builder import MembraneSettings, SystemSettings
 
@@ -38,7 +39,8 @@ class RunConfig:
     pace_ps: float = 1.0                     # time between hills
     platform: str = "auto"                   # auto, CUDA, OpenCL, HIP, CPU, Reference
     precision: str = "mixed"
-    gpus: Optional[list] = None              # device indices to spread replicas over
+    mode: str = "auto"                       # auto, parallel (one replica per GPU), sequential (one GPU)
+    gpus: Optional[list | str] = None        # device numbers, or "all": every GPU that is visible
     checkpoint_ps: float = 250.0
     trajectory_ps: float = 100.0             # 0 disables the trajectory
     trajectory_solute_only: bool = True
@@ -62,6 +64,7 @@ class Config:
         self.metad.pace = max(1, round(self.run.pace_ps / dt))
         if self.run.timestep_fs > 2.0 and not self.system.hydrogen_mass:
             raise ValueError("a time step above 2 fs needs system.hydrogen_mass (e.g. 1.5)")
+        check_devices(self.run.mode, self.run.gpus)
 
     @classmethod
     def from_dict(cls, data: dict, base_dir=None) -> "Config":
@@ -175,5 +178,7 @@ run:
   walkers: 1                  # >1: this many walkers share one bias in each replica
   timestep_fs: 4.0
   platform: auto              # CUDA if available
-  # gpus: [0, 1]              # spread replicas over these devices
+  mode: auto                  # parallel: one replica per GPU, side by side; sequential: one GPU,
+                              # one replica after another; auto: parallel if gpus is set
+  # gpus: [0, 1]              # the GPUs to use (all: every GPU that is visible)
 """
