@@ -159,3 +159,16 @@ def test_ligand_selection_rules():
     assert np.array_equal(classify(topology, [0, 1, 2]).ligand, [0, 1, 2])
     with pytest.raises(ValueError):
         classify(topology, "XYZ")
+
+
+def test_charged_ligand_gets_a_longer_funnel():
+    topology, positions, site = ball_with_channel([0, 0, 1], seed=3)
+    settings = AutoFunnelSettings(**FAST)
+    neutral, report = auto_funnel(topology, positions, settings=settings, ligand_charge=0.0)
+    charged, charged_report = auto_funnel(topology, positions, settings=settings, ligand_charge=1.0)
+    assert status(report, "ligand_charge") is None
+    assert status(charged_report, "ligand_charge") == "warning" and charged_report.ok
+    # the unbound region moves out by the extra 0.5 nm of clearance (a little less or
+    # more, as clearance does not grow exactly one-to-one along the axis)
+    assert 0.3 < charged.upper - neutral.upper < 1.0
+    assert settings.bulk_margin == 1.0            # the caller's settings are left alone

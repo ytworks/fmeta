@@ -138,6 +138,7 @@ def equilibrate_stage(config: Config, workdir, device: Optional[int] = None) -> 
     wall_ok = result.wall_ok(config.system.temperature)
     summary = dict(wall_energy_mean=result.wall_energy_mean, wall_energy_max=result.wall_energy_max,
                    wall_ok=wall_ok, box_lengths=result.box_lengths.tolist(),
+                   area_per_lipid=result.area_per_lipid, area_drift=result.area_drift,
                    funnel_checks=report.to_dict())
     with open(out / "state.xml", "w") as handle:
         handle.write(mm.XmlSerializer.serialize(result.state))
@@ -298,14 +299,22 @@ def run_replicas(config: Config, workdir, gpus: Optional[Sequence[int]] = None,
 
 # ---- analysis ---------------------------------------------------------------
 
-def analyze_stage(workdir, **kwargs) -> dict:
+def analyze_stage(workdir, plot: bool = False, **kwargs) -> dict:
+    """Analyse every replica under ``workdir`` and combine them. With ``plot``,
+    also write ``analysis.png`` per replica and ``summary.png`` (needs matplotlib)."""
     workdir = Path(workdir)
     directories = sorted((d for d in workdir.glob("rep*") if d.is_dir() and d.name[3:].isdigit()
                           and ((d / "HILLS").exists() or walker_directories(d))),
                          key=lambda d: int(d.name[3:]))
     if not directories:
         raise FileNotFoundError(f"no replica directories with a HILLS file under {workdir}")
-    return analyze_replicas(directories, write_to=workdir / "summary.json", **kwargs)
+    summary = analyze_replicas(directories, write_to=workdir / "summary.json", **kwargs)
+    if plot:
+        from .analysis.plots import plot_run, plot_summary
+        for directory in directories:
+            plot_run(directory)
+        plot_summary(workdir)
+    return summary
 
 
 def format_summary(summary: dict) -> str:

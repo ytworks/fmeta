@@ -12,7 +12,8 @@ from ..engine.grid import BiasGrid, BiasSettings
 from ..engine.hills import merge_hills, read_colvar, read_hills
 from ..engine.runner import load_run_metadata
 from ..funnel.geometry import Funnel
-from .binding import BindingEstimate, binding_free_energy, default_unbound_window
+from .binding import (BindingEstimate, binding_free_energy, default_unbound_window,
+                      empty_funnel_free_energy)
 from .convergence import (count_transitions, dg_time_series, plateau_statistics, scan_hills,
                           summarize_replicas)
 from .fes import (free_energy_surface, projection_profile, reweighted_profile,
@@ -29,6 +30,7 @@ MIN_REBINDING = 3
 MAX_DRIFT = 4.184        # kJ/mol (1 kcal/mol): linear trend of dG(t) across the plateau window
 MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
 MAX_REWEIGHT_GAP = 4.0   # kJ/mol, bias-sum vs reweighted estimate
+MIN_BINDING_EXCESS = 1.0  # kT by which dG must beat an empty funnel of the same shape
 
 
 def _reweighted_estimate(colvars: list, offset_times: np.ndarray, offsets: np.ndarray,
@@ -114,7 +116,22 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     dg_reweighted = _reweighted_estimate(colvars, np.array(offset_times), np.array(offsets),
                                          final_grid, funnel, kT, reweight_discard, **kwargs)
 
+    # Does the answer depend on where the bound region is said to end? For a real
+    # binder the basin dominates the integral and it does not.
+    shifted = [binding_free_energy(final_grid.s, profile, funnel, kT,
+                                   site_max=estimate.site_max + delta, unbound=unbound).dG
+               for delta in (-0.2, 0.2)]
+    site_sensitivity = float(max(abs(value - estimate.dG) for value in shifted))
+    # What would the same analysis report if nothing bound at all? Then K_b is just
+    # the volume of funnel that was labelled "bound", and dG is set by that label.
+    dg_empty = empty_funnel_free_energy(final_grid.s, funnel, kT, estimate.site_max)
+    binding_excess = dg_empty - plateau["mean"]
+
     problems = []
+    if binding_excess < MIN_BINDING_EXCESS * kT:
+        problems.append(f"dG is within {MIN_BINDING_EXCESS:.0f} kT of what an empty funnel gives "
+                        f"({dg_empty:.2f} kJ/mol): no binding beyond the funnel volume, and the "
+                        "value depends on where the bound region is said to end")
     if rebinding < MIN_REBINDING:
         problems.append(f"only {rebinding} rebinding event(s); need >= {MIN_REBINDING}")
     if abs(plateau["drift"]) > MAX_DRIFT:
@@ -135,7 +152,8 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
         dG_final=estimate.dG, dG_simple=estimate.dG_simple, dG_reweighted=dg_reweighted,
         drift=plateau["drift"], k_bind_nm3=estimate.k_bind, well_depth=estimate.well_depth,
         s_bound=s_bound, site_max=estimate.site_max, unbound=list(estimate.unbound),
-        unbound_roughness=estimate.unbound_roughness,
+        unbound_roughness=estimate.unbound_roughness, site_sensitivity=site_sensitivity,
+        dG_empty_funnel=dg_empty, binding_excess=float(binding_excess),
         unbinding_events=unbinding, rebinding_events=rebinding,
         last_hill_height=float(hills.height[-1]),
         converged=not problems, problems=problems,

@@ -175,7 +175,7 @@ def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
 
 
 def _write_molfile(path, name: str, elements, coords_nm, bonds) -> None:
-    lines = [name, "  fmeta", "", f"{len(elements):3d}{len(bonds):3d}  0  0  0  0  0  0  0  0999 V2000"]
+    lines = [name, f"{'':2s}{'fmeta':<8s}{'':10s}3D", "", f"{len(elements):3d}{len(bonds):3d}  0  0  0  0  0  0  0  0999 V2000"]
     for symbol, (x, y, z) in zip(elements, np.asarray(coords_nm) * 10.0):
         lines.append(f"{x:10.4f}{y:10.4f}{z:10.4f} {symbol:<3s} 0  0  0  0  0  0  0  0  0  0  0  0")
     lines += [f"{a + 1:3d}{b + 1:3d}{order:3d}  0" for a, b, order in bonds]

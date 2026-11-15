@@ -46,6 +46,9 @@ class EquilibrationResult:
     wall_energy_mean: float                 # kJ/mol, funnel wall energy over the free stage
     wall_energy_max: float
     box_lengths: np.ndarray                 # nm, at the end
+    area_per_lipid: Optional[float] = None  # nm^2: box area over lipids per leaflet (membrane only;
+    area_drift: Optional[float] = None      #   includes the protein's footprint). Relative change
+                                            #   between the two halves of the free stage.
 
     def wall_ok(self, temperature: float) -> bool:
         """The funnel leaves the bound state alone if it does less than 0.1 kT of work."""
@@ -130,11 +133,25 @@ def equilibrate(prepared: Prepared, platform: mm.Platform, properties: Optional[
 
     n_free = max(1, int(round(free_ps / dt)))
     stride = max(1, int(round(1.0 / dt)))           # sample the walls every ps
-    wall = []
+    wall, area = [], []
     for _ in range(max(1, n_free // stride)):
         simulation.step(min(stride, n_free))
         energy = simulation.context.getState(getEnergy=True, groups={prepared.restraint_group})
         wall.append(energy.getPotentialEnergy().value_in_unit(_KJ))
+        vectors = energy.getPeriodicBoxVectors().value_in_unit(unit.nanometer)
+        area.append(vectors[0][0] * vectors[1][1])
     state = simulation.context.getState(getPositions=True, getVelocities=True)
     box = np.diag(np.array(state.getPeriodicBoxVectors().value_in_unit(unit.nanometer)))
-    return EquilibrationResult(state, float(np.mean(wall)), float(np.max(wall)), box)
+    result = EquilibrationResult(state, float(np.mean(wall)), float(np.max(wall)), box)
+    if prepared.membrane:
+        atoms = list(prepared.topology.atoms())
+        n_lipids = sum(atoms[i].element.symbol == "P" for i in prepared.selection.heavy_atoms("lipid"))
+        if n_lipids:
+            half = max(1, len(area) // 2)
+            result.area_per_lipid = float(area[-1] / (n_lipids / 2.0))
+            result.area_drift = float(np.mean(area[half:]) / np.mean(area[:half]) - 1.0)
+            if abs(result.area_drift) > 0.03:
+                log.warning("membrane area changed by %.1f%% during the free stage; the bilayer "
+                            "is still relaxing, extend equilibration.free_ps",
+                            100 * result.area_drift)
+    return result

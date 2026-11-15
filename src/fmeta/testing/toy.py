@@ -93,13 +93,14 @@ def make_toy(well_depth: float = 20.0, well_sigma: float = 0.15, site_s: float =
 
 
 def make_simulation(toy: ToySystem, temperature: float = 300.0, friction: float = 1.0,
-                    timestep: float = 0.02, seed: int = 1, platform: str = "Reference"):
+                    timestep: float = 0.02, seed: int = 1, platform: str = "Reference",
+                    properties: dict | None = None):
     """A Langevin simulation of the toy. Call after the bias force was added."""
     integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin, friction / unit.picosecond,
                                              timestep * unit.picosecond)
     integrator.setRandomNumberSeed(seed)
     simulation = app.Simulation(toy.topology, toy.system, integrator,
-                                mm.Platform.getPlatformByName(platform))
+                                mm.Platform.getPlatformByName(platform), properties or {})
     simulation.context.setPositions(toy.positions)
     simulation.context.setVelocitiesToTemperature(temperature * unit.kelvin, seed)
     return simulation

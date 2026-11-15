@@ -1,13 +1,15 @@
 # A GPCR with a ligand in the orthosteric site, embedded in POPC.
 #
-# Inputs:
-#   protein.pdb  - the receptor, protonated and ORIENTED: membrane normal along z and
-#                  the membrane midplane at z = 0 (structures from the OPM database
-#                  are oriented this way; remove their dummy membrane atoms)
-#   ligand.sdf   - the ligand pose with all hydrogens, in the same frame
+# Inputs (prepare them yourself):
+#   protein.pdb  - the receptor, protonated or at least complete. Best taken from the OPM
+#                  database, where structures are already oriented: membrane normal along z,
+#                  midplane at z = 0. Remove OPM's dummy membrane atoms (residue DUM), or set
+#                  system.fix_protein: true, which drops all hetero groups.
+#   ligand.sdf   - the ligand pose with all hydrogens, in the same frame as the protein
+#   (or use input.complex / ligand_resname / ligand_smiles, as in the trypsin example)
 #
-# The funnel is placed before the membrane is built and treats the bilayer as
-# a slab, so it points into the extracellular or intracellular water. Check it:
+# The funnel is placed before the membrane is built and treats the bilayer as a slab, so
+# it points into the extracellular or intracellular water. Check it before running:
 #   fmeta prepare fmeta.yaml -o run && fmeta funnel run
 # and load run/prepared/funnel.pdb together with run/prepared/topology.cif.
 input:
@@ -22,6 +24,8 @@ system:
 membrane:
   lipid: POPC                  # POPC, POPE, DLPC, DLPE, DMPC, DOPC or DPPC
   center_z: 0.0
+  orient: check                # warn if the input does not look oriented; "auto" re-orients it
+                               # from the protein's hydrophobic belt (a coarse estimate)
 
 # For ligands that leave sideways into the bilayer, or to pick the vestibule by hand:
 # funnel:
@@ -33,4 +37,5 @@ equilibration:
 run:
   length_ns: 1000.0
   replicas: 5
+  # walkers: 4                 # share one bias between 4 walkers per replica
   # gpus: [0, 1, 2, 3]

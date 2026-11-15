@@ -196,6 +196,22 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
                        f"unbound region is only {distance:.2f} nm above the membrane surface")
         else:
             report.add("membrane", OK, f"unbound region is {distance:.2f} nm above the membrane")
+        # lipids that ended up in the ligand's way (e.g. a tail packed into the vestibule)
+        lipid_xyz = positions[selection.heavy_atoms("lipid")] - origin
+        s_lipid = lipid_xyz @ axis
+        rho_lipid = np.linalg.norm(lipid_xyz - np.outer(s_lipid, axis), axis=1)
+        on_path = (s_lipid >= s_bound) & (s_lipid <= funnel.upper)
+        inside = on_path & (rho_lipid < funnel.wall_radius(s_lipid))
+        if (on_path & (rho_lipid < 0.3)).any():
+            report.add("lipids_in_funnel", ERROR,
+                       "lipid atoms sit on the funnel axis between the site and bulk; the exit "
+                       "is blocked by the membrane")
+        elif inside.any():
+            report.add("lipids_in_funnel", WARNING,
+                       f"{int(inside.sum())} lipid atoms lie inside the funnel walls; the ligand "
+                       "will meet them on its way out")
+        else:
+            report.add("lipids_in_funnel", OK, "no lipid atoms inside the funnel")
 
     # -- periodic box --------------------------------------------------------
     if box is not None:

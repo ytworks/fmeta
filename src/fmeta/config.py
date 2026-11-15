@@ -168,6 +168,8 @@ system:
   hydrogen_mass: 1.5          # amu; set to null (and run.timestep_fs: 2) to disable
 
 # membrane: {lipid: POPC, center_z: 0.0}    # uncomment to embed in a bilayer
+#   orient: check (default) warns if the input does not look oriented, auto re-orients the
+#   complex onto the membrane plane estimated from the protein, input trusts the file as is
 
 funnel:
   method: clearance           # automatic placement from the pose

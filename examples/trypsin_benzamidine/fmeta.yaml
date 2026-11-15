@@ -1,17 +1,22 @@
-# Trypsin-benzamidine, the classic funnel metadynamics test case (PDB 3PTB).
+# Trypsin-benzamidine, the classic funnel metadynamics test case (PDB entry 3PTB).
 #
-# Prepare the two input files yourself:
-#   protein.pdb  - the protein only, protonated (crystal waters and the ligand removed;
-#                  keep the calcium ion only if your force-field files cover it)
-#   ligand.sdf   - benzamidine in its crystal pose, with all hydrogens (charge +1)
+#   1. Download 3ptb.pdb from the PDB into this directory.
+#   2. fmeta prepare fmeta.yaml -o run && fmeta funnel run     # look at the funnel first:
+#      load run/prepared/funnel.pdb together with run/prepared/topology.cif
+#   3. fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run --plot
 #
-#   fmeta prepare fmeta.yaml -o run && fmeta funnel run     # check the funnel first
-#   fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run
+# The ligand (residue BEN) is cut out of the entry and protonated from the SMILES
+# below (benzamidinium, charge +1); needs RDKit. fix_protein removes the crystal
+# waters and the calcium ion and rebuilds any missing side-chain atoms (PDBFixer).
+# This configuration has not been run against the real entry in development
+# (no access to the PDB from there); the same route is tested on a small fixture.
 input:
-  protein: protein.pdb
-  ligand: ligand.sdf
+  complex: 3ptb.pdb
+  ligand_resname: BEN
+  ligand_smiles: "NC(=[NH2+])c1ccccc1"
 
 system:
+  fix_protein: true
   ligand_method: openff        # needs openmmforcefields (see environment.yml)
   temperature: 300.0
 

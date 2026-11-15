@@ -79,3 +79,17 @@ def binding_free_energy(s: np.ndarray, profile: np.ndarray, funnel: Funnel, kT: 
 
     return BindingEstimate(float(dG), float(k_bind), float(dG_simple), well_depth, site_max,
                            (float(unbound[0]), float(unbound[1])), float(np.std(bulk_level)))
+
+
+def empty_funnel_free_energy(s: np.ndarray, funnel: Funnel, kT: float, site_max: float) -> float:
+    """The dG0 this analysis would report if nothing bound at all.
+
+    Without any interaction the profile is W(s) = -kT ln A_eff(s), and the
+    "binding constant" reduces to the volume of funnel between the lower wall
+    and ``site_max``. A measured dG0 close to this value says the bound region
+    is no more populated than empty solvent would be.
+    """
+    s = np.asarray(s, dtype=float)
+    in_site = (s >= funnel.lower) & (s <= site_max)
+    volume = np.trapezoid(funnel.effective_area(s[in_site], kT), s[in_site])
+    return float(-kT * np.log(volume / STANDARD_VOLUME))

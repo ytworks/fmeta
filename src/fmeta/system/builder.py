@@ -26,6 +26,7 @@ from ..funnel.validate import (UNBOUND_WINDOW, FunnelReport, funnel_points, liga
 from .imaging import make_whole
 from .inputs import fix_protein, read_ligand, read_structure
 from .ligand import register_ligand
+from .orientation import fit_membrane, orient
 from .selection import Selection, classify
 
 log = logging.getLogger(__name__)
@@ -62,6 +63,11 @@ class MembraneSettings:
     center_z: float = 0.0                    # nm, membrane midplane in the input frame
     half_thickness: float = 2.2              # nm, used for funnel placement before the build
     patch: Optional[str] = None              # custom pre-equilibrated patch (PDB) instead of ``lipid``
+    # What to do about the protein's orientation (membrane normal must be z):
+    #   "check": estimate the membrane plane from the structure and warn if the input disagrees
+    #   "auto":  rotate and shift the complex onto the estimated plane
+    #   "input": trust the input as it is
+    orient: str = "check"
 
 
 @dataclass
@@ -177,10 +183,65 @@ def create_system(forcefield: app.ForceField, topology: app.Topology,
     return forcefield.createSystem(topology, **kwargs)
 
 
+def ligand_net_charge(system: mm.System, ligand_atoms: Sequence[int]) -> Optional[float]:
+    """Sum of the ligand's partial charges (e), or None if the system has no NonbondedForce."""
+    for force in system.getForces():
+        if isinstance(force, mm.NonbondedForce):
+            return float(sum(force.getParticleParameters(int(i))[0].value_in_unit(
+                unit.elementary_charge) for i in ligand_atoms))
+    return None
+
+
+def _membrane_orientation(topology: app.Topology, positions: np.ndarray,
+                          membrane: MembraneSettings):
+    """Check or set the orientation of the complex relative to the membrane.
+
+    Returns the (possibly transformed) positions and ``(status, message, info)``
+    for the report, or ``None`` when the input is to be trusted as it is.
+    """
+    if membrane.orient == "input":
+        return positions, None
+    if membrane.orient not in ("check", "auto"):
+        raise ValueError(f"membrane.orient must be 'check', 'auto' or 'input', not {membrane.orient!r}")
+    try:
+        fit = fit_membrane(topology, positions)
+    except ValueError:
+        fit = None
+    if fit is None or not fit.confident:
+        detail = "too few residues" if fit is None else (
+            f"best correlation {fit.score:.2f}, {fit.contrast:.1f} sigma above shuffled sequences")
+        if membrane.orient == "auto":
+            raise ValueError(
+                "could not find a hydrophobic belt to orient the protein by (" + detail + "); "
+                "supply a structure that is already oriented (e.g. from the OPM database) "
+                "and set membrane.orient to 'input'")
+        return positions, ("ok", "no clear hydrophobic belt found (" + detail + "); "
+                           "taking the input orientation as given", {"confident": False})
+    info = dict(confident=True, score=fit.score, contrast=fit.contrast)
+    if membrane.orient == "auto":
+        new, rotation, translation = orient(positions, fit, membrane.center_z)
+        info.update(rotation=rotation.tolist(), translation=translation.tolist(),
+                    tilt_corrected_deg=fit.tilt(), offset_corrected_nm=fit.offset(membrane.center_z))
+        return new, ("ok", f"complex re-oriented onto the fitted membrane plane (was tilted "
+                     f"{fit.tilt():.0f} deg, midplane {fit.offset(membrane.center_z):+.1f} nm off); "
+                     "prepared coordinates are in the new frame", info)
+    tilt, offset = fit.tilt(), fit.offset(membrane.center_z)
+    info.update(tilt_deg=tilt, offset_nm=offset)
+    if tilt > 25.0 or abs(offset) > 1.0:
+        return positions, ("warning",
+                           f"the hydrophobic belt of the protein is tilted {tilt:.0f} deg from z "
+                           f"and centred {offset:+.1f} nm from the membrane midplane: the input "
+                           "does not look oriented. Use membrane.orient: auto or an "
+                           "OPM-oriented structure", info)
+    return positions, ("ok", f"input orientation agrees with the protein's hydrophobic belt "
+                       f"(tilt {tilt:.0f} deg, midplane {offset:+.1f} nm)", info)
+
+
 def _built_report(placement: FunnelReport, built: FunnelReport) -> FunnelReport:
     """Report for the finished system: how the funnel was placed (from the dry
     complex) followed by the geometric checks on the built system."""
-    kept = [c for c in placement.checks if c.name in ("exit", "channel", "axis")]
+    kept = [c for c in placement.checks
+            if c.name in ("orientation", "ligand_charge", "exit", "channel", "axis")]
     return FunnelReport(kept + built.checks, {**placement.info, **built.info})
 
 
@@ -230,16 +291,24 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     modeller, ligand_atoms = build_complex(protein, ligand, forcefield, settings)
     dry_topology = modeller.topology
     dry_positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
+    orientation = None
+    if membrane is not None:
+        dry_positions, orientation = _membrane_orientation(dry_topology, dry_positions, membrane)
+        modeller.positions = dry_positions * unit.nanometer
     dry_selection = classify(dry_topology, ligand_atoms)
 
     slab = None if membrane is None else MembraneSlab(membrane.center_z, membrane.half_thickness)
     if funnel is None:
+        charge = ligand_net_charge(forcefield.createSystem(dry_topology), ligand_atoms)
         funnel, report = auto_funnel(dry_topology, dry_positions, membrane=slab,
                                      settings=funnel_settings, selection=dry_selection,
-                                     **(funnel_overrides or {}))
+                                     ligand_charge=charge, **(funnel_overrides or {}))
     else:
         report = validate_funnel(funnel, dry_positions, dry_selection, slab=slab,
                                  cutoff=settings.cutoff)
+    if orientation is not None:
+        report.add("orientation", *orientation[:2])
+        report.info["orientation"] = orientation[2]
     report.raise_for_errors()
 
     ions = dict(ionicStrength=settings.ionic_strength * unit.molar, neutralize=True)
@@ -302,7 +371,9 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
     placement = FunnelReport()
     if funnel is None:
         funnel, placement = auto_funnel(topology, positions, settings=funnel_settings,
-                                        selection=selection, **(funnel_overrides or {}))
+                                        selection=selection,
+                                        ligand_charge=ligand_net_charge(system, selection.ligand),
+                                        **(funnel_overrides or {}))
     report = _built_report(placement, validate_funnel(funnel, positions, selection, box=box,
                                                       cutoff=settings.cutoff,
                                                       tumbling=not is_membrane))

@@ -111,12 +111,23 @@ def cmd_run(args) -> None:
 
 def cmd_analyze(args) -> None:
     from .workflow import analyze_stage, format_summary
-    print(format_summary(analyze_stage(args.workdir)))
+    print(format_summary(analyze_stage(args.workdir, plot=args.plot)))
+    if args.plot:
+        print(f"figures: {Path(args.workdir) / 'summary.png'} and rep*/analysis.png")
 
 
 def cmd_auto(args) -> None:
     from .workflow import format_summary, run_all
     print(format_summary(run_all(_config_from_args(args), args.out)))
+
+
+def cmd_check(args) -> None:
+    from .check import Checker
+    gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else None
+    checker = Checker(args.out, args.platform or "auto", args.precision, args.device, gpus,
+                      args.quick)
+    if not checker.run_all():
+        sys.exit(1)
 
 
 def cmd_doctor(args) -> None:
@@ -205,13 +216,26 @@ def main(argv=None) -> None:
 
     sub = commands.add_parser("analyze", help="binding free energy and convergence")
     sub.add_argument("workdir")
+    sub.add_argument("--plot", action="store_true", help="also write figures (needs matplotlib)")
     sub.set_defaults(func=cmd_analyze)
 
     sub = commands.add_parser("auto", help="prepare, equilibrate, run and analyse")
     _add_setup_options(sub)
     sub.set_defaults(func=cmd_auto)
 
-    sub = commands.add_parser("doctor", help="check the installation and the GPU")
+    sub = commands.add_parser(
+        "check", help="acceptance test on this machine: forces, toy free energy, full pipeline, "
+                      "membrane, ligand parameters, throughput")
+    sub.add_argument("-o", "--out", default="fmeta_check", help="directory for the test runs")
+    sub.add_argument("--platform", help="OpenMM platform (default: the GPU platform found)")
+    sub.add_argument("--precision", default="mixed")
+    sub.add_argument("--device", type=int, help="GPU device index")
+    sub.add_argument("--gpus", help="comma-separated device indices, to test the multi-GPU launcher")
+    sub.add_argument("--quick", action="store_true",
+                     help="minimal run lengths (a dry run of the steps, not a validation)")
+    sub.set_defaults(func=cmd_check)
+
+    sub = commands.add_parser("doctor", help="quick look at platforms and optional packages")
     sub.add_argument("--platform")
     sub.set_defaults(func=cmd_doctor)
 

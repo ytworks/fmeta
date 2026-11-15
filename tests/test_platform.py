@@ -93,3 +93,27 @@ def test_gpu_run_and_restart(tmp_path):
     hills = read_hills(tmp_path / "HILLS")
     assert len(hills) == 80 and np.all(np.diff(hills.time) > 0)
     assert hills.s.min() > 0.2 and hills.s.max() < 3.8 and hills.rho.max() < 1.2
+
+
+def test_check_command_plumbing(tmp_path):
+    """The acceptance command: cheap checks run for real on the Reference platform,
+    a failing check is recorded without stopping the rest, and dependants are skipped."""
+    from fmeta.check import Checker
+    checker = Checker(tmp_path / "ref", platform="Reference", quick=True)
+    checker.run("platform", checker.check_platform)
+    checker.run("forces", checker.check_forces, needs=("platform",))
+    checker.run("toy_restart", checker.check_toy_restart, needs=("platform",))
+    checker.run("broken", lambda: 1 / 0)
+    checker.run("dependent", lambda: "never runs", needs=("broken",))
+    assert {item.name: item.status for item in checker.items} == {
+        "platform": "PASS", "forces": "PASS", "toy_restart": "PASS", "broken": "FAIL",
+        "dependent": "SKIP"}
+    assert "DRY RUN" in checker.items[0].detail
+    assert "ZeroDivisionError" in (tmp_path / "ref" / "broken.traceback.txt").read_text()
+
+    # without a GPU, the default (auto) run must fail loudly rather than pass on the CPU
+    auto = Checker(tmp_path / "auto", platform="auto", quick=True)
+    auto.run("platform", auto.check_platform)
+    has_gpu = any(name in available_platforms() for name in GPU_PLATFORMS)
+    if not has_gpu:
+        assert auto.items[0].status == "FAIL" and "no usable GPU" in auto.items[0].detail

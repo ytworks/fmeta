@@ -62,6 +62,14 @@ def test_walkers_share_the_bias(tmp_path):
     a.close()
     b.close()
 
+    # the analysis treats the two walkers as one bias, and the figure draws both
+    result = analyze_run(tmp_path, write=True)
+    assert result["n_walkers"] == 2 and result["n_hills"] == 80
+    assert result["simulated_ns"] == pytest.approx(2 * 40 * 100 * 0.02 / 1000)
+    pytest.importorskip("matplotlib")
+    from fmeta.analysis.plots import plot_run
+    assert plot_run(tmp_path).stat().st_size > 30000
+
 
 def test_walker_restart_rebuilds_from_all_files(tmp_path):
     _, a = make_walker(tmp_path, 0, 2, seed=1)

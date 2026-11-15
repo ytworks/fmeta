@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from fmeta.analysis import analyze_replicas, analyze_run
-from fmeta.analysis.binding import binding_free_energy
+from fmeta.analysis.binding import binding_free_energy, empty_funnel_free_energy
 from fmeta.analysis.convergence import count_transitions, plateau_statistics, summarize_replicas
 from fmeta.analysis.fes import projection_profile, reweighted_profile, reweighting_offset
 from fmeta.engine import BiasGrid, BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
@@ -161,3 +161,51 @@ def test_toy_binding_free_energy_replicas(tmp_path, reflect):
         assert replica["dG_plateau"] == pytest.approx(exact, abs=1.5)
     assert summary["dG"] == pytest.approx(exact, abs=0.75)
     assert summary["ci95"][0] - 1.0 < exact < summary["ci95"][1] + 1.0
+
+
+def test_empty_funnel_reference():
+    """With the well switched off, the exact profile gives exactly the empty-funnel
+    value; the toy's standard well beats it by 1.7 kT, a deep well by much more."""
+    s = np.linspace(-0.5, 3.45, 3951)
+    excess = {}
+    for depth in (0.0, 20.0, 30.0):
+        toy = make_toy(well_depth=depth)
+        estimate = binding_free_energy(s, toy.exact_free_energy_profile(s, T), toy.funnel, KT)
+        empty = empty_funnel_free_energy(s, toy.funnel, KT, estimate.site_max)
+        excess[depth] = (empty - estimate.dG) / KT
+    assert excess[0.0] == pytest.approx(0.0, abs=0.02)
+    assert excess[20.0] == pytest.approx(1.7, abs=0.1)
+    assert excess[30.0] > 4.0
+
+
+def test_run_without_binding_is_flagged(tmp_path):
+    """Funnel metadynamics on the toy with no well at all: the analysis reports a
+    number near the empty-funnel value and says that it is not a binding free energy."""
+    toy = make_toy(well_depth=0.0)
+    settings = BiasSettings(temperature=T, bias_factor=10.0, height=1.2, sigma_s=0.05,
+                            sigma_rho=0.05, pace=100, points_per_sigma=2.0)
+    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    run = MetadynamicsRun(make_simulation(toy, temperature=T, seed=4), bias, tmp_path,
+                          toy.restraint_group, RunSettings(checkpoint_hills=5000))
+    run.run(4000)
+    run.close()
+    result = analyze_run(tmp_path, write=False)
+    assert result["dG_plateau"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
+    assert result["binding_excess"] < 1.0 * KT
+    assert any("empty funnel" in p for p in result["problems"]) and not result["converged"]
+
+
+def test_figures_are_written(tmp_path):
+    pytest.importorskip("matplotlib")
+    from fmeta.analysis.plots import plot_run, plot_summary
+    dirs = []
+    for replica, seed in enumerate((1, 2)):
+        run_toy(tmp_path / f"rep{replica}", seed=seed, n_hills=600)
+        dirs.append(tmp_path / f"rep{replica}")
+    analyze_replicas(dirs, write_to=tmp_path / "summary.json")
+    written = [plot_run(dirs[0]), plot_run(dirs[0], tmp_path / "dark.png", theme="dark"),
+               plot_summary(tmp_path)]
+    assert [p.name for p in written] == ["analysis.png", "dark.png", "summary.png"]
+    for path in written:
+        data = path.read_bytes()
+        assert data[:4] == bytes([0x89]) + b"PNG" and len(data) > 30000

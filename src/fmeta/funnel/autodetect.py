@@ -14,6 +14,7 @@ where "free of protein" is not the same as "in water".
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
@@ -39,6 +40,7 @@ class AutoFunnelSettings:
     probe: float = 0.3               # nm; a path closer than this to an atom is squeezing through
     contact_clearance: float = 0.6   # nm; beyond this the ligand centroid has left the surface
     bulk_margin: float = 1.0         # nm between ligand atoms and solute that counts as bulk
+    charged_bulk_margin: float = 1.5 # ... for a ligand with a net charge (long-range attraction)
     anchor_min_atoms: int = 10
     anchor_radius: float = 1.0       # nm around each anchor target searched for alpha carbons
     anchor_separation: float = 1.2   # nm between the p0 and p1 centroids
@@ -218,6 +220,7 @@ def auto_funnel(topology: app.Topology, positions, ligand: LigandSpec = None,
                 membrane: Optional[MembraneSlab] = None,
                 settings: Optional[AutoFunnelSettings] = None,
                 selection: Optional[Selection] = None,
+                ligand_charge: Optional[float] = None,
                 **funnel_overrides) -> tuple[Funnel, FunnelReport]:
     """Define a funnel for the ligand pose in ``positions``.
 
@@ -226,6 +229,10 @@ def auto_funnel(topology: app.Topology, positions, ligand: LigandSpec = None,
     from it). Lipids already present are obstacles automatically. Keyword
     arguments override individual funnel parameters (e.g. ``upper=4.0``).
 
+    ``ligand_charge`` (in e), if known, lengthens the funnel for charged
+    ligands: their attraction to the protein dies off slowly, so the unbound
+    region has to sit further out before the free-energy profile is flat.
+
     Returns the funnel and a report; check ``report.ok`` or call
     ``report.raise_for_errors()``.
     """
@@ -233,6 +240,13 @@ def auto_funnel(topology: app.Topology, positions, ligand: LigandSpec = None,
     positions = _as_nm(positions)
     selection = selection or classify(topology, ligand)
     report = FunnelReport()
+    if ligand_charge is not None and abs(ligand_charge) > 0.5:
+        margin = max(settings.bulk_margin, settings.charged_bulk_margin)
+        settings = dataclasses.replace(settings, bulk_margin=margin)
+        report.add("ligand_charge", WARNING,
+                   f"the ligand carries a net charge of {ligand_charge:+.0f} e: the unbound region "
+                   f"is placed {margin:.1f} nm from the solute instead of 1.0 nm. Check that W(s) "
+                   "is flat there in the analysis, and raise the upper wall if it is not")
 
     ligand_heavy = selection.heavy_atoms("ligand")
     if len(ligand_heavy) == 0:

@@ -118,3 +118,133 @@ def test_membrane_pipeline(membrane_inputs, tmp_path):
     run_replicas(config, work)
     assert len((work / "rep0" / "HILLS").read_text().splitlines()) == 3 + 10
     assert analyze_stage(work)["n_replicas"] == 1
+
+
+# ---- membrane orientation ----------------------------------------------------
+
+def test_slab_fit_finds_the_membrane_plane_of_a_helix_bundle():
+    from fmeta.system.orientation import fit_slab, orient
+    from synthetic import helix_bundle, random_rotation
+    for seed in range(3):
+        rng = np.random.default_rng(100 + seed)
+        xyz, names = helix_bundle(seed)
+        rotation, shift = random_rotation(rng), rng.uniform(-3, 3, 3)
+        moved = xyz @ rotation.T + shift
+        fit = fit_slab(moved, names)
+        true_normal = rotation @ np.array([0.0, 0.0, 1.0])
+        assert fit.confident and fit.score > 0.6
+        assert np.degrees(np.arccos(abs(fit.normal @ true_normal))) < 12.0
+        assert abs((fit.midpoint - shift) @ true_normal) < 0.3
+
+        new, rot, translation = orient(moved, fit, center_z=0.5)
+        assert np.allclose(new, moved @ rot.T + translation)
+        assert np.allclose(rot @ rot.T, np.eye(3), atol=1e-9) and np.linalg.det(rot) > 0
+        again = fit_slab(new, names)
+        assert again.tilt() < 12.0 and abs(again.offset(0.5)) < 0.3
+
+
+def test_slab_fit_is_not_fooled_by_soluble_proteins():
+    import os
+
+    import openmm.app as app
+    import openmm.unit as unit
+
+    from fmeta.system.orientation import HYDROPHOBICITY, fit_membrane, fit_slab
+    pdb = app.PDBFile(os.path.join(os.path.dirname(app.__file__), "data", "test.pdb"))
+    positions = np.array(pdb.positions.value_in_unit(unit.nanometer))
+    assert not fit_membrane(pdb.topology, positions).confident          # a real soluble protein
+    for seed in range(3):                                               # globules, apolar core
+        rng = np.random.default_rng(50 + seed)
+        points = rng.uniform(-2.2, 2.2, size=(4000, 3))
+        points = points[np.linalg.norm(points, axis=1) < 2.2][:320]
+        names = [rng.choice(("LEU", "ILE", "VAL", "PHE", "ALA"))
+                 if np.linalg.norm(p) < 1.5 and rng.random() < 0.8
+                 else rng.choice(("LYS", "GLU", "SER", "ASP", "ASN", "THR", "GLN", "ARG"))
+                 for p in points]
+        assert not fit_slab(points, names).confident
+    with pytest.raises(ValueError, match="too few"):
+        fit_slab(points[:10], names[:10])
+    assert set(HYDROPHOBICITY) >= {"LEU", "ARG", "GLY"}
+
+
+def _bundle_topology(positions, names):
+    import openmm.app as app
+    topology = app.Topology()
+    chain = topology.addChain("A")
+    for name in names:
+        topology.addAtom("CA", app.Element.getBySymbol("C"), topology.addResidue(str(name), chain))
+    return topology
+
+
+def test_orientation_check_and_auto_modes():
+    from fmeta.system.builder import _membrane_orientation
+    from fmeta.system.orientation import fit_slab
+    from synthetic import helix_bundle
+    xyz, names = helix_bundle(1)
+    topology = _bundle_topology(xyz, names)
+
+    # oriented input: accepted quietly; "input" skips the fit altogether
+    same, (status, message, info) = _membrane_orientation(topology, xyz, MembraneSettings())
+    assert status == "ok" and "agrees" in message and same is xyz
+    assert _membrane_orientation(topology, xyz, MembraneSettings(orient="input")) == (xyz, None)
+
+    # the same bundle lying on its side and 1.5 nm too high
+    tilted = xyz[:, [2, 1, 0]] * np.array([-1.0, 1.0, 1.0]) + np.array([0.0, 0.0, 1.5])
+    _, (status, message, info) = _membrane_orientation(topology, tilted, MembraneSettings())
+    assert status == "warning" and "does not look oriented" in message and info["tilt_deg"] > 70
+
+    fixed, (status, message, info) = _membrane_orientation(
+        topology, tilted, MembraneSettings(orient="auto", center_z=0.0))
+    assert status == "ok" and "re-oriented" in message
+    refit = fit_slab(fixed, names)
+    assert refit.tilt() < 12.0 and abs(refit.offset()) < 0.3
+    assert np.allclose(fixed, tilted @ np.array(info["rotation"]).T + np.array(info["translation"]))
+
+    # a protein without a belt cannot be auto-oriented
+    rng = np.random.default_rng(3)
+    blob = rng.uniform(-2, 2, size=(300, 3))
+    blob_names = list(rng.choice(["LEU", "LYS", "SER", "GLU", "ALA", "ARG"], size=300))
+    with pytest.raises(ValueError, match="hydrophobic belt"):
+        _membrane_orientation(_bundle_topology(blob, blob_names), blob, MembraneSettings(orient="auto"))
+    _, (status, message, _) = _membrane_orientation(_bundle_topology(blob, blob_names), blob,
+                                                    MembraneSettings())
+    assert status == "ok" and "as given" in message
+    with pytest.raises(ValueError, match="membrane.orient"):
+        _membrane_orientation(topology, xyz, MembraneSettings(orient="sideways"))
+
+
+def test_lipids_inside_the_funnel_are_reported():
+    import openmm.app as app
+    topology, positions, site = membrane_barrel(seed=1)
+    selection = classify(topology)
+    ca = [a.index for a in topology.atoms() if a.name == "CA"]
+    funnel = Funnel(ligand_atoms=list(selection.ligand),
+                    p0_atoms=[i for i in ca if np.linalg.norm(positions[i] - (site - [0, 0, 1.2])) < 0.8],
+                    p1_atoms=[i for i in ca if np.linalg.norm(positions[i] - site) < 0.8],
+                    lower=0.6, upper=5.5, inflection=3.2)
+    origin, axis, _ = funnel_frame(funnel, positions)
+
+    def with_lipid(point):
+        """The barrel plus a bilayer-like sheet of lipid atoms and one stray lipid atom."""
+        new = app.Topology()
+        chain = new.addChain("M")
+        carbon = app.Element.getBySymbol("C")
+        rng = np.random.default_rng(0)
+        sheet = np.column_stack([rng.uniform(-3, 3, 400), rng.uniform(-3, 3, 400), rng.uniform(-2, 2, 400)])
+        sheet = sheet[np.hypot(sheet[:, 0], sheet[:, 1]) > 2.0]
+        coords = np.vstack([positions, sheet, [point]])
+        for residue in topology.residues():
+            copy = new.addResidue(residue.name, chain)
+            for atom in residue.atoms():
+                new.addAtom(atom.name, atom.element, copy)
+        for _ in range(len(sheet) + 1):
+            new.addAtom("C1", carbon, new.addResidue("POPC", chain))
+        return new, coords
+
+    for point, expected in ((origin + 4.0 * axis, "error"),                       # on the axis
+                            (origin + 3.0 * axis + np.array([0.35, 0, 0]), "warning"),   # inside the wall
+                            (np.array([2.5, 2.5, 0.0]), "ok")):                   # in the bilayer
+        new, coords = with_lipid(point)
+        report = validate_funnel(funnel, coords, classify(new, list(selection.ligand)),
+                                 box=np.array([8.0, 8.0, 14.0]), tumbling=False)
+        assert {c.name: c.status for c in report.checks}["lipids_in_funnel"] == expected
