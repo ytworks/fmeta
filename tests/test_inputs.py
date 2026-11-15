@@ -256,13 +256,36 @@ def test_template_generator_route(inputs, monkeypatch):
 
     forcefield = app.ForceField("amber14-all.xml")
     register_ligand(forcefield, inputs[1], "gaff")
-    assert calls["generator"][0] == "GAFFTemplateGenerator" and calls["generator"][2] is None
+    assert calls["generator"][0] == "GAFFTemplateGenerator"
     with pytest.raises(ValueError, match="unknown ligand parameter method"):
         register_ligand(forcefield, inputs[1], "magic")
 
 
+@pytest.mark.parametrize("method", ["openff", "gaff"])
+def test_default_settings_work_with_the_real_generators(inputs, method):
+    """A ligand SDF and nothing else, with the real packages (they are in the official image):
+    the generators have no default force field of their own, so ours must name one they know."""
+    pytest.importorskip("openmmforcefields")
+    pytest.importorskip("openff.toolkit")
+    forcefield = app.ForceField("amber14-all.xml")
+    register_ligand(forcefield, inputs[1], method)
+    topology, _ = read_ligand(inputs[1], "BNZ")
+    system = forcefield.createSystem(topology)
+    nonbonded = next(f for f in system.getForces() if f.getName() == "NonbondedForce")
+    charges = [nonbonded.getParticleParameters(i)[0].value_in_unit(unit.elementary_charge)
+               for i in range(system.getNumParticles())]
+    assert len(charges) == 12 and abs(sum(charges)) < 1e-6
+    assert max(charges) > 0.05 and min(charges) < -0.05                # benzene C-H dipoles
+
+
+def _hide_ligand_packages(monkeypatch):
+    """As on a machine without them, also when an earlier test has imported the real ones."""
+    for name in ("openmmforcefields", "openmmforcefields.generators"):
+        monkeypatch.setitem(sys.modules, name, None)
+
+
 def test_missing_ligand_packages_give_a_clear_error(inputs, monkeypatch):
-    monkeypatch.setitem(sys.modules, "openmmforcefields", None)
+    _hide_ligand_packages(monkeypatch)
     with pytest.raises(ImportError, match="openmmforcefields"):
         register_ligand(app.ForceField("amber14-all.xml"), inputs[1], "openff")
 
@@ -270,7 +293,7 @@ def test_missing_ligand_packages_give_a_clear_error(inputs, monkeypatch):
 def test_command_line_reports_input_problems_plainly(inputs, tmp_path, monkeypatch):
     """Missing ligand parameters and a bad pose end with a one-line message, not a traceback."""
     from fmeta.cli import main as cli
-    monkeypatch.setitem(sys.modules, "openmmforcefields", None)
+    _hide_ligand_packages(monkeypatch)
     with pytest.raises(SystemExit) as stop:
         cli(["prepare", "--protein", inputs[0], "--ligand", inputs[1], "-o", str(tmp_path / "a")])
     assert "fmeta: error:" in str(stop.value) and "openmmforcefields" in str(stop.value)

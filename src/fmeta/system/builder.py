@@ -47,7 +47,7 @@ class SystemSettings:
     forcefields: Sequence[str] = ("amber14-all.xml", "amber14/tip3p.xml")
     water_model: str = "tip3p"
     ligand_method: str = "openff"            # "openff", "gaff" or "xml"
-    ligand_forcefield: Optional[str] = None  # e.g. "openff-2.2.0"; default of the generator if None
+    ligand_forcefield: Optional[str] = None  # e.g. "openff-2.3.0"; None: ligand.DEFAULT_FORCEFIELD
     ligand_charge_method: Optional[str] = None   # e.g. "am1bcc", "gasteiger"; default: generator's choice
     fix_protein: Optional[bool] = None       # repair with PDBFixer (missing atoms, non-standard
                                              # residues); None: whenever PDBFixer is installed

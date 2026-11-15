@@ -15,6 +15,11 @@ import openmm.app as app
 
 METHODS = ("xml", "openff", "gaff")
 
+# The ligand force field when the settings name none. The generators have no default of their
+# own (openmmforcefields 0.16 refuses to guess), and a result must not depend on which versions
+# happen to be installed. Both assign AM1-BCC charges.
+DEFAULT_FORCEFIELD = {"openff": "openff-2.2.1", "gaff": "gaff-2.11"}
+
 
 def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "openff",
                     forcefield_name: str | None = None,
@@ -22,11 +27,12 @@ def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "open
     """Make ``forcefield`` able to parameterise the ligand in ``ligand_path``.
 
     For ``method='xml'`` there is nothing to do here: load the ligand ffxml
-    together with the other force-field files. ``charge_method`` (e.g.
-    ``"am1bcc"``, ``"gasteiger"``, or a NAGL model name) assigns partial
-    charges with the OpenFF toolkit before the generator sees the molecule;
-    by default the generator computes AM1-BCC charges itself. The ligand file
-    should be an SDF, which carries bond orders and formal charges.
+    together with the other force-field files. ``forcefield_name`` is a name the
+    generator knows (``DEFAULT_FORCEFIELD`` of the method when None).
+    ``charge_method`` (e.g. ``"am1bcc"``, ``"gasteiger"``, or a NAGL model name)
+    assigns partial charges with the OpenFF toolkit before the generator sees the
+    molecule; by default the generator computes AM1-BCC charges itself. The
+    ligand file should be an SDF, which carries bond orders and formal charges.
     """
     if method == "xml":
         return
@@ -47,6 +53,6 @@ def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "open
     if charge_method is not None:
         molecule.assign_partial_charges(charge_method)
     generator_class = SMIRNOFFTemplateGenerator if method == "openff" else GAFFTemplateGenerator
-    kwargs = {} if forcefield_name is None else {"forcefield": forcefield_name}
-    generator = generator_class(molecules=molecule, **kwargs)
+    generator = generator_class(molecules=molecule,
+                                forcefield=forcefield_name or DEFAULT_FORCEFIELD[method])
     forcefield.registerTemplateGenerator(generator.generator)

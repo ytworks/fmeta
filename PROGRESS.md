@@ -22,8 +22,9 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-15. Decisions: `docs/design/engine.md` (FM-D1..D12 Accepted).
-Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D12 Accepted; FM-D11
+amended twice). Everything below is on PR #1 (not merged).
+Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
 |---|---|
@@ -36,31 +37,34 @@ Everything below is on PR #1 (not merged).
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| M8 GPU gates, real-system validation (R1–R3) | Not started: needs a GPU machine |
+| Official image, Docker-only execution | Image, lock and wrapper built and in use on the GPU machine (fb6bc95, 383b5ec); the rule, the documents and the CI job follow |
+| GPU plan M0: first gate record (R1) | In progress |
+| GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks | Not started |
 
 - GPU gates: **none recorded** (`bench/results/` is empty). The gate script and its criteria
   exist (`scripts/gpu_gates.py`, `docs/gpu-runbook.md`).
-- CPU evidence: CI green on 171220a (Python 3.10 and 3.12: lint, PROGRESS budget, evidence
-  index, `pytest`, 73 tests). `fmeta check --platform CPU --quick` on the same source tree:
-  13 passed, 0 failed, 2 skipped (`pdb_sdf_openff`, `pdb_sdf_gaff`: generators not installed).
-  `pytest -m slow` (6 tests) passed on 171220a. `scripts/gpu_gates.py --quick --platform CPU`
-  runs to the end and, as it must on a machine without a GPU, reports `gpu-tests` and the two
-  skipped items as not passed and records nothing.
+- CPU evidence, in the image (lock d061e45a…, on the source of this commit before it was
+  committed): `ruff check .` passes; `pytest` 76 passed; `fmeta check --platform CPU --quick`
+  15 passed, 0 failed, 0 skipped. `pytest -m slow` not run on this commit (6 passed on aadd0ad, in the
+  image). CI has not run on the commits after aadd0ad (see Blockers); it was green on 171220a.
 - Not verified anywhere yet:
-  - any GPU platform (CUDA / OpenCL), including the periodic-image handling of the CVs there;
-  - ligand parameters from the real OpenFF / GAFF generators — the conda-only packages could
-    not be installed in the development container; fmeta's side is tested with stand-ins and
-    the pipeline with a hand-written benzene ffxml;
+  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures, and
+    their fixes follow in the next commits; nothing is recorded;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
-    the membrane-plane estimate on a real membrane protein (no access to structure databases);
+    the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself.
 - Known gaps: the bias table is refit on the CPU at every hill (about 0.5 µs per grid point;
-  overhead on the GPU unmeasured, R4); ligand protonation is taken from the SDF as drawn (R5);
-  unresolved loops are not modelled; non-protein components are removed unless listed in
-  `system.keep_hetero`.
-- Blockers: none for development. R1 (first GPU gate record) needs the owner's GPU machine.
+  R4); ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
+  modelled; non-protein components are removed unless listed in `system.keep_hetero`.
+- Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
+  commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-15 — [amendment] FM-D11: fmeta names the ligand force field (`openff-2.2.1`, `gaff-2.11`)
+- What: when the settings name no ligand force field, fmeta uses `openff-2.2.1` or `gaff-2.11`, with AM1-BCC charges. Before this change, in the official image (the first run with the real ligand packages): `pytest` 74 passed and `pytest -m slow` 6 passed, but `fmeta check --platform CPU --quick` gave 13 passed, 2 failed (`pdb_sdf_openff`, `pdb_sdf_gaff`). With this change: `pytest` 76 passed; `fmeta check --platform CPU --quick` 15 passed, 0 failed, 0 skipped.
+- Why: the generators of `openmmforcefields` 0.16 have no default force field, so a PDB and an SDF alone failed; a default taken from the installed packages would change the parameters with the environment.
+- Refs: FM-D11; `src/fmeta/system/ligand.py`; `tests/test_inputs.py` (new: `test_default_settings_work_with_the_real_generators`, which fails for both generators on the code before; the two tests that hide the ligand packages also hide the submodule it imports).
 
 ### 2026-11-15 — [progress] Harness introduced: rules, progress log, CPU CI, GPU gates with recorded evidence
 - What: `CLAUDE.md` / `AGENTS.md`, `.claude/rules/` (progress log, invariants), SessionStart hook, `PROGRESS.md` with its size check, `docs/` (design, roadmap, plans, GPU runbook, archive), ruff, `.github/workflows/ci.yml`, `scripts/gpu_gates.py` and `scripts/verify_bench_results.py`.

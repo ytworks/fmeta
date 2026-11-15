@@ -1,6 +1,7 @@
 # Engine design
 
-Status: **Accepted** (2026-11-15, PR #1; FM-D11 amended the same day by owner decision).
+Status: **Accepted** (2026-11-15, PR #1; FM-D11 amended twice the same day: an owner decision,
+and the first run with the real ligand-parameter packages).
 Applies to: `src/fmeta/` (all of it), `examples/`.
 
 ## Requirements (owner, 2026-11-15)
@@ -88,6 +89,11 @@ The protein file is reduced to its amino-acid residues, repaired with PDBFixer w
 and protonated; an SDF without hydrogens gets them from RDKit; a ligand not in contact with the
 protein is refused. Ligand parameters come from the OpenFF or GAFF generators, or a user ffxml.
 Amendment (2026-11-15, owner): readers for AMBER / GROMACS / CHARMM input were removed.
+Amendment (2026-11-15): fmeta names the ligand force field itself when the settings name none:
+`openff-2.2.1` for `openff`, `gaff-2.11` for `gaff`, both with AM1-BCC charges
+(`system/ligand.py`). The first run with the real packages showed that the generators of
+`openmmforcefields` 0.16 have no default (two files alone failed), and a default taken from the
+installed packages would change the parameters with the environment.
 Why: owner decisions — OpenMM only, and two files must be enough.
 
 ### FM-D12 — Verification: a solvable toy system, CPU CI, GPU gates with recorded evidence
