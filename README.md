@@ -60,6 +60,8 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 
 所要時間は GPU で 10〜20 分程度の見込みです（未計測）。`fmeta check --platform CPU --quick` は同じ手順を最短の長さで流す動作確認で、開発環境ではこれが全項目通ることを確認しています。追加で `pytest -m gpu` も用意してあります。
 
+結果を証跡としてリポジトリに残すときは `python scripts/gpu_gates.py` を使います。GPU テストと `fmeta check` の全項目を実行し、すべて通ると `bench/results/<日付>-<コミット>-gpu-gates.json` と `index.json` を書き出します（手順は `docs/gpu-runbook.md`）。
+
 このあと実在の系（`examples/`）で本計算を流せば検証は完了です。
 
 ## 使い方
@@ -216,6 +218,22 @@ GPU のない環境（OpenMM 8.6.1、Reference / CPU プラットフォーム）
 - 電荷をもつリガンドは非結合領域が平らになりにくいので、ファネルを自動で長くし、レポートに警告を出します。解析で `W(s)` が平らでなければ `funnel_overrides: {upper: ...}` でさらに延ばしてください。
 - 膜系では、脱離したリガンドが脂質頭部に分配しないよう、非結合領域を膜表面から 1 nm 以上離しています（検証で確認）。
 - タンパク質ファイルの非タンパク質成分は既定ですべて取り除きます。金属イオンや補因子が結合に関わる系では `system.keep_hetero` と対応する力場ファイルを指定してください。未解像のループは作りません。
+
+## 開発
+
+開発ルールはリポジトリに置いてあります（[kairyu](https://github.com/ytworks/kairyu) / [pypic](https://github.com/ytworks/pypic) と同じ構成）。
+
+- `CLAUDE.md`（`AGENTS.md` はこれを参照）: テスト方針、ファイルの置き場所、開発コマンド。
+- `.claude/rules/`: 進捗ログの書き方、自由エネルギーとファネルに関する不変条件。
+- `PROGRESS.md`: 設計変更・マイルストーン・検証状況・ブロッカーの記録（セッションをまたぐメモ）。大きさは `scripts/check_progress_size.py` がセッション開始時と CI で検査します。
+- `docs/`: 設計判断（`design/`、FM-D 番号）、ロードマップ、計画、GPU 手順書。
+- CI（`.github/workflows/ci.yml`）: lint、PROGRESS.md の検査、GPU 証跡の整合性検査、CPU テスト。GPU を使う検証は CI では行わず、`scripts/gpu_gates.py` の記録を CI が検証します。
+
+```bash
+pip install -e ".[dev,prep,plots]"
+ruff check . && python scripts/check_progress_size.py && python scripts/verify_bench_results.py && pytest
+pytest -m slow        # 時間のかかる CPU テスト
+```
 
 ## 参考文献
 
