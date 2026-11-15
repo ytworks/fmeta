@@ -42,8 +42,7 @@ def _gpu_platform():
 
 def _energy_and_forces(platform, properties, positions, hills):
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), periodic=True,
-                      platform=platform.getName())
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), platform=platform.getName())
     for hill in hills:
         bias.grid.add_hill(*hill)
     context = mm.Context(toy.system, mm.VerletIntegrator(0.001), platform, properties)
@@ -61,14 +60,13 @@ def _energy_and_forces(platform, properties, positions, hills):
 @pytest.mark.gpu
 def test_gpu_matches_reference():
     """Bias and wall energies, forces and CVs on the GPU agree with Reference,
-    inside the funnel, against the walls, near the axis and across a periodic image."""
+    inside the funnel, against the walls and near the axis."""
     platform, properties = _gpu_platform()
     reference = mm.Platform.getPlatformByName("Reference")
     toy = make_toy()
     hills = [(1.0, 0.05, 6.0), (1.6, 0.2, 4.0), (2.6, 0.1, 3.0), (3.4, 0.05, 2.0)]
-    box = 12.0
     offsets = [[0.0, 0.0, 0.0], [0.15, -0.1, 0.5], [0.6, 0.3, 0.3], [0.02, 0.0, 2.6],
-               [1e-4, 0.0, 1.2], [0.1, 0.05, -0.7], [0.15 + box, -0.1, 0.5 - box]]
+               [1e-4, 0.0, 1.2], [0.1, 0.05, -0.7]]
     for offset in offsets:
         positions = toy.positions.copy()
         positions[0] += np.array(offset)
@@ -87,8 +85,7 @@ def test_gpu_run_and_restart(tmp_path):
     for target in (40, 80):
         toy = make_toy()
         settings = BiasSettings(bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05, pace=50)
-        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True,
-                          platform=platform.getName())
+        bias = FunnelBias(toy.system, toy.funnel, settings, platform=platform.getName())
         simulation = make_simulation(toy, seed=2, platform=platform.getName())
         run = MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group)
         run.run(target)
@@ -96,8 +93,7 @@ def test_gpu_run_and_restart(tmp_path):
         # the CV readout follows the positions, although no step evaluates it
         state = simulation.context.getState(getPositions=True)
         assert bias.collective_variables(simulation.context) == pytest.approx(compute_cvs(
-            toy.funnel, state.getPositions(asNumpy=True).value_in_unit(unit.nanometer),
-            box=state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(unit.nanometer)), abs=2e-5)
+            toy.funnel, state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)), abs=2e-5)
     hills = read_hills(tmp_path / "HILLS")
     assert len(hills) == 80 and np.all(np.diff(hills.time) > 0)
     assert hills.s.min() > 0.2 and hills.s.max() < 3.8 and hills.rho.max() < 1.2

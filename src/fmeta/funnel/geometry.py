@@ -128,20 +128,6 @@ def centroid(positions: np.ndarray, atoms: Sequence[int], weights: Sequence[floa
     return (positions[list(atoms)] * weights[:, None]).sum(axis=0) / weights.sum()
 
 
-def _minimum_image(vector: np.ndarray, box: Optional[np.ndarray]) -> np.ndarray:
-    """Minimum-image a displacement. ``box`` is either three edge lengths of a
-    rectangular cell or a 3x3 matrix of reduced lattice vectors (rows)."""
-    if box is None:
-        return vector
-    box = np.asarray(box, dtype=float)
-    if box.ndim == 1:
-        return vector - box * np.round(vector / box)
-    vector = vector - box[2] * np.round(vector[2] / box[2, 2])
-    vector = vector - box[1] * np.round(vector[1] / box[1, 1])
-    vector = vector - box[0] * np.round(vector[0] / box[0, 0])
-    return vector
-
-
 def funnel_frame(funnel: Funnel, positions: np.ndarray):
     """Return (origin, unit axis, ligand centroid) for a set of coordinates."""
     positions = np.asarray(positions, dtype=float)
@@ -152,21 +138,15 @@ def funnel_frame(funnel: Funnel, positions: np.ndarray):
     return p0, axis / np.linalg.norm(axis), lig
 
 
-def compute_cvs(funnel: Funnel, positions: np.ndarray, box: Optional[np.ndarray] = None,
-                regularize: bool = True):
+def compute_cvs(funnel: Funnel, positions: np.ndarray, regularize: bool = True):
     """Numpy reference for the two collective variables: returns ``(s, rho)``.
 
-    The quantities of the OpenMM expressions, from the same two (optionally
-    minimum-image) vectors p0 -> ligand and p0 -> p1: the component of the first
-    along the second, and the length of its component across it.
+    The quantities of the OpenMM expressions, from the same two vectors p0 -> ligand and
+    p0 -> p1: the component of the first along the second, and the length of its component
+    across it. Like the forces, it takes the coordinates as they are, without periodic images.
     """
-    positions = np.asarray(positions, dtype=float)
-    p0 = centroid(positions, funnel.p0_atoms, funnel.p0_weights)
-    p1 = centroid(positions, funnel.p1_atoms, funnel.p1_weights)
-    lig = centroid(positions, funnel.ligand_atoms, funnel.ligand_weights)
-    to_ligand = _minimum_image(lig - p0, box)
-    axis = _minimum_image(p1 - p0, box)
-    axis = axis / np.linalg.norm(axis)
+    p0, axis, lig = funnel_frame(funnel, positions)
+    to_ligand = lig - p0
     rho_sq = float(np.sum(np.cross(to_ligand, axis) ** 2))
     if regularize:
         rho_sq += funnel.eps**2

@@ -122,7 +122,7 @@ def run_toy(workdir, seed, n_hills, reflect=True):
     toy = make_toy()
     settings = BiasSettings(temperature=T, bias_factor=10.0, height=1.2, sigma_s=0.05,
                             sigma_rho=0.05, pace=100, points_per_sigma=2.0, reflect=reflect)
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, settings)
     simulation = make_simulation(toy, temperature=T, seed=seed)
     run = MetadynamicsRun(simulation, bias, workdir, toy.restraint_group,
                           RunSettings(checkpoint_hills=5000))
@@ -184,7 +184,7 @@ def test_run_without_binding_is_flagged(tmp_path):
     toy = make_toy(well_depth=0.0)
     settings = BiasSettings(temperature=T, bias_factor=10.0, height=1.2, sigma_s=0.05,
                             sigma_rho=0.05, pace=100, points_per_sigma=2.0)
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, settings)
     run = MetadynamicsRun(make_simulation(toy, temperature=T, seed=4), bias, tmp_path,
                           toy.restraint_group, RunSettings(checkpoint_hills=5000))
     run.run(10000)

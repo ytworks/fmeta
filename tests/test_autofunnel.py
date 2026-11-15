@@ -122,7 +122,7 @@ def test_validation_catches_bad_funnels(tmp_path):
     selection = classify(topology)
     funnel, report = auto_funnel(topology, positions, settings=AutoFunnelSettings(**FAST))
 
-    # box too small for the minimum-image CVs
+    # box so small that a periodic copy of the protein would be nearer than the ligand's own
     needed = required_image_distance(funnel)
     small = validate_funnel(funnel, positions, selection, box=np.full(3, needed - 0.5))
     assert status(small, "box_cv") == "error" and not small.ok

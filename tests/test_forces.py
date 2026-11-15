@@ -9,6 +9,9 @@ from fmeta.funnel import forces
 from fmeta.funnel.geometry import Funnel, compute_cvs
 
 BOX = 6.0
+CUBE = np.diag([BOX] * 3)
+# the reduced box vectors of a rhombic dodecahedron with image distance BOX, as the builder makes
+DODECAHEDRON = BOX * np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.5, np.sqrt(0.5)]])
 
 
 def make_funnel(**kwargs):
@@ -28,11 +31,11 @@ def make_positions(rng, ligand_center):
     return pos
 
 
-def make_context(funnel, extra_forces, periodic=True):
+def make_context(funnel, extra_forces, box=CUBE):
     system = mm.System()
     for _ in range(10):
         system.addParticle(10.0)
-    system.setDefaultPeriodicBoxVectors(mm.Vec3(BOX, 0, 0), mm.Vec3(0, BOX, 0), mm.Vec3(0, 0, BOX))
+    system.setDefaultPeriodicBoxVectors(*(mm.Vec3(*row) for row in box))
     for group, force in enumerate(extra_forces):
         force.setForceGroup(group)
         system.addForce(force)
@@ -58,20 +61,24 @@ def test_cvs_match_numpy():
         assert energy(context, pos, 1) == pytest.approx(rho_ref, abs=1e-9)
 
 
-def test_cvs_are_invariant_under_periodic_images():
-    """Moving the ligand, or the whole protein, by lattice vectors must not change the CVs."""
+def test_cvs_ignore_the_periodic_box():
+    """The CVs and the walls take the coordinates as they are, whatever the box.
+
+    Regression: with periodic forces OpenMM removed the box vectors one after the other, which
+    is not the nearest image in a rhombic dodecahedron once the ligand is further than 0.35 image
+    distances from p0 along z. At the far end of the funnel the CVs jumped by nanometres.
+    """
     rng = np.random.default_rng(2)
     funnel = make_funnel()
-    context = make_context(funnel, [forces.projection_force(funnel), forces.extent_force(funnel)])
-    pos = make_positions(rng, np.array([0.3, -0.2, 2.2]))
+    context = make_context(funnel, [forces.projection_force(funnel), forces.extent_force(funnel),
+                                    forces.restraint_force(funnel)], box=DODECAHEDRON)
+    pos = make_positions(rng, np.array([0.1, -0.05, 2.4]))
+    to_ligand = pos[0:3].mean(axis=0) - pos[3:7].mean(axis=0)
+    assert 0.5 * DODECAHEDRON[2, 2] < to_ligand[2] and np.linalg.norm(to_ligand) < 0.5 * BOX
     s_ref, rho_ref = compute_cvs(funnel, pos)
-    for shift in ([BOX, 0, 0], [0, -BOX, 0], [0, 0, 2 * BOX], [-BOX, BOX, -BOX]):
-        moved = pos.copy()
-        moved[0:3] += np.array(shift)
-        assert energy(context, moved, 0) == pytest.approx(s_ref, abs=1e-9)
-        assert energy(context, moved, 1) == pytest.approx(rho_ref, abs=1e-9)
-        s_np, rho_np = compute_cvs(funnel, moved, box=np.array([BOX] * 3))
-        assert (s_np, rho_np) == pytest.approx((s_ref, rho_ref), abs=1e-9)
+    assert energy(context, pos, 0) == pytest.approx(s_ref, abs=1e-9)
+    assert energy(context, pos, 1) == pytest.approx(rho_ref, abs=1e-9)
+    assert energy(context, pos, 2) == pytest.approx(float(funnel.restraint_energy(s_ref, rho_ref)), abs=1e-9)
 
 
 def test_restraint_energy_matches_numpy():
@@ -80,8 +87,7 @@ def test_restraint_energy_matches_numpy():
     context = make_context(funnel, [forces.restraint_force(funnel)])
     seen_nonzero = 0
     for _ in range(200):
-        # keep every centroid separation below BOX/2 so the minimum image is the identity
-        center = np.array([rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0), rng.uniform(-0.2, 2.6)])
+        center =np.array([rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0), rng.uniform(-0.2, 2.6)])
         pos = make_positions(rng, center)
         s, rho = compute_cvs(funnel, pos)
         expected = float(funnel.restraint_energy(s, rho))

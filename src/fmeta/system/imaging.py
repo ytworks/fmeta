@@ -16,12 +16,23 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import breadth_first_order, connected_components
 from scipy.spatial import cKDTree
 
-from ..funnel.geometry import _minimum_image
-
 
 def _lattice(box) -> np.ndarray:
     box = np.asarray(box, dtype=float)
     return np.diag(box) if box.ndim == 1 else box
+
+
+def _wrap(delta: np.ndarray, lattice: np.ndarray) -> np.ndarray:
+    """Remove lattice vectors from displacements (rows), one box vector after the other.
+
+    The result is the nearest image while every component of the true displacement is below
+    half of the box width along its axis. A bond always is; a vector as long as the funnel is
+    not, in a rhombic dodecahedron (FM-D2 in ``docs/design/engine.md``).
+    """
+    delta = np.array(delta, dtype=float)
+    for axis in (2, 1, 0):
+        delta -= np.outer(np.round(delta[:, axis] / lattice[axis, axis]), lattice[axis])
+    return delta
 
 
 def make_whole(topology: app.Topology, positions: np.ndarray, box,
@@ -53,8 +64,7 @@ def make_whole(topology: app.Topology, positions: np.ndarray, box,
     for level in range(2, depth.max() + 1):          # level 1 are the molecule roots
         atoms = np.flatnonzero(depth[:n] == level)
         delta = positions[atoms] - positions[parent[atoms]]
-        wrapped = np.array([_minimum_image(d, lattice) for d in delta]) if len(atoms) else delta
-        positions[atoms] = positions[parent[atoms]] + wrapped
+        positions[atoms] = positions[parent[atoms]] + _wrap(delta, lattice)
 
     if assemble is not None and len(assemble):
         chosen = np.unique(labels[np.asarray(assemble, dtype=int)])

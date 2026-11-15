@@ -164,8 +164,7 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     system = prepared.system
     add_barostat(system, temperature, config.system.pressure, prepared.membrane)
     platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
-    bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True,
-                      platform=platform.getName())
+    bias = FunnelBias(system, prepared.funnel, config.metad, platform=platform.getName())
     integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin,
                                              run_cfg.friction / unit.picosecond,
                                              dt * unit.picosecond)

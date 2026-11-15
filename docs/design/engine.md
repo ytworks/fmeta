@@ -2,7 +2,7 @@
 
 Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
 (2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
-FM-D2 and FM-D4 amended (2026-11-15 and 16: the first runs on a GPU).
+FM-D2, FM-D4, FM-D5 and FM-D6 amended (2026-11-15 and 16: the first runs on a GPU).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -22,7 +22,7 @@ CUDA and OpenCL platforms with everything else. No PLUMED plugin.
 Why: one dependency, the bias stays on the GPU, and CPU CI can check every expression on the
 Reference platform.
 
-### FM-D2 — Two CVs from centroid distances, explicit weights, periodic boundaries on
+### FM-D2 — Two CVs from centroid distances, explicit weights, no periodic boundaries
 `s = (dL0² + d01² − dL1²) / (2 d01)`, `rho = sqrt(max(dL0² − s², 0) + eps²)` over the groups
 ligand / p0 / p1. Group weights are stored in the funnel (ligand heavy atoms by element mass,
 anchors as given), never taken from particle masses.
@@ -33,9 +33,35 @@ precision) gave a `rho` 3.6e-05 nm off Reference near the axis, above the criter
 2e-5 nm: `dL0² − s²` is a difference of nearly equal numbers there and loses its digits in
 single precision. The angle form has no such difference (3.8e-07 nm at worst over the same
 positions), and `eps` bounds its gradient on the axis. The criterion is unchanged.
+Amendment (2026-11-16): the forces of the CVs, the walls and the bias do not use periodic
+boundaries. Until now they did, for the reason this decision gave: "GPU platforms wrap
+molecules, so the distances must be minimum-image". Two facts from the first runs on a GPU
+changed that. (1) OpenMM wraps a displacement one box vector at a time, which gives the nearest
+image only while its components stay within half of `a.x`, `b.y` and `c.z`. In the rhombic
+dodecahedron `c.z / 2 = 0.354 L`, less than half the image distance, so the box rule of FM-D6
+did not protect the CVs. On the test system of `fmeta check` (L = 7.0 nm, upper wall at
+2.77 nm) the CVs jumped from `s` = 2.75 nm to −4.00 nm in one step when the ligand passed
+2.475 nm along z; the walls answered with 4.7e5 kJ/mol, and 5 of 40 runs of 800 ps ended in
+NaN. (2) A context holds the ligand and the protein as one molecule, because the centroid
+forces join their groups, so a platform moves them between periodic cells together. Measured
+without periodic boundaries (CUDA, mixed precision): in 200 ps started with a corner of the
+cell inside the complex the complex changed cell 57 times, never apart from the ligand, with
+the CVs within 8.9e-07 nm of the numpy values; the five seeds that failed pass, and so do
+40 new runs of 800 ps. Rejected: periodic CVs in a cube of side 2 (reach + 0.3 nm), which
+is 41% more volume to simulate.
+The gate `periodic_images` is redefined with this. Before, it compared the CVs of three static
+placements with the values at build time: that passed on the forces that failed in dynamics,
+and its question (do periodic CVs survive a move to another image) no longer exists. Now it
+asserts that the ligand and the anchors are in one molecule of the context, runs dynamics from
+two placements and puts the ligand at the upper wall along the narrowest direction of the box:
+the CVs must be within 2e-3 nm (unchanged) of the numpy CVs of the reported coordinates, and
+the wall energy within 0.1 kJ/mol of the walls at those CVs. It fails on the periodic forces
+(1.2e6 kJ/mol at the upper wall). The item `forces` loses its seventh position, a periodic
+image of another one; its tolerances are unchanged.
 Why: the same CVs as `d cos(angle)` / `d sin(angle)` but with a bounded gradient on the axis;
-explicit weights survive hydrogen mass repartitioning and massless test anchors; GPU platforms
-wrap molecules, so the distances must be minimum-image.
+explicit weights survive hydrogen mass repartitioning and massless test anchors; without
+periodic boundaries the CVs do not depend on the shape of the box, and the platform keeps the
+complex in one piece.
 
 ### FM-D3 — Walls: one force for the sigmoid side wall and the lower / upper walls
 `R(s) = width / (1 + exp(steepness (s − inflection))) + buffer`; harmonic penalties, default
@@ -74,6 +100,10 @@ cost R4 removed).
 ### FM-D5 — HILLS is the record; one atomic checkpoint bundle; exact restart
 PLUMED-layout HILLS / COLVAR. A checkpoint is one zip (binary checkpoint, State XML, bias
 grid, counters) replaced atomically; a restart rolls HILLS / COLVAR / DCD back to it.
+Amendment (2026-11-16): a run stops with an error before a value that is not finite (a CV, the
+bias or the wall energy) is written to COLVAR or HILLS or added to the grid. The first
+breakdown on a GPU wrote NaN rows and failed only later, inside the spline fit. Now the files
+stay readable and a restart continues from the last checkpoint.
 Why: a crash between files must not leave a mixed state; on the Reference platform a split run
 reproduces the continuous one byte for byte, which makes restart testable.
 
@@ -81,8 +111,14 @@ reproduces the continuous one byte for byte, which makes restart testable.
 Tumbling solute: image distance ≥ max(bounding sphere + padding, funnel reach + solute radius +
 cutoff, 2 (reach + 0.3 nm)), rhombic dodecahedron. Membrane: box height from the funnel, xy
 from the lipid patch.
-Why: with minimum-image CVs a box smaller than twice the reach lets the ligand change image
-before the upper wall; a box sized from the solute alone does not know the funnel.
+Amendment (2026-11-16): the rule is unchanged; its reason is restated because the CVs are no
+longer periodic (FM-D2). The original reason was: "with minimum-image CVs a box smaller than
+twice the reach lets the ligand change image before the upper wall".
+Why: wherever the walls let the ligand go it is within reach + 0.3 nm of its own protein, and
+with an image distance of twice that every periodic copy of the protein is farther away. So
+the ligand does not meet a copy of the protein inside the funnel, and analysis that puts a
+trajectory together by nearest images finds the ligand in the funnel. A box sized from the
+solute alone does not know the funnel.
 
 ### FM-D7 — Automatic placement by path clearance, weighted alpha-carbon anchors
 Straight paths from the ligand are scored by the solute (and membrane) they cross and by how

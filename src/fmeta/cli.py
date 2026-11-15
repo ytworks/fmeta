@@ -151,7 +151,7 @@ def cmd_doctor(args) -> None:
     values = {}
     for name in dict.fromkeys(["Reference", platform.getName()]):
         toy = make_toy()
-        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), periodic=True, platform=name)
+        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), platform=name)
         bias.grid.add_hill(1.4, 0.1, 5.0)
         selected = mm.Platform.getPlatformByName(name)
         context = mm.Context(toy.system, mm.VerletIntegrator(0.001), selected,

@@ -10,7 +10,7 @@ procedure in `docs/gpu-runbook.md`) check them.
 |---|---|---|
 | CVs `s`, `rho` vs the numpy reference (`compute_cvs`) | ≤ 1e-9 nm on Reference | `tests/test_forces.py` |
 | Wall and bias energy, forces, CVs on the run platform vs Reference | CV ≤ 2e-5 nm; energy ≤ 1e-4, force ≤ 2e-3 (relative) | gate `forces`, `tests/test_platform.py` (`gpu`) |
-| CVs of a solvated complex under periodic re-imaging | ≤ 2e-3 nm on the run platform | gate `periodic_images` |
+| CVs and wall energy of a solvated complex while the run platform moves it between periodic cells (dynamics from two placements, and the ligand at the upper wall along the narrowest direction of the box) | ligand and anchors in one molecule of the context; CVs ≤ 2e-3 nm from the numpy CVs of the reported coordinates; wall energy ≤ 0.1 kJ/mol from the walls at those CVs | gate `periodic_images` |
 | Bias table vs `openmm.app.Metadynamics` for the same hills | ≤ 1e-6 relative | `tests/test_engine.py` |
 | Bias force (both forms) vs a `Continuous2DFunction` table of the same grid values | energy ≤ 1e-10 relative, forces ≤ 1e-8 (Reference) | `tests/test_engine.py` |
 | Restart: N + N hills vs 2N in one run | HILLS, COLVAR, DCD frames identical (Reference) | `tests/test_engine.py` |
@@ -26,10 +26,16 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
 
 - The bias lookup is clamped to the grid. An OpenMM tabulated function is zero outside its
   range, so an unclamped bias vanishes the moment a CV overshoots the grid.
-- CV forces use periodic boundaries (GPU platforms wrap molecules internally). That needs a box
-  with image distance > 2 × (reach + 0.3 nm) for a tumbling solute, or per axis for a membrane
-  system. The funnel is therefore placed BEFORE solvation and the box is sized from it; never
-  size a box from the solute alone.
+- CV forces (CVs, walls, bias) never use periodic boundaries. OpenMM's periodic wrap of a
+  displacement is the nearest image only within half of `a.x`, `b.y` and `c.z` (0.354 L along z
+  in the rhombic dodecahedron); beyond that the CVs jumped to another image and 5 of 40 short
+  GPU runs ended in NaN. The complex stays in one piece because the centroid forces make the
+  ligand and the protein one molecule of the context, which a platform moves between cells as a
+  whole. Compute CVs from coordinates as reported or made whole, never wrapped atom by atom.
+- The box has an image distance ≥ 2 × (reach + 0.3 nm) for a tumbling solute, or per axis for
+  a membrane system: the ligand in the funnel is then nearer to its own protein than to any
+  periodic copy. The funnel is therefore placed BEFORE solvation and the box is sized from it;
+  never size a box from the solute alone.
 - Group weights of the CVs are explicit, never particle masses: hydrogen mass repartitioning
   changes masses, and the toy system's anchors are massless.
 - `rho` is regularised at the axis (`eps`) and hills are mirrored at `rho = 0` by default.
@@ -43,7 +49,8 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   "no binding", never as a binding free energy.
 - HILLS is the record of the bias (heights stored times `gamma / (gamma - 1)`, as PLUMED does).
   The checkpoint bundle is replaced atomically; a restart rolls HILLS / COLVAR / DCD back to
-  it. With walkers, every walker is rolled back before any of them restarts.
+  it. With walkers, every walker is rolled back before any of them restarts. A run stops with
+  an error before a value that is not finite is written to HILLS or COLVAR or added to the grid.
 
 ## Change gate
 

@@ -25,8 +25,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4
-and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4,
+D5, D6 and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -41,29 +41,37 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
-| GPU plan M0: first gate record (R1) | In progress: first GPU runs done; the fixes of their failures are being committed |
+| GPU plan M0: first gate record (R1) | In progress: first GPU runs done and their failures fixed; gate record pending |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
-- GPU gates: **none recorded** (`bench/results/` is empty). The gate script and its criteria
-  exist (`scripts/gpu_gates.py`, `docs/gpu-runbook.md`).
-- CPU evidence, in the image (lock d061e45a…, on the source of this commit before it was
-  committed): `ruff check .` passes; `pytest` 78 passed. Not rerun on this commit: `fmeta check
-  --platform CPU --quick` (15 passed, 0 failed, 0 skipped on 20c43af) and `pytest -m slow`
-  (6 passed on aadd0ad, in the image). CI has not run on the commits after aadd0ad (see
+- GPU gates: **none recorded** (`bench/results/` is empty). The full gates have not run on a
+  clean commit yet. `fmeta check --quick` on CUDA (2 GPUs, in the image, on the source of this
+  commit before it was committed): 15 passed, 0 failed, 0 skipped. That is not evidence: quick
+  lengths and a dirty tree.
+- CPU evidence, in the image (lock d061e45a…, same source): `ruff check .` passes; `pytest`
+  79 passed; `pytest -m slow` 6 passed. CI has not run on the commits after aadd0ad (see
   Blockers); it was green on 171220a.
-- Not verified anywhere yet:
-  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures; two
-    fixes are committed (FM-D2, FM-D4), the last follows; nothing is recorded;
+- Seen for the first time on this machine (quick check and diagnostics, not evidence): the
+  CUDA platform, the real OpenFF / GAFF generators, a membrane build and run on a GPU.
+- Not verified yet:
+  - recorded gate evidence (R1), including the 10 ns toy free energy on a GPU;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself;
   - the CI job `docker` and the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
-  modelled; non-protein components are removed unless listed in `system.keep_hetero`.
+  modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
+  directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
+  must be prepared again.
 - Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D2, FM-D5, FM-D6: CV forces without periodic boundaries; gate `periodic_images` redefined; runs stop before recording NaN
+- What: the forces of the CVs, the walls and the bias no longer use periodic boundaries (the `periodic` argument is gone); the box rule is unchanged. Before: 5 of 40 biased GPU runs of 800 ps on the test system of `fmeta check` ended in NaN. After: the 5 failing seeds pass and so do 40 new runs; started with a corner of the cell inside the complex, the complex changed cell 57 times in 200 ps with the CVs within 8.9e-07 nm of numpy. The gate `periodic_images` now runs dynamics from two placements and probes the upper wall along the narrowest direction of the box (CV tolerance 2e-3 nm unchanged; wall energy within 0.1 kJ/mol): it fails on the periodic forces (1.2e6 kJ/mol), which the old static gate passed. `forces` loses its seventh position, a periodic image of another one. A run now stops with an error before a value that is not finite reaches HILLS, COLVAR or the grid. `fmeta check --quick` on CUDA: 15 passed, 0 failed, 0 skipped (not evidence).
+- Why: two facts from the first GPU runs. OpenMM's periodic wrap of a displacement is the nearest image only within half of `a.x`, `b.y` and `c.z`, which is 0.354 L along z in the rhombic dodecahedron, so the CVs jumped (`s` from 2.75 to −4.00 nm in one step) in a box that satisfies FM-D6. And a context holds the ligand and the protein as one molecule, because the centroid forces join them, so a platform moves them between cells together. Rejected: periodic CVs in a cube (41% more volume).
+- Refs: FM-D2, FM-D5, FM-D6; `.claude/rules/numerics-invariants.md`; `src/fmeta/funnel/forces.py`, `src/fmeta/check.py`, `src/fmeta/engine/runner.py`; `tests/test_engine.py`.
 
 ### 2026-11-16 — [amendment] FM-D4 (roadmap R4): the bias table holds spline coefficients; two force forms by platform
 - What: fmeta fits the B-spline coefficients of the bias itself after every hill, and the energy expression evaluates the bicubic spline from a `Discrete2DFunction`. The bias is the same function as before (test against a `Continuous2DFunction`: energy 1e-10, forces 1e-8). Measured on the test system of `fmeta check` (24062 atoms, CUDA, mixed precision, 4 fs, one hill per ps): 73.4% of the speed of plain MD before, 96–97% after (1.84 ms per hill). GPU platforms get a `CustomCentroidBondForce` plus a zero-energy force that reads the CVs outside the integration; Reference and CPU get one `CustomCVForce`; a context of the other kind is refused. `benchmark` compares the same stretch with and without the bias and reports the cost of a checkpoint.

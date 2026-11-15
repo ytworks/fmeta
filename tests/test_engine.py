@@ -45,9 +45,9 @@ def test_grid_layout_and_kernels():
 def _reference_metadynamics(settings, grid):
     toy = make_toy()
     variables = [
-        app.BiasVariable(forces.projection_force(toy.funnel, True), grid.s_min, grid.s_max,
+        app.BiasVariable(forces.projection_force(toy.funnel), grid.s_min, grid.s_max,
                          settings.sigma_s, False, grid.n_s),
-        app.BiasVariable(forces.extent_force(toy.funnel, True), 0.0, grid.rho_max,
+        app.BiasVariable(forces.extent_force(toy.funnel), 0.0, grid.rho_max,
                          settings.sigma_rho, False, grid.n_rho),
     ]
     reference = app.Metadynamics(toy.system, variables, settings.temperature * unit.kelvin,
@@ -69,7 +69,7 @@ def test_matches_openmm_metadynamics_dynamics(tmp_path):
     n_hills = 25
 
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, settings)
     simulation = make_simulation(toy, seed=7)
     MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group).run(n_hills)
 
@@ -87,7 +87,7 @@ def test_matches_openmm_metadynamics_table(tmp_path):
     """Feeding our logged hills to OpenMM's class reproduces our table."""
     settings = BiasSettings(reflect=False, **SETTINGS)
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, settings)
     simulation = make_simulation(toy, seed=7)
     run = MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group)
     run.run(300)
@@ -108,7 +108,7 @@ def test_matches_openmm_metadynamics_table(tmp_path):
 
 def test_hills_replay_reproduces_grid(tmp_path):
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS), periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
     simulation = make_simulation(toy, seed=3)
     run = MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group)
     run.run(120)
@@ -135,7 +135,7 @@ def test_hills_replay_reproduces_grid(tmp_path):
 def _run(tmp_path, name, segments, seed=5, **run_kwargs):
     for target in segments:
         toy = make_toy()
-        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS), periodic=True)
+        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
         simulation = make_simulation(toy, seed=seed)
         run = MetadynamicsRun(simulation, bias, tmp_path / name, toy.restraint_group,
                               RunSettings(checkpoint_hills=25, **run_kwargs))
@@ -162,7 +162,7 @@ def test_restart_discards_work_after_the_last_checkpoint(tmp_path):
     whole, _ = _run(tmp_path, "whole", [100], trajectory_hills=10)
 
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS), periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
     simulation = make_simulation(toy, seed=5)
     run = MetadynamicsRun(simulation, bias, tmp_path / "crash", toy.restraint_group,
                           RunSettings(checkpoint_hills=25, trajectory_hills=10))
@@ -189,11 +189,32 @@ def test_restart_discards_work_after_the_last_checkpoint(tmp_path):
     assert count_dcd_frames(crashed / "traj.dcd") == 10
 
 
+def test_run_stops_before_recording_values_that_are_not_finite(tmp_path):
+    """A simulation that broke down leaves no NaN in HILLS, COLVAR or the bias."""
+    toy = make_toy()
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
+    simulation = make_simulation(toy, seed=5)
+    run = MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group)
+    run.run(3)
+    state = simulation.context.getState(getPositions=True)
+    positions = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)
+    positions[toy.funnel.ligand_atoms[0]] = np.nan
+    simulation.context.setPositions(positions)
+    with pytest.raises(RuntimeError, match="not finite"):
+        run.run(6)
+    run.close()
+
+    assert len(read_hills(tmp_path / "HILLS")) == 3
+    colvar = read_colvar(tmp_path / "COLVAR")
+    assert colvar["time"].size == 3 and all(np.isfinite(column).all() for column in colvar.values())
+    assert np.isfinite(bias.grid.values).all()
+
+
 def test_bias_stays_continuous_outside_the_grid():
     """Past the grid edge the bias keeps its edge value instead of dropping to zero."""
     toy = make_toy()
     settings = BiasSettings(**SETTINGS)
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, settings)
     simulation = make_simulation(toy)
     context = simulation.context
     grid = bias.grid
@@ -224,7 +245,7 @@ def test_bias_is_the_spline_of_openmm_tables(built_for):
     evaluated on Reference here as well."""
     settings = BiasSettings(**SETTINGS)
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True, platform=built_for)
+    bias = FunnelBias(toy.system, toy.funnel, settings, platform=built_for)
     grid = bias.grid
     rng = np.random.default_rng(4)
     grid.add_hills(rng.uniform(grid.s_min, grid.s_max, 60), rng.uniform(0.0, grid.rho_max, 60),
@@ -232,8 +253,8 @@ def test_bias_is_the_spline_of_openmm_tables(built_for):
     bias.push(None)
 
     stock = mm.CustomCVForce("table(s, rho)")
-    stock.addCollectiveVariable("s", forces.projection_force(toy.funnel, True))
-    stock.addCollectiveVariable("rho", forces.extent_force(toy.funnel, True))
+    stock.addCollectiveVariable("s", forces.projection_force(toy.funnel))
+    stock.addCollectiveVariable("rho", forces.extent_force(toy.funnel))
     stock.addTabulatedFunction("table", mm.Continuous2DFunction(
         grid.n_s, grid.n_rho, grid.values.ravel(), grid.s_min, grid.s_max, 0.0, grid.rho_max))
     stock.setForceGroup(forces.free_force_group(toy.system))

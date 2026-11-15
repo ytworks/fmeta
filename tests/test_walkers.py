@@ -14,7 +14,7 @@ SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, s
 
 def make_walker(base, index, n_walkers, seed, **run_kwargs):
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS), periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
     simulation = make_simulation(toy, seed=seed)
     dirs = [base / f"w{k}" for k in range(n_walkers)]
     settings = RunSettings(walker_dirs=dirs, checkpoint_hills=20, **run_kwargs)

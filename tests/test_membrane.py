@@ -35,7 +35,7 @@ def test_membrane_box_height_follows_the_funnel():
     short, tall = funnel(5.0), funnel(6.5)
     z_short = membrane_box_z(short, positions, selection.solute, cutoff=1.0, padding=1.2)
     z_tall = membrane_box_z(tall, positions, selection.solute, cutoff=1.0, padding=1.2)
-    # a longer funnel needs a taller box, by about twice the extra length (minimum-image rule)
+    # a longer funnel needs a taller box, by about twice the extra length
     assert z_tall - z_short == pytest.approx(2 * 1.5 * 1.03, abs=0.2)
     _, axis, _ = funnel_frame(tall, positions)
     assert z_tall >= 2 * (abs(axis[2]) * (tall.upper + 0.3) + tall.max_radius + 0.3)

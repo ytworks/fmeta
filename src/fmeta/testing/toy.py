@@ -79,7 +79,7 @@ def make_toy(well_depth: float = 20.0, well_sigma: float = 0.15, site_s: float =
 
     funnel_kwargs.setdefault("upper", 3.5)
     funnel = Funnel(ligand_atoms=[0], p0_atoms=[1], p1_atoms=[2], **funnel_kwargs)
-    restraint = add_funnel_restraint(system, funnel, periodic=True)
+    restraint = add_funnel_restraint(system, funnel)
 
     topology = app.Topology()
     chain = topology.addChain()

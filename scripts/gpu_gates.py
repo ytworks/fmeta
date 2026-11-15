@@ -2,9 +2,10 @@
 """Run the GPU gates and record the evidence.
 
 The gates are the GPU tests (``pytest -m gpu``) and every item of ``fmeta check``
-(fmeta/check.py: forces against the Reference platform, periodic images, the solvable toy
-system, the route from a protein PDB and a ligand SDF, the full pipeline with restart and
-walkers, a membrane build and run). On ALL PASSED the result is written to
+(fmeta/check.py: forces against the Reference platform, the solvable toy system, the route
+from a protein PDB and a ligand SDF, the CVs while the platform moves the complex between
+periodic images, the full pipeline with restart and walkers, a membrane build and run). On
+ALL PASSED the result is written to
 ``bench/results/<date>-<commit>-gpu-gates.json`` and added to ``bench/results/index.json``;
 commit both. Procedure: docs/gpu-runbook.md.
 

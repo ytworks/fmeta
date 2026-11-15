@@ -33,7 +33,7 @@ record stores the UUIDs, which identify the physical GPUs.
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
      `forces`, `toy_restart`, `toy_free_energy`, `pdb_sdf_openff`, `pdb_sdf_gaff`, `prepare`,
-     `periodic_images`, `equilibrate`, `production`, `walkers`, `analysis`, `benchmark`,
+     `equilibrate`, `periodic_images`, `production`, `walkers`, `analysis`, `benchmark`,
      `membrane_build`, `membrane_run`.
    A skipped item is not a pass.
    While iterating use `fmeta check --quick` or `scripts/gpu_gates.py --quick` (not recorded).
@@ -68,6 +68,12 @@ Wall time and the `benchmark` item (ns/day with and without the bias over the sa
 the test system, and the cost of a checkpoint) are recorded but never decide a verdict.
 `scripts/in_docker.sh --gpus 6 fmeta doctor` prints the platforms, the optional packages and
 the cost of a bias table update without running anything long.
+
+When a run stops with "values that are not finite", the simulation broke down: nothing of the
+broken step is in HILLS or COLVAR, and running the same command again continues from the last
+checkpoint. If it happens again at the same place, look at the last COLVAR rows: a CV that
+jumps by more than the funnel is long means the ligand and the protein were read in different
+periodic images, which the item `periodic_images` exists to exclude.
 
 ## Production runs (reported, not gated)
 

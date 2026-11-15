@@ -182,8 +182,13 @@ class MetadynamicsRun:
                     self.simulation.step(self.stride)
                     t = context.getStepCount() * self.dt
                     s, rho = self.bias.collective_variables(context)
-                    bias = self.bias.energy(context)
-                    self._colvar.write(t, s, rho, bias, self._restraint_energy())
+                    bias, wall = self.bias.energy(context), self._restraint_energy()
+                    if not np.isfinite([s, rho, bias, wall]).all():
+                        # Nothing of this is written: a restart continues from the last checkpoint.
+                        raise RuntimeError(
+                            f"the simulation broke down before t = {t:.3f} ps: values that are not finite "
+                            f"(s = {s} nm, rho = {rho} nm, bias = {bias} kJ/mol, funnel walls = {wall} kJ/mol)")
+                    self._colvar.write(t, s, rho, bias, wall)
                 height = self.bias.hill_height(bias)
                 self.bias.grid.add_hill(s, rho, height)
                 self._hills.write(t, s, rho, settings.sigma_s, settings.sigma_rho, height)

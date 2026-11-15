@@ -5,7 +5,8 @@ packages, on a small self-contained system (the 35-residue protein shipped with
 OpenMM plus a benzene molecule), and prints PASS / FAIL / SKIP per item:
 
 * the funnel and bias forces on the selected platform against the Reference platform;
-* periodic-image handling of the collective variables on a real solvated system;
+* the collective variables of a real solvated system while the platform moves the complex
+  between periodic images;
 * funnel metadynamics on a solvable toy system against its exact binding free energy;
 * the whole pipeline (build, equilibrate, replicas, restart, walkers, analysis);
 * a membrane build with ``Modeller.addMembrane`` and a short membrane run;
@@ -37,7 +38,7 @@ from .config import Config
 from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
-from .funnel.geometry import compute_cvs
+from .funnel.geometry import compute_cvs, funnel_frame
 from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
 from .testing.systems import BENZENE_XML, write_complex_inputs, write_membrane_inputs
 from .testing.toy import make_simulation, make_toy
@@ -57,8 +58,8 @@ PROFILES = {
 # What each item has to show. scripts/gpu_gates.py stores these with the recorded evidence.
 CRITERIA = {
     "platform": "a GPU platform (CUDA, HIP or OpenCL) is selected and usable",
-    "forces": "funnel-wall and bias energies, forces and CVs match the Reference platform at 7 "
-              "positions incl. a periodic image: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3 (relative)",
+    "forces": "funnel-wall and bias energies, forces and CVs match the Reference platform at 6 "
+              "positions: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3 (relative)",
     "toy_restart": "80 time-ordered hills after a restart at 40; CVs finite and inside the walls",
     "toy_free_energy": "solvable toy system, 10 ns: reweighted dG0 within 2.0 kJ/mol and plateau "
                        "mean within 3.0 kJ/mol of the exact value",
@@ -66,9 +67,14 @@ CRITERIA = {
                       "parameters: finite energy, neutral benzene, funnel checks pass",
     "pdb_sdf_gaff": "the same with GAFF ligand parameters",
     "prepare": "solvated system built, funnel placed automatically, no funnel check fails",
-    "periodic_images": "CVs of the solvated complex change by <= 2e-3 nm when the whole system or "
-                       "the ligand is moved to another periodic image; wall energy stays zero",
     "equilibrate": "staged equilibration completes; funnel checks pass on the equilibrated structure",
+    "periodic_images": "the ligand and the funnel anchors are in one molecule of the context; during "
+                       "1000 steps each with the whole system shifted across the box and with a corner "
+                       "of the periodic cell inside the complex, and with the ligand at the upper wall "
+                       "while the funnel axis lies along the narrowest direction of the box, the CVs on "
+                       "the run platform are within 2e-3 nm of the numpy CVs of the reported "
+                       "coordinates (as reported and wrapped into the cell) and the wall energy within "
+                       "0.1 kJ/mol of the walls at those CVs",
     "production": "2 replicas reach the requested number of hills and continue from their "
                   "checkpoints without changing earlier hills; CVs finite, inside the funnel, "
                   "no jump above 1 nm between samples",
@@ -175,14 +181,12 @@ class Checker:
         reference = mm.Platform.getPlatformByName("Reference")
         toy = make_toy()
         hills = [(1.0, 0.05, 6.0), (1.6, 0.2, 4.0), (2.6, 0.1, 3.0), (3.4, 0.05, 2.0)]
-        box = 12.0
         offsets = [[0.0, 0.0, 0.0], [0.15, -0.1, 0.5], [0.6, 0.3, 0.3], [0.02, 0.0, 2.6],
-                   [1e-4, 0.0, 1.2], [0.1, 0.05, -0.7], [0.15 + box, -0.1, 0.5 - box]]
+                   [1e-4, 0.0, 1.2], [0.1, 0.05, -0.7]]
 
         def evaluate(platform, properties, positions):
             system_toy = make_toy()
-            bias = FunnelBias(system_toy.system, system_toy.funnel, BiasSettings(), periodic=True,
-                              platform=platform.getName())
+            bias = FunnelBias(system_toy.system, system_toy.funnel, BiasSettings(), platform=platform.getName())
             for hill in hills:
                 bias.grid.add_hill(*hill)
             context = mm.Context(system_toy.system, mm.VerletIntegrator(0.001), platform, properties)
@@ -210,15 +214,14 @@ class Checker:
         if worst_cv > 2e-5 or worst_energy > 1e-4 or worst_force > 2e-3:
             raise AssertionError(f"differs from Reference: CV {worst_cv:.1e} nm, energy "
                                  f"{worst_energy:.1e} (relative), force {worst_force:.1e} (relative)")
-        return (f"bias and wall forces match Reference at {len(offsets)} positions incl. a periodic "
-                f"image: CV {worst_cv:.1e} nm, energy {worst_energy:.1e}, force {worst_force:.1e} (relative)")
+        return (f"bias and wall forces match Reference at {len(offsets)} positions: CV {worst_cv:.1e} nm, "
+                f"energy {worst_energy:.1e}, force {worst_force:.1e} (relative)")
 
     def _toy_run(self, directory, n_hills: int, seed: int):
         toy = make_toy()
         settings = BiasSettings(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05,
                                 sigma_rho=0.05, pace=100, points_per_sigma=2.0)
-        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True,
-                          platform=self.platform.getName())
+        bias = FunnelBias(toy.system, toy.funnel, settings, platform=self.platform.getName())
         simulation = make_simulation(toy, seed=seed, platform=self.platform.getName(),
                                      properties=self.properties)
         run = MetadynamicsRun(simulation, bias, directory, toy.restraint_group,
@@ -301,36 +304,6 @@ class Checker:
         return (f"{prepared.topology.getNumAtoms()} atoms; funnel from s = {funnel.lower:.2f} to "
                 f"{funnel.upper:.2f} nm, placed and validated automatically")
 
-    def check_pbc(self) -> str:
-        work = self.workdir / "soluble"
-        prepared = load_prepared(work)
-        config = Config.load(work / "config.yaml")
-        system = prepared.system
-        bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True,
-                          platform=self.platform.getName())
-        context = mm.Context(system, mm.VerletIntegrator(0.001), self.platform, self.properties)
-        box = prepared.box_vectors
-        context.setPeriodicBoxVectors(*(mm.Vec3(*row) for row in box))
-        reference = np.array(compute_cvs(prepared.funnel, prepared.positions))
-        cases = {"as built": prepared.positions}
-        shifted = prepared.positions + 0.37 * box[0] + 0.6 * box[1] - 0.45 * box[2]
-        cases["whole system shifted across the box"] = shifted
-        moved = prepared.positions.copy()
-        moved[prepared.selection.ligand] += box[2] - box[0]
-        cases["ligand placed in another periodic image"] = moved
-        worst = 0.0
-        for label, positions in cases.items():
-            context.setPositions(positions)
-            values = np.array(bias.collective_variables(context))
-            wall = context.getState(getEnergy=True, groups={prepared.restraint_group})
-            wall = wall.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-            error = float(np.abs(values - reference).max())
-            worst = max(worst, error)
-            if error > 2e-3 or abs(wall) > 1e-2:
-                raise AssertionError(f"{label}: CVs {values} vs {reference}, wall energy {wall:.3f}")
-        return (f"CVs of the solvated complex are unchanged under {len(cases) - 1} periodic "
-                f"re-imagings (max deviation {worst:.1e} nm)")
-
     def check_equilibrate(self) -> str:
         work = self.workdir / "soluble"
         summary = equilibrate_stage(Config.load(work / "config.yaml"), work, self.device)
@@ -339,6 +312,89 @@ class Checker:
         return (f"funnel wall energy on the bound ligand {summary['wall_energy_mean']:.3f} kJ/mol "
                 f"({'ok' if summary['wall_ok'] else 'above 0.1 kT'}); box "
                 + " x ".join(f"{v:.2f}" for v in summary["box_lengths"]) + " nm")
+
+    def check_pbc(self) -> str:
+        work = self.workdir / "soluble"
+        config = Config.load(work / "config.yaml")
+        prepared = load_prepared(work, config)
+        funnel = prepared.funnel
+        with open(work / "equil" / "state.xml") as handle:
+            state = mm.XmlSerializer.deserialize(handle.read())
+        system = prepared.system
+        add_barostat(system, config.system.temperature, config.system.pressure, False)
+        bias = FunnelBias(system, funnel, config.metad, platform=self.platform.getName())
+        integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
+                                                 1.0 / unit.picosecond,
+                                                 config.run.timestep_fs * unit.femtosecond)
+        integrator.setRandomNumberSeed(1)
+        context = mm.Context(system, integrator, self.platform, self.properties)
+        bias.exclude_probe(integrator)
+
+        # A platform moves whole molecules between periodic images. The forces of the CVs join
+        # the ligand and the anchors into one, and the CVs rely on that.
+        anchors = set(funnel.ligand_atoms + funnel.p0_atoms + funnel.p1_atoms)
+        molecules = [molecule for molecule in context.getMolecules() if anchors.intersection(molecule)]
+        if len(molecules) != 1:
+            raise AssertionError(f"the ligand and the funnel anchors are spread over {len(molecules)} "
+                                 "molecules of the context: the platform may move them to different "
+                                 "periodic images")
+        solute = np.array(molecules[0])
+        worst = {"cv": 0.0, "wall": 0.0}
+        cells = set()
+
+        def compare(label):
+            values = np.array(bias.collective_variables(context))
+            wall = context.getState(getEnergy=True, groups={prepared.restraint_group})
+            wall = wall.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            images = []
+            for wrapped in (False, True):
+                snapshot = context.getState(getPositions=True, enforcePeriodicBox=wrapped)
+                images.append(snapshot.getPositions(asNumpy=True).value_in_unit(unit.nanometer))
+                reference = np.array(compute_cvs(funnel, images[-1]))
+                error = float(np.abs(values - reference).max())
+                wall_error = abs(wall - float(funnel.restraint_energy(*reference)))
+                worst["cv"], worst["wall"] = max(worst["cv"], error), max(worst["wall"], wall_error)
+                if error > 2e-3 or wall_error > 0.1:
+                    raise AssertionError(
+                        f"{label}: CVs {values} and wall energy {wall:.3f} kJ/mol on the platform, CVs "
+                        f"{reference} from the coordinates "
+                        f"{'wrapped into the cell' if wrapped else 'as reported'}")
+            lattice = snapshot.getPeriodicBoxVectors(asNumpy=True).value_in_unit(unit.nanometer)
+            moved = images[1][solute[0]] - images[0][solute[0]]
+            cells.add(tuple(np.round(np.linalg.solve(lattice.T, moved)).astype(int)))
+
+        start = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)
+        box = state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(unit.nanometer)
+        centre = start[solute].mean(axis=0)
+        chunks, steps = 4, 250
+        placements = {"whole system shifted across the box": 0.37 * box[0] + 0.6 * box[1] - 0.45 * box[2],
+                      "corner of the periodic cell inside the complex": -centre}
+        for label, shift in placements.items():
+            context.setState(state)
+            context.setPositions(start + shift)
+            compare(label)
+            for _ in range(chunks):
+                integrator.step(steps)
+                compare(label)
+
+        # The far end of the funnel in the worst orientation of the tumbling complex: the axis
+        # along the narrowest direction of the box, where a vector as long as the funnel is more
+        # than half a box width and a periodic force would take another image of the ligand.
+        p0, axis, ligand = funnel_frame(funnel, start)
+        across = np.cross(np.eye(3)[np.argmin(np.abs(axis))], axis)
+        across /= np.linalg.norm(across)
+        narrow = int(np.argmin(np.diag(box)))
+        rotation = np.roll([across, np.cross(axis, across), axis], narrow + 1, axis=0)
+        far = start.copy()
+        far[prepared.selection.ligand] += (funnel.upper - np.dot(ligand - p0, axis)) * axis
+        context.setState(state)
+        context.setPositions(centre + (far - centre) @ rotation.T)
+        compare("ligand at the upper wall, funnel axis along the narrowest direction of the box")
+        return (f"ligand and anchors in one molecule of {len(solute)} atoms; shifted across the box and "
+                f"with a cell corner inside the complex ({chunks * steps} steps each, the complex in "
+                f"{len(cells)} periodic cells), and at the upper wall along the narrowest direction of "
+                f"the box: CVs within {worst['cv']:.1e} nm, wall energy within {worst['wall']:.1e} kJ/mol "
+                "of the values from the coordinates")
 
     def _verify_run(self, directory: Path, expected: int, funnel) -> str:
         hills = read_hills(directory / "HILLS")
@@ -350,7 +406,7 @@ class Checker:
         jump = float(np.abs(np.diff(colvar["s"])).max()) if colvar["s"].size > 1 else 0.0
         if jump > 1.0 or colvar["s"].min() < funnel.lower - 0.5 or colvar["s"].max() > funnel.upper + 0.5:
             raise AssertionError(f"{directory.name}: CV left the funnel or jumped by {jump:.2f} nm "
-                                 "(a periodic-image problem would look like this)")
+                                 "(a ligand in another periodic image than the protein looks like this)")
         speed = (directory / "run.log").read_text().strip().splitlines()[-1].split("speed")[-1].strip()
         return speed
 
@@ -421,8 +477,8 @@ class Checker:
             system = prepared.system
             add_barostat(system, config.system.temperature, config.system.pressure, False)
             metad = BiasSettings(temperature=config.system.temperature, pace=pace)
-            bias = FunnelBias(system, prepared.funnel, metad, periodic=True,
-                              platform=self.platform.getName()) if label == "biased" else None
+            bias = (FunnelBias(system, prepared.funnel, metad, platform=self.platform.getName())
+                    if label == "biased" else None)
             integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
                                                      1.0 / unit.picosecond, dt * unit.picosecond)
             simulation = app.Simulation(prepared.topology, system, integrator, self.platform,
@@ -501,8 +557,8 @@ class Checker:
         self.run("pdb_sdf_openff", lambda: self._check_ligand("openff"), needs=("platform",))
         self.run("pdb_sdf_gaff", lambda: self._check_ligand("gaff"), needs=("platform",))
         self.run("prepare", self.check_prepare, needs=("platform",))
-        self.run("periodic_images", self.check_pbc, needs=("prepare",))
         self.run("equilibrate", self.check_equilibrate, needs=("prepare",))
+        self.run("periodic_images", self.check_pbc, needs=("equilibrate",))
         self.run("production", self.check_production, needs=("equilibrate",))
         self.run("walkers", self.check_walkers, needs=("equilibrate",))
         self.run("analysis", self.check_analysis, needs=("production",))

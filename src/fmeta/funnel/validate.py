@@ -102,8 +102,11 @@ def _shortest_image_distance(box: np.ndarray) -> float:
 
 
 def required_image_distance(funnel: Funnel) -> float:
-    """Smallest periodic image distance for which the minimum-image CVs stay
-    correct everywhere the walls allow the ligand to go."""
+    """Smallest periodic image distance for which the ligand stays nearer to its own protein
+    than to any periodic copy of it, everywhere the walls allow the ligand to go.
+
+    The forces do not need it: they take the coordinates as they are. A trajectory that is
+    analysed or made whole by nearest images does."""
     reach = float(np.hypot(funnel.upper + 0.3, funnel.max_radius))
     return 2.0 * (reach + 0.3)
 
@@ -114,9 +117,9 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
                     tumbling: bool = True) -> FunnelReport:
     """Run the geometric checks. ``box`` (three lengths or lattice vectors, nm)
     enables the periodic checks; ``slab`` stands in for a membrane not built yet.
-    ``tumbling=False`` (membrane systems) applies the minimum-image rule per box
-    axis instead of to the shortest image distance, since the solute cannot rotate
-    out of the membrane plane."""
+    ``tumbling=False`` (membrane systems) applies the rule of
+    :func:`required_image_distance` per box axis instead of to the shortest image
+    distance, since the solute cannot rotate out of the membrane plane."""
     positions = np.asarray(positions, dtype=float)
     report = report or FunnelReport()
     origin, axis, lig = funnel_frame(funnel, positions)
@@ -221,7 +224,8 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
             if shortest < needed:
                 report.add("box_cv", ERROR,
                            f"shortest periodic image distance {shortest:.2f} nm < {needed:.2f} nm: "
-                           "the minimum-image CVs would flip before the upper wall")
+                           "before the upper wall the ligand would be nearer to a periodic copy "
+                           "of the protein than to its own")
             else:
                 report.add("box_cv", OK, f"image distance {shortest:.2f} nm >= {needed:.2f} nm")
         else:
@@ -233,7 +237,8 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
             if lengths[2] < need_z or min(lengths[0], lengths[1]) < need_xy:
                 report.add("box_cv", ERROR,
                            f"box {lengths[0]:.2f} x {lengths[1]:.2f} x {lengths[2]:.2f} nm is too "
-                           f"small for the minimum-image CVs (need xy >= {need_xy:.2f}, "
+                           f"small: before the upper wall the ligand would be nearer to a periodic "
+                           f"copy of the protein than to its own (need xy >= {need_xy:.2f}, "
                            f"z >= {need_z:.2f} nm)")
             else:
                 report.add("box_cv", OK, f"box z {lengths[2]:.2f} nm >= {need_z:.2f} nm, "

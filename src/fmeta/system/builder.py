@@ -2,7 +2,8 @@
 
 The funnel is placed on the dry complex first, because the periodic box has to
 be sized from it: the unbound end of the funnel must sit in bulk, clear of the
-periodic images, and the minimum-image CVs must stay valid up to the upper wall.
+periodic images, and up to the upper wall the ligand must stay nearer to its own
+protein than to any periodic copy of it.
 """
 
 from __future__ import annotations
@@ -104,8 +105,9 @@ def soluble_image_distance(funnel: Funnel, positions: np.ndarray, solute: np.nda
 
     Three requirements, each independent of the solute's orientation:
     solvent padding around its bounding sphere; an unbound ligand that stays a
-    cutoff (plus 0.5 nm) away from the next image; and minimum-image CVs that
-    remain valid up to the upper wall. 3% is added for NPT volume changes.
+    cutoff (plus 0.5 nm) away from the next image; and a ligand that is nearer to
+    its own protein than to any periodic copy, up to the upper wall
+    (``required_image_distance``). 3% is added for NPT volume changes.
     """
     coords = positions[solute]
     centre = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
@@ -135,9 +137,10 @@ def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
     """Box height for a membrane system.
 
     The solute does not tumble, so only z matters: the unbound ligand must stay
-    a cutoff (plus 0.5 nm) from the periodic image above or below, the
-    z component of the ligand-anchor vector must stay under half the box, and
-    the solute needs ordinary solvent padding. 3% is added for NPT.
+    a cutoff (plus 0.5 nm) from the periodic image above or below, the ligand
+    must stay nearer to its own protein than to the copy above or below (the
+    z component of the ligand-anchor vector under half the box), and the solute
+    needs ordinary solvent padding. 3% is added for NPT.
     """
     coords = positions[solute]
     z_min, z_max = float(coords[:, 2].min()), float(coords[:, 2].max())
@@ -377,7 +380,7 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     funnel = remap_funnel(funnel, dry_positions, positions)
     selection = classify(topology, remap_atoms(dry_positions, positions, ligand_atoms))
     system = create_system(forcefield, topology, settings)
-    restraint = add_funnel_restraint(system, funnel, periodic=True)
+    restraint = add_funnel_restraint(system, funnel)
 
     box = np.array(topology.getPeriodicBoxVectors().value_in_unit(unit.nanometer))
     report = _built_report(report, validate_funnel(funnel, positions, selection, box=box,
@@ -423,6 +426,6 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
         if isinstance(system.getForce(index), (mm.MonteCarloBarostat, mm.MonteCarloMembraneBarostat,
                                                mm.MonteCarloAnisotropicBarostat)):
             system.removeForce(index)
-    restraint = add_funnel_restraint(system, funnel, periodic=True)
+    restraint = add_funnel_restraint(system, funnel)
     return Prepared(topology, system, positions, funnel, selection, report,
                     restraint.getForceGroup(), is_membrane, settings)

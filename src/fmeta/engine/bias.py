@@ -108,26 +108,23 @@ class FunnelBias:
     """
 
     def __init__(self, system: mm.System, funnel: Funnel, settings: BiasSettings,
-                 periodic: Optional[bool] = None, grid: Optional[BiasGrid] = None,
-                 platform: str = "Reference"):
+                 grid: Optional[BiasGrid] = None, platform: str = "Reference"):
         self.funnel = funnel
         self.settings = settings
         self.grid = grid if grid is not None else BiasGrid.from_funnel(funnel, settings)
-        if periodic is None:
-            periodic = system.usesPeriodicBoundaryConditions()
         self._on_gpu = platform in GPU_PLATFORMS
 
         g = self.grid
         self._table = mm.Discrete2DFunction(g.n_s + 3, g.n_rho + 3,
                                             spline_coefficients(g.values).ravel())
         if self._on_gpu:
-            self.force = forces.cv_force(_lookup(g), funnel, periodic)
+            self.force = forces.cv_force(_lookup(g), funnel)
             self._probe = mm.CustomCVForce("0")
             self._probe.setName("FunnelCVs")
         else:
             self.force = self._probe = mm.CustomCVForce(_lookup(g))
-        self._probe.addCollectiveVariable("s", forces.projection_force(funnel, periodic))
-        self._probe.addCollectiveVariable("rho", forces.extent_force(funnel, periodic))
+        self._probe.addCollectiveVariable("s", forces.projection_force(funnel))
+        self._probe.addCollectiveVariable("rho", forces.extent_force(funnel))
         self.force.addTabulatedFunction("table", self._table)
         self.force.setName("FunnelBias")
         for force in [self.force] + [self._probe] * self._on_gpu:
