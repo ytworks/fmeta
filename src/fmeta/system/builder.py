@@ -241,8 +241,12 @@ def _membrane_orientation(topology: app.Topology, positions: np.ndarray,
                 "could not find a hydrophobic belt to orient the protein by (" + detail + "); "
                 "supply a structure that is already oriented (e.g. from the OPM database) "
                 "and set membrane.orient to 'input'")
-        return positions, ("ok", "no clear hydrophobic belt found (" + detail + "); "
-                           "taking the input orientation as given", {"confident": False})
+        # Not "ok": nothing was checked, and a wrong orientation puts the bilayer through the
+        # protein without any later step noticing (FM-D15).
+        return positions, ("warning", "the orientation of the input could not be checked: no "
+                           "clear hydrophobic belt found (" + detail + "). The input is taken "
+                           "as given; use an OPM-oriented structure, and set membrane.orient: "
+                           "input once the orientation is known to be right", {"confident": False})
     info = dict(confident=True, score=fit.score, contrast=fit.contrast)
     if membrane.orient == "auto":
         new, rotation, translation = orient(positions, fit, membrane.center_z)

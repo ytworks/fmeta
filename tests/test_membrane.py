@@ -207,7 +207,7 @@ def test_orientation_check_and_auto_modes():
     assert refit.tilt() < 12.0 and abs(refit.offset()) < 0.3
     assert np.allclose(fixed, tilted @ np.array(info["rotation"]).T + np.array(info["translation"]))
 
-    # a protein without a belt cannot be auto-oriented
+    # a protein without a belt cannot be auto-oriented, and its check is a warning: it checked nothing
     rng = np.random.default_rng(3)
     blob = rng.uniform(-2, 2, size=(300, 3))
     blob_names = list(rng.choice(["LEU", "LYS", "SER", "GLU", "ALA", "ARG"], size=300))
@@ -215,7 +215,7 @@ def test_orientation_check_and_auto_modes():
         _membrane_orientation(_bundle_topology(blob, blob_names), blob, MembraneSettings(orient="auto"))
     _, (status, message, _) = _membrane_orientation(_bundle_topology(blob, blob_names), blob,
                                                     MembraneSettings())
-    assert status == "ok" and "as given" in message
+    assert status == "warning" and "could not be checked" in message
     with pytest.raises(ValueError, match="membrane.orient"):
         _membrane_orientation(topology, xyz, MembraneSettings(orient="sideways"))
 
