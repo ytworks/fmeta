@@ -15,24 +15,34 @@ from .binding import binding_free_energy
 from .fes import projection_profile
 
 
+def scan_hills(hills: Hills, grid: BiasGrid, every: int):
+    """Yield ``(n_hills, time_ps, grid)`` after each ``every`` hills, and at the end.
+
+    The same grid object is updated in place between yields; copy what you keep.
+    """
+    work = grid.empty_copy()
+    stops = list(range(every, len(hills) + 1, every))
+    if not stops or stops[-1] != len(hills):
+        stops.append(len(hills))
+    done = 0
+    for stop in stops:
+        part = hills[done:stop]
+        work.add_hills(part.s, part.rho, part.height)
+        done = stop
+        yield stop, float(hills.time[stop - 1]), work
+
+
 def dg_time_series(hills: Hills, grid: BiasGrid, funnel: Funnel, fes_scale: float, kT: float,
                    every: int, **binding_kwargs) -> tuple[np.ndarray, np.ndarray]:
     """dG0 from the bias accumulated up to each multiple of ``every`` hills.
 
     Returns ``(times_ps, dG)``; the last point always uses all hills.
     """
-    work = grid.empty_copy()
-    stops = list(range(every, len(hills) + 1, every))
-    if not stops or stops[-1] != len(hills):
-        stops.append(len(hills))
-    times, values, done = [], [], 0
-    for stop in stops:
-        part = hills[done:stop]
-        work.add_hills(part.s, part.rho, part.height)
-        done = stop
+    times, values = [], []
+    for _, time_ps, work in scan_hills(hills, grid, every):
         profile = projection_profile(work, fes_scale, kT)
         values.append(binding_free_energy(work.s, profile, funnel, kT, **binding_kwargs).dG)
-        times.append(hills.time[stop - 1])
+        times.append(time_ps)
     return np.array(times), np.array(values)
 
 

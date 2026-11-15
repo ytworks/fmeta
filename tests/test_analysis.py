@@ -8,7 +8,7 @@ import pytest
 from fmeta.analysis import analyze_replicas, analyze_run
 from fmeta.analysis.binding import binding_free_energy
 from fmeta.analysis.convergence import count_transitions, plateau_statistics, summarize_replicas
-from fmeta.analysis.fes import projection_profile, reweighted_profile
+from fmeta.analysis.fes import projection_profile, reweighted_profile, reweighting_offset
 from fmeta.engine import BiasGrid, BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.funnel.geometry import KB, STANDARD_VOLUME
 from fmeta.testing.toy import make_simulation, make_toy
@@ -74,20 +74,32 @@ def test_projection_profile_integrates_out_rho():
 
 
 def test_reweighted_profile_recovers_the_unbiased_profile():
-    """Samples drawn from exp(-(F - V)/kT) reweight back to F."""
+    """Samples drawn from exp(-(F + V)/kT) reweight back to F with weights exp(V/kT)."""
     rng = np.random.default_rng(0)
-    grid = BiasGrid(0.0, 2.0, 81, 0.5, 21, 0.05, 0.05)
-    free_energy = 6.0 * (grid.s - 1.0) ** 2            # true F(s)
+    s_grid = np.linspace(0.0, 2.0, 2001)
+    free_energy = 6.0 * (s_grid - 1.0) ** 2
     bias = 0.8 * (free_energy.max() - free_energy)     # cancels 80% of F
-    grid.values[...] = bias[None, :]
     biased = np.exp(-(free_energy + bias) / KT)
     cdf = np.cumsum(biased) / biased.sum()
-    s = np.interp(rng.random(400000), cdf, grid.s)
+    s = np.interp(rng.random(400000), cdf, s_grid)
     edges = np.linspace(0.3, 1.7, 15)
-    profile = reweighted_profile(s, np.full_like(s, 0.1), grid, KT, edges)
+    profile = reweighted_profile(s, np.interp(s, s_grid, bias) / KT, KT, edges)
     centres = 0.5 * (edges[1:] + edges[:-1])
     expected = 6.0 * (centres - 1.0) ** 2
     assert np.allclose(profile - profile.min(), expected - expected.min(), atol=0.25)
+
+
+def test_reweighting_offset_limits():
+    grid = BiasGrid(0.0, 2.0, 41, 1.0, 21, 0.05, 0.05)
+    assert reweighting_offset(grid, 1.25, KT) == pytest.approx(0.0)       # no bias yet
+    grid.values[...] = 7.0                                                 # uniform bias
+    assert reweighting_offset(grid, 1.25, KT) == pytest.approx(7.0)       # c equals the bias
+    # one biased cell among n: both integrals are two-term sums
+    grid.values[...] = 0.0
+    grid.values[5, 10] = 40.0
+    n, scale = grid.values.size, 10.0 / 9.0
+    expected = KT * np.log((np.exp(scale * 40.0 / KT) + n - 1) / (np.exp((scale - 1) * 40.0 / KT) + n - 1))
+    assert reweighting_offset(grid, scale, KT) == pytest.approx(expected)
 
 
 def test_transition_counting_uses_hysteresis():
@@ -130,7 +142,8 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     # (the well is 14 kJ/mol deep); the replica test below checks the mean tightly.
     assert result["dG_plateau"] == pytest.approx(exact, abs=2.0)
     assert not [p for p in result["problems"] if "rebinding" in p or "flat" in p]
-    assert result["dG_reweighted"] == pytest.approx(exact, abs=3.0)
+    # the reweighted histogram is the more precise of the two estimators here
+    assert result["dG_reweighted"] == pytest.approx(exact, abs=1.0)
     assert (tmp_path / "result.json").exists() and (tmp_path / "fes.npz").exists()
 
 

@@ -27,14 +27,32 @@ def projection_profile(grid: BiasGrid, fes_scale: float, kT: float) -> np.ndarra
     return profile - profile.min()
 
 
-def reweighted_profile(s_samples, rho_samples, grid: BiasGrid, kT: float, s_edges) -> np.ndarray:
-    """W(s) from samples reweighted with the final bias, exp(+V/kT).
+def reweighting_offset(grid: BiasGrid, fes_scale: float, kT: float) -> float:
+    """The time-dependent offset c(t) of well-tempered metadynamics for the bias
+    currently on ``grid`` (Tiwary and Parrinello, J. Phys. Chem. B 2015):
 
-    This treats the final bias as static, so pass samples from the late part of
-    the run only. Bins without samples are returned as ``inf``.
+        c = kT ln [ int exp(-F/kT) / int exp(-(F + V)/kT) ],   F = -fes_scale * V
+
+    For plain metadynamics (fes_scale = 1) the denominator is flat, as it should be.
     """
-    bias = grid.interpolate(s_samples, rho_samples)
-    weights = np.exp((bias - bias.max()) / kT)
+    bias = grid.values / kT
+    top = fes_scale * bias
+    bottom = (fes_scale - 1.0) * bias
+    log_top = top.max() + np.log(np.exp(top - top.max()).sum())
+    log_bottom = bottom.max() + np.log(np.exp(bottom - bottom.max()).sum())
+    return float(kT * (log_top - log_bottom))
+
+
+def reweighted_profile(s_samples, log_weights, kT: float, s_edges) -> np.ndarray:
+    """W(s) from a weighted histogram of samples, shifted so its minimum is zero.
+
+    For metadynamics the weight of a sample taken at time t is
+    exp((V(s, rho, t) - c(t))/kT), with V the bias the system felt at that
+    moment and c(t) from :func:`reweighting_offset`. Bins without samples are
+    returned as ``inf``.
+    """
+    log_weights = np.asarray(log_weights, dtype=float)
+    weights = np.exp(log_weights - log_weights.max())
     histogram, _ = np.histogram(s_samples, bins=s_edges, weights=weights)
     with np.errstate(divide="ignore"):
         profile = -kT * np.log(histogram / np.diff(s_edges))

@@ -9,18 +9,19 @@ from typing import Optional, Sequence
 import numpy as np
 
 from ..engine.grid import BiasGrid, BiasSettings
-from ..engine.hills import read_colvar, read_hills, sum_hills
+from ..engine.hills import read_colvar, read_hills
 from ..engine.runner import load_run_metadata
 from ..funnel.geometry import Funnel
 from .binding import BindingEstimate, binding_free_energy, default_unbound_window
-from .convergence import (count_transitions, dg_time_series, plateau_statistics,
+from .convergence import (count_transitions, dg_time_series, plateau_statistics, scan_hills,
                           summarize_replicas)
-from .fes import free_energy_surface, projection_profile, reweighted_profile
+from .fes import (free_energy_surface, projection_profile, reweighted_profile,
+                  reweighting_offset)
 
 KCAL = 4.184
 
 __all__ = ["analyze_run", "analyze_replicas", "binding_free_energy", "BindingEstimate",
-           "free_energy_surface", "projection_profile", "reweighted_profile",
+           "free_energy_surface", "projection_profile", "reweighted_profile", "reweighting_offset",
            "dg_time_series", "count_transitions", "summarize_replicas"]
 
 # Heuristic thresholds for calling a run converged; see ``analyze_run``.
@@ -30,12 +31,18 @@ MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
 MAX_REWEIGHT_GAP = 4.0   # kJ/mol, bias-sum vs reweighted estimate
 
 
-def _reweighted_estimate(colvar: dict, grid: BiasGrid, funnel: Funnel, kT: float,
-                         fraction: float, **binding_kwargs) -> Optional[float]:
-    n = colvar["s"].size
-    start = int(n * (1.0 - fraction))
+def _reweighted_estimate(colvar: dict, offset_times: np.ndarray, offsets: np.ndarray,
+                         grid: BiasGrid, funnel: Funnel, kT: float, discard: float,
+                         **binding_kwargs) -> Optional[float]:
+    """dG0 from the reweighted histogram of the trajectory itself. It shares the
+    trajectory with the bias-sum estimate but not the route from data to W(s)."""
+    start = int(colvar["s"].size * discard)
+    s, time, bias = (colvar[key][start:] for key in ("s", "time", "bias"))
+    if s.size < 100:
+        return None
+    log_weights = (bias - np.interp(time, offset_times, offsets)) / kT
     edges = np.linspace(grid.s_min, grid.s_max, max(20, int((grid.s_max - grid.s_min) / 0.05)) + 1)
-    profile = reweighted_profile(colvar["s"][start:], colvar["rho"][start:], grid, kT, edges)
+    profile = reweighted_profile(s, log_weights, kT, edges)
     centres = 0.5 * (edges[1:] + edges[:-1])
     sampled = np.isfinite(profile)
     unbound = binding_kwargs.get("unbound") or default_unbound_window(funnel)
@@ -48,13 +55,15 @@ def _reweighted_estimate(colvar: dict, grid: BiasGrid, funnel: Funnel, kT: float
 
 
 def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
-                site_max: Optional[float] = None,
+                reweight_discard: float = 0.2, site_max: Optional[float] = None,
                 unbound: Optional[tuple[float, float]] = None, write: bool = True) -> dict:
     """Analyse one run directory and return (and by default write) the results.
 
     The headline number is ``dG_plateau``: the mean of dG0(t) over the last
     ``plateau_fraction`` of the run. The estimate from the final bias alone
     (``dG_final``) still fluctuates as hills are added and is noisier.
+    ``dG_reweighted`` comes from the reweighted histogram of the trajectory
+    (skipping the first ``reweight_discard`` of it) and serves as a cross-check.
     """
     workdir = Path(workdir)
     meta = load_run_metadata(workdir)
@@ -68,9 +77,19 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     kT, scale = settings.kT, settings.fes_scale
     kwargs = dict(site_max=site_max, unbound=unbound)
 
-    times, dg = dg_time_series(hills, grid, funnel, scale, kT,
-                               every=max(1, len(hills) // n_points), **kwargs)
-    final_grid = sum_hills(hills, grid)
+    # One pass over the hills: dG(t) at n_points times, c(t) ten times as often.
+    fine = max(1, len(hills) // (10 * n_points))
+    coarse = max(1, len(hills) // n_points)
+    times, dg, offset_times, offsets = [], [], [0.0], [0.0]
+    for n, time_ps, work in scan_hills(hills, grid, fine):
+        offset_times.append(time_ps)
+        offsets.append(reweighting_offset(work, scale, kT))
+        if n % coarse == 0 or n == len(hills):
+            times.append(time_ps)
+            dg.append(binding_free_energy(work.s, projection_profile(work, scale, kT),
+                                          funnel, kT, **kwargs).dG)
+    times, dg = np.array(times), np.array(dg)
+    final_grid = work
     profile = projection_profile(final_grid, scale, kT)
     estimate = binding_free_energy(final_grid.s, profile, funnel, kT, **kwargs)
     plateau = plateau_statistics(times, dg, plateau_fraction)
@@ -78,7 +97,8 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     s_bound = float(final_grid.s[np.argmin(profile)])
     bound_below = min(s_bound + 0.3, estimate.site_max)
     transitions = count_transitions(colvar["s"], bound_below, estimate.unbound[0])
-    dg_reweighted = _reweighted_estimate(colvar, final_grid, funnel, kT, plateau_fraction, **kwargs)
+    dg_reweighted = _reweighted_estimate(colvar, np.array(offset_times), np.array(offsets),
+                                         final_grid, funnel, kT, reweight_discard, **kwargs)
 
     problems = []
     if transitions.rebinding < MIN_REBINDING:
