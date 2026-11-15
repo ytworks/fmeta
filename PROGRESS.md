@@ -26,7 +26,7 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4,
-D5, D6, D7 and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -41,7 +41,7 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
-| GPU plan M0: first gate record (R1) | Gate record done (all 16 gates on 2c4ad4e). Remaining: a run with the fmeta inside the image, without the mounted source |
+| GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
 - GPU gates: **all 16 passed** on clean 2c4ad4e (CUDA, mixed precision, 2 GPUs, in the image):
@@ -58,13 +58,18 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
-  must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare (its
-  seed is the worst of 12 on CUDA mixed, see the Change Log), so a change of the trajectory
-  (another GPU, another OpenMM) can fail it without a defect.
+  must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare, and
+  about 1 run in 30 of its 10 ns misses the criterion on every platform (FM-D12), so a change
+  of the toy trajectory (another GPU, another OpenMM) can fail it without a defect.
 - Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D12: the scatter of the toy gate is on record, criteria unchanged; GPU plan M0 complete
+- What: the 10 ns run of the gate `toy_free_energy` was repeated with 48 other seeds, and a 40 ns run with 12, on CUDA mixed, CUDA double and Reference (diagnostic in the image, not evidence). Error of the reweighted estimate at 10 ns, mean ± sd: +0.48 ± 0.83, +0.51 ± 0.83, +0.46 ± 0.83 kJ/mol; beyond the criterion of 2.0 in 2, 2 and 1 of 48 runs; the plateau estimate never beyond 3.0 (largest 2.62). At 40 ns (36 runs): reweighted +0.12 ± 0.33, plateau +0.40 ± 0.50. The gate's seed gave the same numbers in both full gate runs. M0 closed with the fmeta inside the image, without the mounted source (image b08f577e…, built from b19deff): `fmeta doctor` found CUDA; `fmeta check --quick` on CUDA 15 passed, 0 failed, 0 skipped; all 116 files it wrote belong to the caller (quick mode on a GPU shared with the diagnostic: not evidence).
+- Why: the gate passed with 0.04 kJ/mol to spare and 12 seeds (entry below) suggested an offset of mixed precision. 48 seeds show none: the platforms agree, and the positive mean belongs to a 10 ns run. About 1 trajectory in 30 misses the criterion with a correct implementation, so a failure after a change of the toy trajectory is compared with these numbers first. The tolerance is not widened for a run; another form of the criterion would be a new amendment (open proposal: the mean over several seeds).
+- Refs: FM-D12 (table); `README.md` (検証状況); `src/fmeta/check.py` (`check_toy_free_energy`).
 
 ### 2026-11-16 — [progress] First GPU gate record (R1): all 16 gates passed on 2c4ad4e
 - What: `scripts/gpu_gates.py` in the official image (image 6f68772d…, lock d061e45a…) on two RTX PRO 6000 Blackwell (host GPUs 6 and 7), CUDA, mixed precision, clean 2c4ad4e, 211 s: `pytest -m gpu` 2 passed and the 15 items of `fmeta check` passed. Measured: forces against Reference CV 3.8e-07 nm, energy 7.2e-06, force 5.6e-06; `periodic_images` CVs 2.3e-06 nm, wall energy 5.1e-03 kJ/mol; toy 10 ns reweighted 1.96 and plateau 1.49 kJ/mol from exact (criteria 2.0 and 3.0), 24 rebinding events; 24062 atoms at 1343 ns/day plain and 1293 with the bias; membrane (35500 atoms) 803 ns/day. Because the toy margin is 0.04 kJ/mol, the same 10 ns run was repeated with 12 seeds per platform (diagnostic, not evidence). Error of the reweighted estimate, mean ± sd and largest: CUDA mixed +0.96 ± 0.64, 1.96; CUDA double +0.61 ± 0.52, 1.18; Reference +0.44 ± 0.59, 1.52 kJ/mol. The gate's seed is the worst of the 12 on CUDA mixed. The criterion is unchanged. `pytest` 81 passed, `pytest -m slow` 6 passed on the same source.

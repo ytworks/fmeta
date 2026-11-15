@@ -2,7 +2,8 @@
 
 Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
 (2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
-FM-D2, FM-D4, FM-D5, FM-D6 and FM-D7 amended (2026-11-15 and 16: the first runs on a GPU).
+FM-D2, FM-D4, FM-D5, FM-D6 and FM-D7 amended (2026-11-15 and 16: the first runs on a GPU);
+FM-D12 amended (2026-11-16: the scatter of the toy gate is on record, criteria unchanged).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -186,6 +187,29 @@ and standard state end to end: four 40 ns runs gave plateau errors of −0.15 to
 four 20 ns runs reweighted errors of −0.12 to −0.27 kJ/mol. `fmeta check` /
 `scripts/gpu_gates.py` repeat the platform-dependent checks on the GPU and record them in
 `bench/results/`.
+Amendment (2026-11-16): the criteria are unchanged; the scatter of the gate's 10 ns toy run is
+on record. The run of the item `toy_free_energy` was repeated with 48 other seeds (100–147),
+and a 40 ns run with 12 seeds, on CUDA in mixed and in double precision and on Reference
+(a diagnostic in the image, not gate evidence). Error against the exact value, mean ± standard
+deviation, kJ/mol:
+
+| Run | Estimate | CUDA mixed | CUDA double | Reference | Largest | Beyond the gate criterion |
+|---|---|---|---|---|---|---|
+| 10 ns (48 each) | reweighted | +0.48 ± 0.83 | +0.51 ± 0.83 | +0.46 ± 0.83 | 2.62 | 2, 2 and 1 of 48 (criterion 2.0) |
+| 10 ns (48 each) | plateau | +0.19 ± 0.87 | +0.15 ± 0.88 | +0.33 ± 0.86 | 2.62 | none (criterion 3.0) |
+| 40 ns (12 each) | reweighted | +0.18 ± 0.25 | +0.13 ± 0.39 | +0.05 ± 0.35 | 0.87 | — |
+| 40 ns (12 each) | plateau | +0.50 ± 0.44 | +0.33 ± 0.58 | +0.36 ± 0.50 | 1.28 | — |
+
+The platforms do not differ (a difference seen with 12 seeds was scatter), and mixed precision
+adds no offset. The positive mean of the reweighted estimate belongs to the short run: it is
++0.48 ± 0.07 at 10 ns and +0.12 ± 0.05 at 40 ns (mean ± standard error over the platforms).
+The gate's own seed gives +1.96 (reweighted) and +1.49 (plateau) on CUDA mixed, the same
+numbers in both full gate runs so far: the verdict is repeatable while the toy trajectory is
+unchanged. A change that alters the trajectory (the bias code, OpenMM, the GPU) draws a new
+value, and about one 10 ns run in 30 misses the criterion with a correct implementation. When
+the item fails after such a change, repeat the run over seeds and compare with this table
+first. The tolerance is not widened for a run; another form of the criterion (the mean over
+several seeds, say) would be a new amendment.
 Why: the development machine has no GPU; correctness has to be established where it can be
 (exact answers on CPU) and the rest gated on the machine that runs production.
 
