@@ -1,0 +1,33 @@
+<!-- Benzene with ff14SB aromatic atom types (as in the Phe ring), so all bonded
+     terms come from the protein force field. Test fixture and a minimal example
+     of a user-supplied ligand template. -->
+<ForceField>
+ <Residues>
+  <Residue name="BNZ">
+   <Atom name="C1" type="protein-CA" charge="-0.115"/>
+   <Atom name="C2" type="protein-CA" charge="-0.115"/>
+   <Atom name="C3" type="protein-CA" charge="-0.115"/>
+   <Atom name="C4" type="protein-CA" charge="-0.115"/>
+   <Atom name="C5" type="protein-CA" charge="-0.115"/>
+   <Atom name="C6" type="protein-CA" charge="-0.115"/>
+   <Atom name="H1" type="protein-HA" charge="0.115"/>
+   <Atom name="H2" type="protein-HA" charge="0.115"/>
+   <Atom name="H3" type="protein-HA" charge="0.115"/>
+   <Atom name="H4" type="protein-HA" charge="0.115"/>
+   <Atom name="H5" type="protein-HA" charge="0.115"/>
+   <Atom name="H6" type="protein-HA" charge="0.115"/>
+   <Bond atomName1="C1" atomName2="C2"/>
+   <Bond atomName1="C2" atomName2="C3"/>
+   <Bond atomName1="C3" atomName2="C4"/>
+   <Bond atomName1="C4" atomName2="C5"/>
+   <Bond atomName1="C5" atomName2="C6"/>
+   <Bond atomName1="C6" atomName2="C1"/>
+   <Bond atomName1="C1" atomName2="H1"/>
+   <Bond atomName1="C2" atomName2="H2"/>
+   <Bond atomName1="C3" atomName2="H3"/>
+   <Bond atomName1="C4" atomName2="H4"/>
+   <Bond atomName1="C5" atomName2="H5"/>
+   <Bond atomName1="C6" atomName2="H6"/>
+  </Residue>
+ </Residues>
+</ForceField>

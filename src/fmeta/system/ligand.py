@@ -1,0 +1,42 @@
+"""Ligand parameters for an OpenMM ``ForceField``.
+
+Three routes:
+
+* ``xml``    - the user supplies ffxml file(s) with a residue template for the ligand;
+* ``openff`` - OpenFF (SMIRNOFF) parameters generated on the fly;
+* ``gaff``   - GAFF parameters generated on the fly.
+
+The last two need ``openmmforcefields`` and ``openff-toolkit`` (conda-forge).
+"""
+
+from __future__ import annotations
+
+import openmm.app as app
+
+METHODS = ("xml", "openff", "gaff")
+
+
+def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "openff",
+                    forcefield_name: str | None = None) -> None:
+    """Make ``forcefield`` able to parameterise the ligand in ``ligand_path``.
+
+    For ``method='xml'`` there is nothing to do here: load the ligand ffxml
+    together with the other force-field files.
+    """
+    if method == "xml":
+        return
+    if method not in METHODS:
+        raise ValueError(f"unknown ligand parameter method {method!r}; choose from {METHODS}")
+    try:
+        from openff.toolkit import Molecule
+        from openmmforcefields.generators import GAFFTemplateGenerator, SMIRNOFFTemplateGenerator
+    except ImportError as error:
+        raise ImportError(
+            f"ligand method {method!r} needs openmmforcefields and openff-toolkit "
+            "(conda install -c conda-forge openmmforcefields). Alternatively supply an ffxml "
+            "file for the ligand (method 'xml') or a pre-parameterised system.") from error
+    molecule = Molecule.from_file(str(ligand_path), allow_undefined_stereo=True)
+    generator_class = SMIRNOFFTemplateGenerator if method == "openff" else GAFFTemplateGenerator
+    kwargs = {} if forcefield_name is None else {"forcefield": forcefield_name}
+    generator = generator_class(molecules=molecule, **kwargs)
+    forcefield.registerTemplateGenerator(generator.generator)

@@ -172,8 +172,9 @@ class MetadynamicsRun:
             for writer in (self._hills, self._colvar, self._traj):
                 if writer is not None:
                     writer.flush()
-        self.checkpoint()
-        self._log_progress(start_hills, start_time, n_hills)
+        if self.n_hills % self.settings.checkpoint_hills:   # not already written in the loop
+            self.checkpoint()
+            self._log_progress(start_hills, start_time, n_hills)
 
     def _log_progress(self, start_hills: int, start_time: float, target: int) -> None:
         elapsed = max(time.time() - start_time, 1e-9)

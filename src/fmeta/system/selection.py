@@ -25,6 +25,8 @@ LIPID_RESIDUES = {
     # whole-lipid residues (CHARMM, OpenMM's amber lipid17 port, Slipids)
     "POPC", "POPE", "DLPC", "DLPE", "DMPC", "DOPC", "DPPC", "POPS", "POPG", "POPA", "DOPE",
     "DOPS", "DOPG", "DSPC", "DPPE", "DMPE", "DMPG", "PSM", "SSM", "CHL1", "CHOL", "CLR", "CHL",
+    # three-letter names used by the membrane patches bundled with OpenMM
+    "POP", "DLP", "DMP", "DOP", "DPP",
     # split-residue Amber Lipid14/17/21 naming
     "PA", "PC", "OL", "PE", "PS", "PGR", "PH-", "LAL", "MY", "ST", "AR", "DHA",
 }

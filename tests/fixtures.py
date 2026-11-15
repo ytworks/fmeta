@@ -1,0 +1,63 @@
+"""A small real system for pipeline tests: the 35-residue protein shipped with
+OpenMM (app/data/test.pdb) with a benzene molecule placed against its surface.
+The pose is not a real binding mode; it exercises the machinery."""
+
+import os
+from pathlib import Path
+
+import numpy as np
+import openmm.app as app
+import openmm.unit as unit
+from scipy.spatial import cKDTree
+
+DATA = Path(__file__).parent / "data"
+BENZENE_XML = str(DATA / "benzene.xml")
+
+
+def write_protein(path) -> np.ndarray:
+    """Write the protein (no solvent) and return its heavy-atom coordinates in nm."""
+    source = app.PDBFile(os.path.join(os.path.dirname(app.__file__), "data", "test.pdb"))
+    modeller = app.Modeller(source.topology, source.positions)
+    modeller.delete([r for r in modeller.topology.residues() if r.name in ("HOH", "Cl")])
+    modeller.topology.setPeriodicBoxVectors(None)
+    with open(path, "w") as handle:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, handle)
+    positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
+    heavy = [a.index for a in modeller.topology.atoms() if a.element.symbol != "H"]
+    return positions[heavy]
+
+
+def pocket_point(heavy: np.ndarray, clearance: float = 0.5) -> np.ndarray:
+    """The most enclosed point that keeps ``clearance`` nm from every heavy atom."""
+    tree = cKDTree(heavy)
+    lo, hi = heavy.min(axis=0) - 0.5, heavy.max(axis=0) + 0.5
+    axes = [np.arange(a, b, 0.1) for a, b in zip(lo, hi)]
+    grid = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1).reshape(-1, 3)
+    distance, _ = tree.query(grid)
+    grid = grid[(distance >= clearance) & (distance <= clearance + 0.1)]
+    neighbours = np.array([len(n) for n in tree.query_ball_point(grid, 1.0)])
+    return grid[np.argmax(neighbours)]
+
+
+def write_benzene(path, centre: np.ndarray, resname: str = "BNZ") -> None:
+    """Benzene as a V2000 molfile, ring centred on ``centre`` (nm) in the xy plane."""
+    angles = np.arange(6) * np.pi / 3
+    ring = np.column_stack([np.cos(angles), np.sin(angles), np.zeros(6)])
+    coords = np.vstack([centre + 0.1397 * ring, centre + 0.2484 * ring]) * 10.0
+    lines = [resname, "  fmeta test fixture", "", f"{12:3d}{12:3d}  0  0  0  0  0  0  0  0999 V2000"]
+    for index, (x, y, z) in enumerate(coords):
+        lines.append(f"{x:10.4f}{y:10.4f}{z:10.4f} {'C' if index < 6 else 'H':<3s} 0  0  0  0  0  0  0  0  0  0  0  0")
+    for i in range(6):
+        lines.append(f"{i + 1:3d}{(i + 1) % 6 + 1:3d}{2 if i % 2 == 0 else 1:3d}  0")
+    for i in range(6):
+        lines.append(f"{i + 1:3d}{i + 7:3d}{1:3d}  0")
+    lines += ["M  END", "$$$$"]
+    Path(path).write_text("\n".join(lines) + "\n")
+
+
+def write_complex_inputs(directory) -> tuple[str, str]:
+    """Write protein.pdb and benzene.sdf into ``directory``; return their paths."""
+    directory = Path(directory)
+    heavy = write_protein(directory / "protein.pdb")
+    write_benzene(directory / "benzene.sdf", pocket_point(heavy))
+    return str(directory / "protein.pdb"), str(directory / "benzene.sdf")

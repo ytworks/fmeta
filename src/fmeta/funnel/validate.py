@@ -110,9 +110,13 @@ def required_image_distance(funnel: Funnel) -> float:
 
 def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
                     box: Optional[np.ndarray] = None, slab: Optional[MembraneSlab] = None,
-                    cutoff: float = 1.0, report: Optional[FunnelReport] = None) -> FunnelReport:
+                    cutoff: float = 1.0, report: Optional[FunnelReport] = None,
+                    tumbling: bool = True) -> FunnelReport:
     """Run the geometric checks. ``box`` (three lengths or lattice vectors, nm)
-    enables the periodic checks; ``slab`` stands in for a membrane not built yet."""
+    enables the periodic checks; ``slab`` stands in for a membrane not built yet.
+    ``tumbling=False`` (membrane systems) applies the minimum-image rule per box
+    axis instead of to the shortest image distance, since the solute cannot rotate
+    out of the membrane plane."""
     positions = np.asarray(positions, dtype=float)
     report = report or FunnelReport()
     origin, axis, lig = funnel_frame(funnel, positions)
@@ -195,14 +199,29 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
 
     # -- periodic box --------------------------------------------------------
     if box is not None:
-        shortest = _shortest_image_distance(box)
-        needed = required_image_distance(funnel)
-        if shortest < needed:
-            report.add("box_cv", ERROR,
-                       f"shortest periodic image distance {shortest:.2f} nm < {needed:.2f} nm: "
-                       "the minimum-image CVs would flip before the upper wall")
+        if tumbling:
+            shortest = _shortest_image_distance(box)
+            needed = required_image_distance(funnel)
+            if shortest < needed:
+                report.add("box_cv", ERROR,
+                           f"shortest periodic image distance {shortest:.2f} nm < {needed:.2f} nm: "
+                           "the minimum-image CVs would flip before the upper wall")
+            else:
+                report.add("box_cv", OK, f"image distance {shortest:.2f} nm >= {needed:.2f} nm")
         else:
-            report.add("box_cv", OK, f"image distance {shortest:.2f} nm >= {needed:.2f} nm")
+            lengths = np.asarray(box, dtype=float)
+            lengths = lengths if lengths.ndim == 1 else np.diag(lengths)
+            reach = funnel.upper + 0.3
+            need_z = 2.0 * (abs(axis[2]) * reach + funnel.max_radius + 0.3)
+            need_xy = 2.0 * (np.hypot(axis[0], axis[1]) * reach + funnel.max_radius + 0.3)
+            if lengths[2] < need_z or min(lengths[0], lengths[1]) < need_xy:
+                report.add("box_cv", ERROR,
+                           f"box {lengths[0]:.2f} x {lengths[1]:.2f} x {lengths[2]:.2f} nm is too "
+                           f"small for the minimum-image CVs (need xy >= {need_xy:.2f}, "
+                           f"z >= {need_z:.2f} nm)")
+            else:
+                report.add("box_cv", OK, f"box z {lengths[2]:.2f} nm >= {need_z:.2f} nm, "
+                                         f"xy >= {need_xy:.2f} nm")
         image_gap = obstacles.nearest_image_distance(unbound, box) - r_lig
         if image_gap < 0.5:
             report.add("box_images", ERROR,
