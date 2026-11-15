@@ -239,7 +239,7 @@ class Checker:
         forcefield = app.ForceField("amber14-all.xml", "amber14/tip3p.xml")
         register_ligand(forcefield, ligand, method)
         settings = SystemSettings(ligand_method=method, ligand_resname="BNZ")
-        modeller, ligand_atoms = build_complex(protein, ligand, forcefield, settings)
+        modeller, ligand_atoms, _ = build_complex(protein, ligand, forcefield, settings)
         system = forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff)
         context = mm.Context(system, mm.VerletIntegrator(0.001), mm.Platform.getPlatformByName("Reference"))
         context.setPositions(modeller.positions)

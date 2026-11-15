@@ -8,6 +8,7 @@ periodic images, and the minimum-image CVs must stay valid up to the upper wall.
 from __future__ import annotations
 
 import logging
+import tempfile
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
@@ -24,7 +25,7 @@ from ..funnel.obstacles import MembraneSlab
 from ..funnel.validate import (UNBOUND_WINDOW, FunnelReport, funnel_points, ligand_radius,
                                required_image_distance, validate_funnel)
 from .imaging import make_whole
-from .inputs import fix_protein, read_ligand, read_structure
+from .inputs import (complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein)
 from .ligand import register_ligand
 from .orientation import fit_membrane, orient
 from .selection import Selection, classify
@@ -42,11 +43,13 @@ class SystemSettings:
     ligand_method: str = "openff"            # "openff", "gaff" or "xml"
     ligand_forcefield: Optional[str] = None  # e.g. "openff-2.2.0"; default of the generator if None
     ligand_charge_method: Optional[str] = None   # e.g. "am1bcc", "gasteiger"; default: generator's choice
-    fix_protein: bool = False                # repair the protein with PDBFixer (missing atoms, non-standard residues)
+    fix_protein: Optional[bool] = None       # repair with PDBFixer (missing atoms, non-standard
+                                             # residues); None: whenever PDBFixer is installed
+    keep_hetero: Sequence[str] = ()          # non-protein residue names to keep (need force-field files)
     ligand_xml: Sequence[str] = ()           # ffxml file(s) holding the ligand template
     ligand_resname: str = "LIG"
     keep_water: bool = False                 # keep waters present in the protein file
-    add_hydrogens: Optional[bool] = None     # None: only if the protein has none
+    add_hydrogens: bool = True               # complete the protein's hydrogens with the force field
     ph: float = 7.0
     ionic_strength: float = 0.15             # mol/L
     padding: float = 1.2                     # nm of solvent around the solute (lipid in XY for membranes)
@@ -241,38 +244,56 @@ def _built_report(placement: FunnelReport, built: FunnelReport) -> FunnelReport:
     """Report for the finished system: how the funnel was placed (from the dry
     complex) followed by the geometric checks on the built system."""
     kept = [c for c in placement.checks
-            if c.name in ("orientation", "ligand_charge", "exit", "channel", "axis")]
+            if c.name in ("protein_input", "ligand_input", "pose_contact", "orientation",
+                          "ligand_charge", "exit", "channel", "axis")]
     return FunnelReport(kept + built.checks, {**placement.info, **built.info})
 
 
 # ---- the build -------------------------------------------------------------
 
-def build_complex(protein, ligand, forcefield: app.ForceField,
-                  settings: SystemSettings) -> tuple[app.Modeller, list[int]]:
-    """Dry protein-ligand complex. Returns the modeller and the ligand atom indices."""
-    if settings.fix_protein:
-        topology, positions = fix_protein(protein, settings.keep_water)
-    else:
-        topology, positions = read_structure(protein)
+def build_complex(protein, ligand, forcefield: app.ForceField, settings: SystemSettings,
+                  scratch_dir=None) -> tuple[app.Modeller, list[int], list[str]]:
+    """Dry protein-ligand complex from a protein file and a posed ligand file.
+
+    The protein is reduced to its amino-acid residues, repaired if PDBFixer is
+    available, and given hydrogens; a ligand SDF without hydrogens gets them
+    from RDKit. Returns the modeller, the ligand atom indices and notes on
+    everything that was changed along the way.
+    """
+    topology, positions, notes = read_protein(protein, settings.fix_protein, settings.keep_water,
+                                              settings.keep_hetero)
     modeller = app.Modeller(topology, positions * unit.nanometer)
-    if not settings.keep_water:
-        modeller.deleteWater()
-    has_hydrogens = any(a.element is not None and a.element.symbol == "H"
-                        for a in modeller.topology.atoms())
-    add = settings.add_hydrogens if settings.add_hydrogens is not None else not has_hydrogens
-    if add:
-        modeller.addHydrogens(forcefield, pH=settings.ph)
+    if settings.add_hydrogens:
+        notes += complete_hydrogens(modeller, forcefield, settings.ph)
     ligand_topology, ligand_positions = read_ligand(ligand, settings.ligand_resname)
     first = modeller.topology.getNumAtoms()
     modeller.add(ligand_topology, ligand_positions * unit.nanometer)
-    return modeller, list(range(first, modeller.topology.getNumAtoms()))
+    return modeller, list(range(first, modeller.topology.getNumAtoms())), notes
+
+
+def pose_contact(positions: np.ndarray, selection: Selection) -> tuple[str, str]:
+    """Is the ligand where a bound ligand would be? Returns (status, message)."""
+    protein = positions[selection.heavy_atoms("protein")]
+    ligand = positions[selection.heavy_atoms("ligand")]
+    distance, _ = cKDTree(protein).query(ligand)
+    closest = float(distance.min())
+    contacts = int((distance < 0.45).sum())
+    if closest > 0.6:
+        return "error", (f"the ligand is not in contact with the protein (closest heavy atoms "
+                         f"{closest:.2f} nm apart): the ligand file must hold the bound pose in "
+                         "the protein's coordinate frame")
+    if closest < 0.15:
+        return "warning", (f"ligand and protein heavy atoms overlap (closest {closest:.2f} nm); "
+                           "minimisation will try to relax the clash, but check the pose")
+    return "ok", (f"ligand pose is in contact with the protein ({contacts} of {len(ligand)} heavy "
+                  f"atoms within 0.45 nm, closest {closest:.2f} nm)")
 
 
 def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
             membrane: Optional[MembraneSettings] = None,
             funnel_settings: Optional[AutoFunnelSettings] = None,
             funnel_overrides: Optional[dict] = None, funnel: Optional[Funnel] = None,
-            platform: Optional[mm.Platform] = None) -> Prepared:
+            platform: Optional[mm.Platform] = None, scratch_dir=None) -> Prepared:
     """From a protein file and a posed ligand to a solvated (or membrane-embedded)
     system with its funnel.
 
@@ -286,9 +307,14 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
         log.warning("%s is close to or below its gel transition at %.0f K; raise the temperature",
                     membrane.lipid, settings.temperature)
     forcefield = app.ForceField(*settings.forcefields, *settings.ligand_xml)
+    if scratch_dir is None:
+        scratch_dir = tempfile.mkdtemp(prefix="fmeta_")
+    ligand, ligand_notes = ensure_ligand_hydrogens(ligand, scratch_dir)
     register_ligand(forcefield, ligand, settings.ligand_method, settings.ligand_forcefield,
                     settings.ligand_charge_method)
-    modeller, ligand_atoms = build_complex(protein, ligand, forcefield, settings)
+    modeller, ligand_atoms, protein_notes = build_complex(protein, ligand, forcefield, settings)
+    for note in protein_notes + ligand_notes:
+        log.info(note)
     dry_topology = modeller.topology
     dry_positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
     orientation = None
@@ -296,6 +322,10 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
         dry_positions, orientation = _membrane_orientation(dry_topology, dry_positions, membrane)
         modeller.positions = dry_positions * unit.nanometer
     dry_selection = classify(dry_topology, ligand_atoms)
+    # before anything else: is the ligand where a bound ligand would be?
+    contact = pose_contact(dry_positions, dry_selection)
+    if contact[0] == "error":
+        raise ValueError(contact[1])
 
     slab = None if membrane is None else MembraneSlab(membrane.center_z, membrane.half_thickness)
     if funnel is None:
@@ -309,6 +339,11 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     if orientation is not None:
         report.add("orientation", *orientation[:2])
         report.info["orientation"] = orientation[2]
+    # what was done to the two input files, and whether the pose makes sense
+    for name, notes in (("protein_input", protein_notes), ("ligand_input", ligand_notes)):
+        if notes:
+            report.add(name, "warning" if name == "ligand_input" else "ok", "; ".join(notes))
+    report.add("pose_contact", *contact)
     report.raise_for_errors()
 
     ions = dict(ionicStrength=settings.ionic_strength * unit.molar, neutralize=True)

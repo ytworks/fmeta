@@ -62,7 +62,8 @@ def prepare_stage(config: Config, workdir) -> Prepared:
     if not (source.protein and source.ligand):
         raise ValueError("config.input needs protein + ligand (or complex + ligand_resname)")
     prepared = prepare(source.protein, source.ligand, config.system, config.membrane,
-                       config.funnel, config.funnel_overrides, platform=platform)
+                       config.funnel, config.funnel_overrides, platform=platform,
+                       scratch_dir=workdir / "inputs")
     save_prepared(prepared, out)
     log.info("prepared system: %d atoms\n%s", prepared.topology.getNumAtoms(), prepared.report)
     return prepared

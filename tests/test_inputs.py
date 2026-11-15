@@ -12,7 +12,8 @@ from fmeta.config import Config
 from fmeta.funnel.geometry import compute_cvs
 from fmeta.system.builder import SystemSettings, prepare
 from fmeta.system.imaging import make_whole
-from fmeta.system.inputs import fix_protein, read_ligand, read_structure, split_complex
+from fmeta.system.inputs import (ensure_ligand_hydrogens, pdbfixer_available, read_ligand,
+                                 read_protein, read_structure, split_complex)
 from fmeta.system.ligand import register_ligand
 from fmeta.workflow import prepare_stage
 
@@ -68,7 +69,65 @@ def test_complex_input_through_prepare_stage(inputs, tmp_path):
     assert saved.input.ligand.endswith("ligand.sdf") and saved.system.ligand_resname == "BNZ"
 
 
-def test_fix_protein_rebuilds_missing_atoms(inputs, tmp_path):
+def raw_entry(inputs, path, hydrogens=True):
+    """The protein as a raw PDB entry would have it: with waters, an ion and a
+    second copy of the ligand as hetero atoms."""
+    import os
+    source = app.PDBFile(os.path.join(os.path.dirname(app.__file__), "data", "test.pdb"))
+    modeller = app.Modeller(source.topology, source.positions)
+    waters = [r for r in modeller.topology.residues() if r.name == "HOH"]
+    modeller.delete(waters[40:])                                   # keep 40 waters and the Cl ions
+    ligand_topology, ligand_positions = read_ligand(inputs[1], "BNZ")
+    modeller.add(ligand_topology, (ligand_positions + [3.0, 0, 0]) * unit.nanometer)
+    if not hydrogens:
+        modeller.delete([a for a in modeller.topology.atoms() if a.element.symbol == "H"])
+    modeller.topology.setPeriodicBoxVectors(None)
+    with open(path, "w") as handle:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, handle)
+
+
+def test_protein_file_is_reduced_to_the_protein(inputs, tmp_path):
+    raw_entry(inputs, tmp_path / "raw.pdb")
+    topology, positions, notes = read_protein(tmp_path / "raw.pdb", fix=False)
+    assert topology.getNumResidues() == 35 and topology.getNumAtoms() == 582
+    assert len(notes) == 1 and "HOH x40" in notes[0] and "BNZ x1" in notes[0] and "CL x2" in notes[0]
+
+    kept, _, notes = read_protein(tmp_path / "raw.pdb", fix=False, keep_water=True, keep_hetero=["BNZ"])
+    names = [r.name for r in kept.residues()]
+    assert names.count("HOH") == 40 and names.count("BNZ") == 1 and "Cl" not in names
+
+    empty = tmp_path / "empty.pdb"
+    empty.write_text("HETATM    1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O\nEND\n")
+    with pytest.raises(ValueError, match="no amino-acid residues"):
+        read_protein(empty, fix=False)
+
+
+@pytest.mark.parametrize("hydrogens", [True, False])
+def test_raw_pdb_and_sdf_are_enough(inputs, tmp_path, hydrogens):
+    """A raw entry (waters, ions, another ligand; with or without hydrogens) and the
+    ligand SDF build a system without any further preparation by the user."""
+    raw_entry(inputs, tmp_path / "raw.pdb", hydrogens=hydrogens)
+    built = prepare(tmp_path / "raw.pdb", inputs[1], SystemSettings(**LIGAND_SETTINGS))
+    assert built.report.ok, str(built.report)
+    assert len(built.selection.protein) == 582 and len(built.selection.ligand) == 12
+    assert len(built.selection.other) == 0                    # the stray ligand copy is gone
+    checks = {c.name: (c.status, c.message) for c in built.report.checks}
+    assert "removed from the protein file" in checks["protein_input"][1]
+    assert ("hydrogens added" in checks["protein_input"][1]) == (not hydrogens)
+    assert checks["pose_contact"][0] == "ok"
+
+
+def test_protein_hydrogens_with_foreign_names_are_rebuilt(inputs, tmp_path):
+    text = open(inputs[0]).read().replace(" HB2 LEU", " XB2 LEU").replace(" HB3 LEU", " XB3 LEU")
+    assert " XB2 LEU" in text
+    (tmp_path / "odd.pdb").write_text(text)
+    built = prepare(tmp_path / "odd.pdb", inputs[1], SystemSettings(fix_protein=False, **LIGAND_SETTINGS))
+    assert len(built.selection.protein) == 582
+    message = {c.name: c.message for c in built.report.checks}["protein_input"]
+    assert "did not match the force field and were rebuilt" in message
+
+
+def test_pdbfixer_repairs_missing_atoms_automatically(inputs, tmp_path):
     pytest.importorskip("pdbfixer")
     topology, positions = read_structure(inputs[0])
     n_heavy = sum(a.element.symbol != "H" for a in topology.atoms())
@@ -80,12 +139,46 @@ def test_fix_protein_rebuilds_missing_atoms(inputs, tmp_path):
         app.PDBFile.writeFile(modeller.topology, modeller.positions, handle)
     assert modeller.topology.getNumAtoms() == n_heavy - 24            # four phenylalanines
 
-    fixed_topology, fixed_positions = fix_protein(tmp_path / "broken.pdb")
+    assert pdbfixer_available()
+    fixed_topology, _, notes = read_protein(tmp_path / "broken.pdb")     # fix defaults to "if available"
     assert sum(a.element.symbol != "H" for a in fixed_topology.atoms()) == n_heavy
+    assert any("24 missing heavy atoms rebuilt" in note for note in notes)
     # ... and the repaired protein goes through the normal build (hydrogens re-added)
-    settings = SystemSettings(fix_protein=True, **LIGAND_SETTINGS)
-    rebuilt = prepare(tmp_path / "broken.pdb", inputs[1], settings)
+    rebuilt = prepare(tmp_path / "broken.pdb", inputs[1], SystemSettings(**LIGAND_SETTINGS))
     assert len(rebuilt.selection.protein) == 582 and rebuilt.report.ok
+    # without the repair the same file is refused with advice, not a traceback from OpenMM
+    with pytest.raises(ValueError, match="does not fit the force field"):
+        prepare(tmp_path / "broken.pdb", inputs[1], SystemSettings(fix_protein=False, **LIGAND_SETTINGS))
+
+
+def test_ligand_sdf_without_hydrogens_gets_them(inputs, tmp_path):
+    pytest.importorskip("rdkit")
+    lines = open(inputs[1]).read().splitlines()
+    bare = tmp_path / "bare.sdf"
+    bare.write_text("\n".join(lines[:3] + ["  6  6  0  0  0  0  0  0  0  0999 V2000"] + lines[4:10]
+                              + lines[16:22] + ["M  END", "$$$$"]) + "\n")
+    path, notes = ensure_ligand_hydrogens(bare, tmp_path / "scratch")
+    assert path.endswith("bare_with_hydrogens.sdf") and "6 added" in notes[0] and "+0" in notes[0]
+    topology, positions = read_ligand(path, "BNZ")
+    reference = read_ligand(inputs[1], "BNZ")[1]
+    assert [a.element.symbol for a in topology.atoms()] == ["C"] * 6 + ["H"] * 6
+    assert np.abs(positions[:6] - reference[:6]).max() < 1e-4            # the pose is untouched
+    assert ensure_ligand_hydrogens(inputs[1], tmp_path / "scratch") == (inputs[1], [])
+
+    built = prepare(inputs[0], bare, SystemSettings(**LIGAND_SETTINGS), scratch_dir=tmp_path / "s2")
+    assert len(built.selection.ligand) == 12 and built.report.ok
+    assert {c.name: c.status for c in built.report.checks}["ligand_input"] == "warning"
+
+
+def test_ligand_away_from_the_protein_is_refused(inputs, tmp_path):
+    lines = open(inputs[1]).read().splitlines()
+    moved = []
+    for line in lines[4:16]:
+        x = float(line[0:10]) + 30.0
+        moved.append(f"{x:10.4f}" + line[10:])
+    (tmp_path / "far.sdf").write_text("\n".join(lines[:4] + moved + lines[16:]) + "\n")
+    with pytest.raises(ValueError, match="not in contact with the protein"):
+        prepare(inputs[0], tmp_path / "far.sdf", SystemSettings(**LIGAND_SETTINGS))
 
 
 def test_make_whole_undoes_wrapping(prepared):

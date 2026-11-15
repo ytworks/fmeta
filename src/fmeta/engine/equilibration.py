@@ -147,10 +147,11 @@ def equilibrate(prepared: Prepared, platform: mm.Platform, properties: Optional[
         atoms = list(prepared.topology.atoms())
         n_lipids = sum(atoms[i].element.symbol == "P" for i in prepared.selection.heavy_atoms("lipid"))
         if n_lipids:
-            half = max(1, len(area) // 2)
             result.area_per_lipid = float(area[-1] / (n_lipids / 2.0))
-            result.area_drift = float(np.mean(area[half:]) / np.mean(area[:half]) - 1.0)
-            if abs(result.area_drift) > 0.03:
+            if len(area) >= 4:                      # needs a few samples in each half
+                half = len(area) // 2
+                result.area_drift = float(np.mean(area[half:]) / np.mean(area[:half]) - 1.0)
+            if result.area_drift is not None and abs(result.area_drift) > 0.03:
                 log.warning("membrane area changed by %.1f%% during the free stage; the bilayer "
                             "is still relaxing, extend equilibration.free_ps",
                             100 * result.area_drift)

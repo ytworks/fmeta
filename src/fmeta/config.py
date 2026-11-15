@@ -119,6 +119,7 @@ class Config:
         data = dataclasses.asdict(self)
         data["system"]["forcefields"] = list(data["system"]["forcefields"])
         data["system"]["ligand_xml"] = list(data["system"]["ligand_xml"])
+        data["system"]["keep_hetero"] = list(data["system"]["keep_hetero"])
         data["equilibration"]["release_factors"] = list(data["equilibration"]["release_factors"])
         if data["funnel"]["exit_direction"] is not None:
             data["funnel"]["exit_direction"] = [float(x) for x in data["funnel"]["exit_direction"]]
@@ -142,7 +143,9 @@ input:
 system:
   forcefields: [amber14-all.xml, amber14/tip3p.xml]
   ligand_method: openff       # openff | gaff | xml (then list ligand_xml files)
-  fix_protein: false          # true: add missing heavy atoms / fix non-standard residues (PDBFixer)
+  # The protein file is reduced to its amino-acid residues (waters, ions, other ligands are
+  # removed) and, if PDBFixer is installed, repaired; hydrogens are completed automatically.
+  # keep_hetero: [ZN]         # residue names to keep; add force-field files that cover them
   ligand_xml: []
   temperature: 300.0
   ionic_strength: 0.15

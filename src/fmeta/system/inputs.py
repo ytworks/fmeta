@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import openmm.app as app
@@ -100,29 +100,143 @@ def read_ligand(path, resname: str = "LIG") -> tuple[app.Topology, np.ndarray]:
 
 # ---- protein clean-up and complexes -----------------------------------------
 
-def fix_protein(path, keep_water: bool = False) -> tuple[app.Topology, np.ndarray]:
-    """Repair a protein file with PDBFixer: non-standard residues are replaced by
-    their standard parents and missing heavy atoms are built. Missing residues
-    (unresolved loops, termini) are not modelled; hydrogens are added later with
-    the force field. Hetero groups other than water are removed."""
+_BACKBONE = {"N", "CA", "C"}
+_WATER = {"HOH", "WAT", "H2O", "TIP3", "TIP", "SOL", "DOD"}
+
+
+def pdbfixer_available() -> bool:
+    try:
+        import pdbfixer  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
+                 keep_hetero: Sequence[str] = ()) -> tuple[app.Topology, np.ndarray, list[str]]:
+    """Read a protein file and reduce it to what will be simulated.
+
+    Everything that is not an amino-acid residue is removed: other ligands,
+    ions, cofactors, buffer molecules and (unless ``keep_water``) water. Name
+    residues in ``keep_hetero`` to keep them; the force-field files must then
+    cover them. With ``fix`` (default: whenever PDBFixer is installed)
+    non-standard amino acids are replaced by their standard parents and missing
+    heavy atoms are built; unresolved loops are not modelled.
+
+    Returns the topology, the positions in nm and a list of notes saying what
+    was changed.
+    """
+    topology, positions = read_structure(path)
+    notes = []
+    keep = {name.strip().upper() for name in keep_hetero}
+    removed: dict[str, int] = {}
+    doomed = []
+    for residue in topology.residues():
+        name = residue.name.strip().upper()
+        amino_acid = _BACKBONE <= {atom.name for atom in residue.atoms()}
+        if amino_acid or name in keep or (keep_water and name in _WATER):
+            continue
+        doomed.append(residue)
+        removed[name] = removed.get(name, 0) + 1
+    modeller = app.Modeller(topology, positions * unit.nanometer)
+    if doomed:
+        modeller.delete(doomed)
+        listing = ", ".join(f"{name} x{count}" for name, count in sorted(removed.items()))
+        notes.append(f"removed from the protein file: {listing}")
+    if modeller.topology.getNumAtoms() == 0:
+        raise ValueError(f"{path} contains no amino-acid residues")
+
+    use_fixer = pdbfixer_available() if fix is None else fix
+    if use_fixer:
+        modeller, fixed = _fix_with_pdbfixer(modeller)
+        notes += fixed
+    return modeller.topology, _nm(modeller.positions), notes
+
+
+def _fix_with_pdbfixer(modeller: app.Modeller) -> tuple[app.Modeller, list[str]]:
     try:
         from pdbfixer import PDBFixer
     except ImportError as error:
         raise ImportError("fix_protein needs PDBFixer (conda install -c conda-forge pdbfixer)") from error
-    path = Path(path)
-    if path.suffix.lower() in (".cif", ".mmcif", ".pdbx"):
-        with open(path) as handle:
-            fixer = PDBFixer(pdbxfile=handle)
-    else:
-        fixer = PDBFixer(filename=str(path))
+    import io
+    text = io.StringIO()
+    app.PDBFile.writeFile(modeller.topology, modeller.positions, text, keepIds=True)
+    fixer = PDBFixer(pdbfile=io.StringIO(text.getvalue()))
     fixer.findMissingResidues()
-    fixer.missingResidues = {}
+    fixer.missingResidues = {}                    # unresolved loops are not modelled
     fixer.findNonstandardResidues()
-    fixer.replaceNonstandardResidues()
-    fixer.removeHeterogens(keepWater=keep_water)
+    notes = []
+    if fixer.nonstandardResidues:
+        swaps = sorted({f"{residue.name} -> {standard}" for residue, standard in fixer.nonstandardResidues})
+        notes.append("non-standard residues replaced: " + ", ".join(swaps))
+        fixer.replaceNonstandardResidues()
     fixer.findMissingAtoms()
-    fixer.addMissingAtoms()
-    return fixer.topology, _nm(fixer.positions)
+    n_missing = (sum(len(atoms) for atoms in fixer.missingAtoms.values())
+                 + sum(len(atoms) for atoms in fixer.missingTerminals.values()))
+    if n_missing:
+        notes.append(f"{n_missing} missing heavy atoms rebuilt")
+        fixer.addMissingAtoms()
+    return app.Modeller(fixer.topology, fixer.positions), notes
+
+
+def complete_hydrogens(modeller: app.Modeller, forcefield: app.ForceField, ph: float) -> list[str]:
+    """Add the protein's missing hydrogens in place. If the hydrogens already in
+    the file do not fit the force field's naming, they are removed and rebuilt."""
+    notes = []
+    before = modeller.topology.getNumAtoms()
+    try:
+        modeller.addHydrogens(forcefield, pH=ph)
+    except Exception:
+        hydrogens = [a for a in modeller.topology.atoms()
+                     if a.element is not None and a.element.symbol == "H"]
+        modeller.delete(hydrogens)
+        before = modeller.topology.getNumAtoms()
+        try:
+            modeller.addHydrogens(forcefield, pH=ph)
+        except Exception as error:
+            hint = "" if pdbfixer_available() else (
+                " Installing PDBFixer (conda install -c conda-forge pdbfixer) lets fmeta repair "
+                "missing atoms and non-standard residues automatically.")
+            raise ValueError("the protein does not fit the force field's residue templates "
+                             f"({error}).{hint}") from error
+        notes.append(f"{len(hydrogens)} hydrogens in the protein file did not match the force "
+                     "field and were rebuilt")
+    added = modeller.topology.getNumAtoms() - before
+    if added:
+        notes.append(f"{added} hydrogens added to the protein at pH {ph:g}")
+    return notes
+
+
+def ensure_ligand_hydrogens(path, out_dir) -> tuple[str, list[str]]:
+    """Return a ligand file that has hydrogens.
+
+    If the given SDF has none, they are added with RDKit at the positions the
+    heavy atoms imply, following the formal charges in the file, and the result
+    is written to ``out_dir``. The heavy-atom pose is not changed.
+    """
+    path = Path(path)
+    if path.suffix.lower() not in (".sdf", ".mol"):
+        return str(path), []
+    topology, _ = _read_molfile(path, "LIG")
+    if any(atom.element.symbol == "H" for atom in topology.atoms()):
+        return str(path), []
+    try:
+        from rdkit import Chem
+    except ImportError as error:
+        raise ImportError("the ligand SDF has no hydrogens; adding them needs RDKit "
+                          "(pip install rdkit), or supply a protonated SDF") from error
+    molecule = Chem.MolFromMolFile(str(path), removeHs=False)
+    if molecule is None:
+        raise ValueError(f"RDKit cannot read {path}; check the SDF")
+    protonated = Chem.AddHs(molecule, addCoords=True)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{path.stem}_with_hydrogens.sdf"
+    out.write_text(Chem.MolToMolBlock(protonated) + "$$$$\n")
+    added = protonated.GetNumAtoms() - molecule.GetNumAtoms()
+    charge = Chem.GetFormalCharge(protonated)
+    return str(out), [f"the ligand SDF had no hydrogens: {added} added for the structure as drawn "
+                      f"(net charge {charge:+d}); check that this is the protonation state you want"]
 
 
 def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
