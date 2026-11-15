@@ -1,8 +1,7 @@
-"""Input routes: complexes, protein repair, wrapped coordinates, other programs' formats."""
+"""Input routes: complexes, protein repair, wrapped coordinates, ligand parameters."""
 
 import sys
 import types
-import warnings
 
 import numpy as np
 import openmm.app as app
@@ -18,7 +17,7 @@ from fmeta.system.ligand import register_ligand
 from fmeta.workflow import prepare_stage
 
 from conftest import LIGAND_SETTINGS
-from fixtures import BENZENE_XML, write_preparameterised
+from fixtures import BENZENE_XML
 
 
 def crystal_like_complex(inputs, path):
@@ -108,35 +107,6 @@ def test_make_whole_undoes_wrapping(prepared):
     # each atom moved by a lattice vector only
     shift = np.linalg.solve(box.T, (whole - positions).T).T
     assert np.abs(shift - np.round(shift)).max() < 1e-6
-
-
-@pytest.mark.parametrize("kind", ["amber", "gromacs", "charmm"])
-def test_preparameterised_input_through_prepare_stage(prepared, tmp_path, kind):
-    """The same system written as AMBER, GROMACS and CHARMM files (via ParmEd), with
-    the coordinates wrapped into the box as simulation output often is."""
-    pytest.importorskip("parmed")
-    box = prepared.box_vectors
-    fractional = np.linalg.solve(box.T, prepared.positions.T).T
-    wrapped = (fractional - np.floor(fractional)) @ box
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        block = write_preparameterised(prepared, tmp_path, kind, positions=wrapped)
-        config = Config.from_dict({"input": block, "run": {"platform": "CPU"}}, base_dir=tmp_path)
-        loaded = prepare_stage(config, tmp_path / "work")
-
-    assert loaded.report.ok, str(loaded.report)
-    assert loaded.topology.getNumAtoms() == prepared.topology.getNumAtoms()
-    atoms = list(loaded.topology.atoms())
-    assert {atoms[i].residue.name for i in loaded.selection.ligand} == {"BNZ"}   # found by itself
-    assert len(loaded.selection.ligand) == 12 and len(loaded.selection.protein) == 582
-    checks = {c.name: c.status for c in loaded.report.checks}
-    assert checks["box_cv"] == "ok" and checks["pose"] == "ok" and checks["p0_anchor"] == "ok"
-    direction = np.array(loaded.funnel.metadata["exit_direction"])
-    assert direction @ np.array(prepared.funnel.metadata["exit_direction"]) > np.cos(np.radians(15))
-    # hydrogen mass repartitioning is applied to these inputs as well
-    hydrogen = next(a.index for a in atoms if a.element.symbol == "H" and a.residue.name == "LEU")
-    assert loaded.system.getParticleMass(hydrogen).value_in_unit(unit.amu) == pytest.approx(1.5)
-    assert (tmp_path / "work" / "prepared" / "funnel.pdb").exists()
 
 
 def test_template_generator_route(inputs, monkeypatch):

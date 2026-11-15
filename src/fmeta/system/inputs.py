@@ -1,4 +1,4 @@
-"""Reading structures: protein files, posed ligands, and pre-parameterised systems."""
+"""Reading structures: protein files, posed ligands, and complexes to split into the two."""
 
 from __future__ import annotations
 
@@ -22,8 +22,6 @@ def read_structure(path) -> tuple[app.Topology, np.ndarray]:
         structure = app.PDBFile(str(path))
     elif suffix in (".cif", ".mmcif", ".pdbx"):
         structure = app.PDBxFile(str(path))
-    elif suffix == ".gro":
-        raise ValueError("a .gro file carries no bonds; use load_gromacs(top, gro)")
     else:
         raise ValueError(f"unsupported structure format: {path.name}")
     return structure.topology, _nm(structure.positions)
@@ -225,63 +223,3 @@ def _write_ligand_from_smiles(path, name: str, elements, coords_nm, smiles: str)
     molecule = Chem.AddHs(molecule, addCoords=True)
     molecule.SetProp("_Name", name)
     Path(path).write_text(Chem.MolToMolBlock(molecule) + "$$$$\n")
-
-
-# ---- pre-parameterised systems ---------------------------------------------
-
-def _system_kwargs(cutoff: float, hydrogen_mass) -> dict:
-    kwargs = dict(nonbondedMethod=app.PME, nonbondedCutoff=cutoff * unit.nanometer,
-                  constraints=app.HBonds, rigidWater=True)
-    if hydrogen_mass:
-        kwargs["hydrogenMass"] = hydrogen_mass * unit.amu
-    return kwargs
-
-
-def load_amber(prmtop, coordinates, cutoff: float = 1.0, hydrogen_mass=1.5):
-    """Load an AMBER prmtop with inpcrd/rst7 coordinates. Returns (topology, system, positions)."""
-    top = app.AmberPrmtopFile(str(prmtop))
-    crd = app.AmberInpcrdFile(str(coordinates))
-    if crd.boxVectors is not None:
-        top.topology.setPeriodicBoxVectors(crd.boxVectors)
-    system = top.createSystem(**_system_kwargs(cutoff, hydrogen_mass))
-    return top.topology, system, _nm(crd.positions)
-
-
-def load_gromacs(top, gro, include_dir=None, cutoff: float = 1.0, hydrogen_mass=1.5):
-    """Load a GROMACS topology with a .gro file. Returns (topology, system, positions)."""
-    coordinates = app.GromacsGroFile(str(gro))
-    kwargs = dict(periodicBoxVectors=coordinates.getPeriodicBoxVectors())
-    if include_dir is not None:
-        kwargs["includeDir"] = str(include_dir)
-    topology = app.GromacsTopFile(str(top), **kwargs)
-    system = topology.createSystem(**_system_kwargs(cutoff, hydrogen_mass))
-    return topology.topology, system, _nm(coordinates.positions)
-
-
-def load_charmm(psf, coordinates, parameter_files, box_nm=None, cutoff: float = 1.2,
-                switch: float = 1.0, hydrogen_mass=1.5):
-    """Load a CHARMM PSF (e.g. from CHARMM-GUI) with a PDB or CRD and its
-    parameter files. ``box_nm`` (three lengths) is needed if the coordinate
-    file does not carry the box. Returns (topology, system, positions)."""
-    psf_file = app.CharmmPsfFile(str(psf))
-    path = Path(coordinates)
-    if path.suffix.lower() == ".crd":
-        positions = _nm(app.CharmmCrdFile(str(path)).positions)
-        vectors = None
-    else:
-        pdb = app.PDBFile(str(path))
-        positions, vectors = _nm(pdb.positions), pdb.topology.getPeriodicBoxVectors()
-    if box_nm is not None:
-        psf_file.setBox(*(float(v) * unit.nanometer for v in box_nm))
-    elif vectors is not None:
-        from openmm.app.internal.unitcell import computeLengthsAndAngles
-        a, b, c, alpha, beta, gamma = computeLengthsAndAngles(vectors)
-        psf_file.setBox(a * unit.nanometer, b * unit.nanometer, c * unit.nanometer,
-                        alpha * unit.radian, beta * unit.radian, gamma * unit.radian)
-    else:
-        raise ValueError("no periodic box found; pass box_nm=(x, y, z)")
-    parameters = app.CharmmParameterSet(*(str(p) for p in parameter_files))
-    kwargs = _system_kwargs(cutoff, hydrogen_mass)
-    kwargs["switchDistance"] = switch * unit.nanometer
-    system = psf_file.createSystem(parameters, **kwargs)
-    return psf_file.topology, system, positions

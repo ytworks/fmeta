@@ -352,8 +352,8 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
                         funnel_settings: Optional[AutoFunnelSettings] = None,
                         funnel_overrides: Optional[dict] = None,
                         funnel: Optional[Funnel] = None) -> Prepared:
-    """Attach a funnel to a system that is already parameterised and solvated
-    (AMBER, GROMACS or CHARMM-GUI input). Lipids in the topology make it a membrane system."""
+    """Attach a funnel to an OpenMM system that is already parameterised and
+    solvated (for use from Python). Lipids in the topology make it a membrane system."""
     settings = settings or SystemSettings()
     if unit.is_quantity(positions):
         positions = positions.value_in_unit(unit.nanometer)

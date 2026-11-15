@@ -25,11 +25,6 @@ class InputConfig:
     ligand_smiles: Optional[str] = None      # its SMILES (protonation state to simulate)
     ligand_chain: Optional[str] = None       # to pick one of several copies
     ligand_resid: Optional[str] = None
-    # pre-parameterised alternatives (give exactly one instead of protein + ligand)
-    amber: Optional[dict] = None             # {prmtop:, coordinates:}
-    gromacs: Optional[dict] = None           # {top:, gro:, include_dir:}
-    charmm: Optional[dict] = None            # {psf:, coordinates:, parameters: [...], box: [x, y, z]}
-    ligand_selection: Optional[object] = None  # residue name or atom indices, for those inputs
 
 
 @dataclass
@@ -110,14 +105,6 @@ class Config:
         self.input.protein = absolute(self.input.protein)
         self.input.ligand = absolute(self.input.ligand)
         self.input.complex = absolute(self.input.complex)
-        for name in ("amber", "gromacs", "charmm"):
-            block = getattr(self.input, name)
-            if block:
-                for key, value in list(block.items()):
-                    if key == "parameters":
-                        block[key] = [absolute(v) for v in value]
-                    elif key != "box" and value is not None:
-                        block[key] = absolute(value)
         self.system.ligand_xml = [absolute(p) for p in self.system.ligand_xml]
         if self.membrane is not None and self.membrane.patch:
             self.membrane.patch = absolute(self.membrane.patch)
@@ -151,11 +138,6 @@ input:
   # complex: 3ptb.pdb
   # ligand_resname: BEN
   # ligand_smiles: "NC(=[NH2+])c1ccccc1"
-  # Pre-parameterised input instead of protein + ligand (pick one):
-  # amber:   {prmtop: complex.prmtop, coordinates: complex.inpcrd}
-  # gromacs: {top: topol.top, gro: conf.gro}
-  # charmm:  {psf: step5.psf, coordinates: step5.pdb, parameters: [toppar/par_all36m_prot.prm]}
-  # ligand_selection: LIG     # ligand residue name in such inputs (auto-detected if unique)
 
 system:
   forcefields: [amber14-all.xml, amber14/tip3p.xml]

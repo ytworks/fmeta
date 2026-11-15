@@ -35,8 +35,7 @@ from .funnel.geometry import Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
 from .system import inputs
-from .system.builder import (MembraneSettings, Prepared, add_barostat, prepare,
-                             prepare_from_system)
+from .system.builder import Prepared, add_barostat, prepare
 from .system.selection import classify
 
 log = logging.getLogger(__name__)
@@ -60,27 +59,10 @@ def prepare_stage(config: Config, workdir) -> Prepared:
             source.ligand_chain, source.ligand_resid)
         config.system.ligand_resname = source.ligand_resname
         config.save(workdir / "config.yaml")
-    if source.protein and source.ligand:
-        prepared = prepare(source.protein, source.ligand, config.system, config.membrane,
-                           config.funnel, config.funnel_overrides, platform=platform)
-    else:
-        kwargs = dict(cutoff=config.system.cutoff, hydrogen_mass=config.system.hydrogen_mass)
-        if source.amber:
-            loaded = inputs.load_amber(source.amber["prmtop"], source.amber["coordinates"], **kwargs)
-        elif source.gromacs:
-            loaded = inputs.load_gromacs(source.gromacs["top"], source.gromacs["gro"],
-                                         source.gromacs.get("include_dir"), **kwargs)
-        elif source.charmm:
-            kwargs["cutoff"] = max(kwargs["cutoff"], 1.2)
-            loaded = inputs.load_charmm(source.charmm["psf"], source.charmm["coordinates"],
-                                        source.charmm["parameters"], source.charmm.get("box"),
-                                        **kwargs)
-        else:
-            raise ValueError("config.input needs protein + ligand, a complex, or one of "
-                             "amber/gromacs/charmm")
-        prepared = prepare_from_system(*loaded, ligand=source.ligand_selection,
-                                       settings=config.system, funnel_settings=config.funnel,
-                                       funnel_overrides=config.funnel_overrides)
+    if not (source.protein and source.ligand):
+        raise ValueError("config.input needs protein + ligand (or complex + ligand_resname)")
+    prepared = prepare(source.protein, source.ligand, config.system, config.membrane,
+                       config.funnel, config.funnel_overrides, platform=platform)
     save_prepared(prepared, out)
     log.info("prepared system: %d atoms\n%s", prepared.topology.getNumAtoms(), prepared.report)
     return prepared
