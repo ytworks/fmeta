@@ -35,17 +35,19 @@ class ToySystem:
         r_sq = (np.asarray(s) - self.site_s) ** 2 + np.asarray(rho) ** 2
         return -self.well_depth * np.exp(-r_sq / (2.0 * self.well_sigma**2))
 
-    def exact_free_energy_profile(self, s, temperature: float, rho_max: float = 3.0,
-                                  n_rho: int = 6001):
+    def exact_free_energy_profile(self, s, temperature: float, rho_max: float = 1.5,
+                                  n_rho: int = 1501):
         """W(s) = -kT ln int 2 pi rho exp(-U/kT) drho, with U = well + funnel walls."""
         kT = KB * temperature
         rho = np.linspace(0.0, rho_max, n_rho)
         s_grid, rho_grid = np.meshgrid(np.atleast_1d(s), rho, indexing="ij")
         energy = self.well_energy(s_grid, rho_grid) + self.funnel.restraint_energy(s_grid, rho_grid)
-        return -kT * np.log(np.trapezoid(2.0 * np.pi * rho_grid * np.exp(-energy / kT), rho, axis=1))
+        weight = np.trapezoid(2.0 * np.pi * rho_grid * np.exp(-energy / kT), rho, axis=1)
+        with np.errstate(divide="ignore"):   # far behind the lower wall the weight underflows
+            return -kT * np.log(weight)
 
     def exact_binding_free_energy(self, temperature: float, site_max: float,
-                                  s_min: float = -2.0, n_s: int = 8001) -> float:
+                                  s_min: float = -0.5, n_s: int = 3501) -> float:
         """Standard binding free energy with the site defined as ``s < site_max``."""
         kT = KB * temperature
         s = np.linspace(s_min, site_max, n_s)

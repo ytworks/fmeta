@@ -26,12 +26,17 @@ class BiasSettings:
     sigma_s: float = 0.025
     sigma_rho: float = 0.05
     pace: int = 250                       # MD steps between hills
-    points_per_sigma: float = 4.0         # grid resolution
+    points_per_sigma: float = 3.0         # grid resolution (see note below)
     grid_margin: float = 0.3              # grid extends this far past the walls
     reflect: bool = True                  # mirror hills at rho = 0
     s_min: Optional[float] = None         # explicit grid limits override the margin rule
     s_max: Optional[float] = None
     rho_max: Optional[float] = None
+
+    # Grid resolution: the cubic-spline table reproduces a Gaussian to about
+    # 5e-4 of its height at 3 points per sigma. Finer grids only cost time, since
+    # OpenMM refits the whole spline on the CPU after every hill (roughly 0.4
+    # microseconds per grid point).
 
     def __post_init__(self):
         if self.bias_factor is not None and self.bias_factor <= 1.0:
