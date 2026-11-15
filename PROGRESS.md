@@ -25,8 +25,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D11
-amended twice). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2 and
+D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -41,19 +41,19 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
-| GPU plan M0: first gate record (R1) | In progress |
+| GPU plan M0: first gate record (R1) | In progress: first GPU runs done; the fixes of their failures are being committed |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
 - GPU gates: **none recorded** (`bench/results/` is empty). The gate script and its criteria
   exist (`scripts/gpu_gates.py`, `docs/gpu-runbook.md`).
 - CPU evidence, in the image (lock d061e45a…, on the source of this commit before it was
-  committed): `ruff check .` passes; `pytest` 76 passed. `fmeta check --platform CPU --quick`
-  15 passed, 0 failed, 0 skipped on 20c43af (`src/` is unchanged since). `pytest -m slow` not
-  run on this commit (6 passed on aadd0ad, in the image). CI has not run on the commits after
-  aadd0ad (see Blockers); it was green on 171220a.
+  committed): `ruff check .` passes; `pytest` 76 passed. Not rerun on this commit: `fmeta check
+  --platform CPU --quick` (15 passed, 0 failed, 0 skipped on 20c43af) and `pytest -m slow`
+  (6 passed on aadd0ad, in the image). CI has not run on the commits after aadd0ad (see
+  Blockers); it was green on 171220a.
 - Not verified anywhere yet:
-  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures, and
-    their fixes follow in the next commits; nothing is recorded;
+  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures; the
+    first fix is in this commit (FM-D2), the others follow; nothing is recorded;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself;
@@ -65,6 +65,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-15 — [amendment] FM-D2: the forces compute the CVs in the angle form
+- What: `s = d cos θ`, `rho = sqrt((d sin θ)² + eps²)` from the distance ligand–p0 and the angle ligand–p0–p1, instead of three distances; the numpy reference uses the dot and the cross product of the same two vectors. Gate item `forces` on CUDA (mixed precision), worst CV deviation from Reference: 3.6e-05 nm before (criterion 2e-5 nm: failed), 3.8e-07 nm after. The criterion is unchanged.
+- Why: the first run of the item on a GPU. Near the axis `dL0² − s²` is a difference of nearly equal numbers and loses its digits in single precision.
+- Refs: FM-D2; `src/fmeta/funnel/forces.py`, `src/fmeta/funnel/geometry.py`; `tests/test_forces.py`.
 
 ### 2026-11-15 — [design] FM-D13: everything except CI runs in one official image built from a lock
 - What: `Dockerfile` (base pinned by digest, the environment of `conda-linux-64.lock`, fmeta, the test and lint tools), `scripts/in_docker.sh` (repository mounted, calling user, only the GPUs named), `scripts/update_lock.sh`, rule `.claude/rules/docker-execution.md`; `CLAUDE.md`, the GPU runbook and the README give Docker commands. Gate evidence is written only in the image whose lock is the repository's, and names the image, the lock and the GPU UUIDs. Roadmap: R7–R10 added (run modes, real inputs, presets, examples and benchmarks). The CI job `docker` and a publish workflow (tags and manual runs only) follow in the next commit.

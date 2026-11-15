@@ -1,13 +1,15 @@
 """OpenMM forces for the funnel: the two collective variables and the walls.
 
-Everything is a ``CustomCentroidBondForce`` over the groups (ligand, p0, p1),
-written with centroid distances only:
+Everything is a ``CustomCentroidBondForce`` over the groups (ligand, p0, p1):
 
-    s   = (dL0^2 + d01^2 - dL1^2) / (2*d01)          (law of cosines)
-    rho = sqrt(max(dL0^2 - s^2, 0) + eps^2)
+    d     = |L - p0|,   theta = angle(L, p0, p1)
+    s     = d*cos(theta)
+    rho   = sqrt((d*sin(theta))^2 + eps^2)
 
-This is the same pair of CVs as ``d*cos(angle)`` / ``d*sin(angle)`` but has a
-well-defined, bounded gradient on the funnel axis (rho -> 0).
+``eps`` gives ``rho`` a well-defined gradient on the funnel axis (theta -> 0, where
+``d*sin(theta)`` alone has a cusp). The angle form is the one that keeps its accuracy in
+single precision: OpenMM evaluates a nearly straight angle from the cross product of the two
+vectors, so ``rho`` near the axis does not come from a difference of large numbers.
 """
 
 from __future__ import annotations
@@ -16,32 +18,12 @@ import openmm as mm
 
 from .geometry import Funnel
 
-_DISTANCES = "dL0=distance(g1,g2); dL1=distance(g1,g3); d01=distance(g2,g3)"
-_S = "(dL0^2 + d01^2 - dL1^2)/(2*d01)"
 
-
-def projection_expression() -> str:
-    return f"{_S}; {_DISTANCES}"
-
-
-def extent_expression(eps: float) -> str:
-    return f"sqrt(max(dL0^2 - s^2, 0) + {eps!r}^2); s={_S}; {_DISTANCES}"
-
-
-def restraint_expression(funnel: Funnel) -> str:
-    f = funnel
-    return (
-        f"0.5*{f.k_wall!r}*max(rho - R, 0)^2"
-        f" + 0.5*{f.k_lower!r}*max({f.lower!r} - s, 0)^2"
-        f" + 0.5*{f.k_upper!r}*max(s - {f.upper!r}, 0)^2;"
-        f" R = {f.width!r}/(1 + exp({f.steepness!r}*(s - {f.inflection!r}))) + {f.buffer!r};"
-        f" rho = sqrt(max(dL0^2 - s^2, 0) + {f.eps!r}^2);"
-        f" s = {_S}; {_DISTANCES}"
-    )
-
-
-def _centroid_force(expression: str, funnel: Funnel, periodic: bool) -> mm.CustomCentroidBondForce:
-    force = mm.CustomCentroidBondForce(3, expression)
+def cv_force(energy: str, funnel: Funnel, periodic: bool = True) -> mm.CustomCentroidBondForce:
+    """Force whose energy is ``energy``, an expression of the two CVs ``s`` and ``rho`` (nm)."""
+    force = mm.CustomCentroidBondForce(
+        3, f"{energy}; rho = sqrt((d*sin(theta))^2 + {funnel.eps!r}^2); s = d*cos(theta);"
+           " d=distance(g1,g2); theta=angle(g1,g2,g3)")
     g1 = force.addGroup(funnel.ligand_atoms, funnel.ligand_weights)
     g2 = force.addGroup(funnel.p0_atoms, funnel.p0_weights)
     g3 = force.addGroup(funnel.p1_atoms, funnel.p1_weights)
@@ -52,17 +34,23 @@ def _centroid_force(expression: str, funnel: Funnel, periodic: bool) -> mm.Custo
 
 def projection_force(funnel: Funnel, periodic: bool = True) -> mm.CustomCentroidBondForce:
     """Force whose energy is the projection CV ``s`` (nm)."""
-    return _centroid_force(projection_expression(), funnel, periodic)
+    return cv_force("s", funnel, periodic)
 
 
 def extent_force(funnel: Funnel, periodic: bool = True) -> mm.CustomCentroidBondForce:
     """Force whose energy is the extent CV ``rho`` (nm)."""
-    return _centroid_force(extent_expression(funnel.eps), funnel, periodic)
+    return cv_force("rho", funnel, periodic)
 
 
 def restraint_force(funnel: Funnel, periodic: bool = True) -> mm.CustomCentroidBondForce:
     """Side wall plus lower and upper walls, as a single force."""
-    return _centroid_force(restraint_expression(funnel), funnel, periodic)
+    f = funnel
+    return cv_force(
+        f"0.5*{f.k_wall!r}*max(rho - R, 0)^2"
+        f" + 0.5*{f.k_lower!r}*max({f.lower!r} - s, 0)^2"
+        f" + 0.5*{f.k_upper!r}*max(s - {f.upper!r}, 0)^2;"
+        f" R = {f.width!r}/(1 + exp({f.steepness!r}*(s - {f.inflection!r}))) + {f.buffer!r}",
+        funnel, periodic)
 
 
 def free_force_group(system: mm.System) -> int:

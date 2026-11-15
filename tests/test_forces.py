@@ -46,22 +46,16 @@ def energy(context, positions, group):
     return state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
 
-def test_cvs_match_numpy_and_angle_form():
+def test_cvs_match_numpy():
     rng = np.random.default_rng(1)
     funnel = make_funnel()
-    angle_s = forces._centroid_force("distance(g1,g2)*cos(angle(g1,g2,g3))", funnel, True)
-    angle_rho = forces._centroid_force("distance(g1,g2)*sin(angle(g1,g2,g3))", funnel, True)
-    context = make_context(funnel, [forces.projection_force(funnel), forces.extent_force(funnel),
-                                    angle_s, angle_rho])
+    context = make_context(funnel, [forces.projection_force(funnel), forces.extent_force(funnel)])
     for _ in range(50):
         center = np.array([rng.uniform(-0.8, 0.8), rng.uniform(-0.8, 0.8), rng.uniform(0.2, 2.6)])
         pos = make_positions(rng, center)
         s_ref, rho_ref = compute_cvs(funnel, pos)
         assert energy(context, pos, 0) == pytest.approx(s_ref, abs=1e-9)
         assert energy(context, pos, 1) == pytest.approx(rho_ref, abs=1e-9)
-        # same quantities as the BioSimSpace-style angle expressions
-        assert energy(context, pos, 2) == pytest.approx(s_ref, abs=1e-6)
-        assert energy(context, pos, 3) == pytest.approx(np.sqrt(rho_ref**2 - funnel.eps**2), abs=1e-6)
 
 
 def test_cvs_are_invariant_under_periodic_images():

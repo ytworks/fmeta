@@ -1,7 +1,8 @@
 # Engine design
 
-Status: **Accepted** (2026-11-15, PR #1; FM-D11 amended and FM-D13 added the same day: owner
-decisions, and the first run with the real ligand-parameter packages).
+Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
+(2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
+FM-D2 amended (2026-11-15: the first runs on a GPU).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -25,6 +26,13 @@ Reference platform.
 `s = (dL0² + d01² − dL1²) / (2 d01)`, `rho = sqrt(max(dL0² − s², 0) + eps²)` over the groups
 ligand / p0 / p1. Group weights are stored in the funnel (ligand heavy atoms by element mass,
 anchors as given), never taken from particle masses.
+Amendment (2026-11-15): the forces compute the same CVs in the angle form, `s = d cos θ`,
+`rho = sqrt((d sin θ)² + eps²)`, with `d` the distance ligand–p0 and `θ` the angle
+ligand–p0–p1 (`funnel/forces.py`). The first run of the gate `forces` on a GPU (CUDA, mixed
+precision) gave a `rho` 3.6e-05 nm off Reference near the axis, above the criterion of
+2e-5 nm: `dL0² − s²` is a difference of nearly equal numbers there and loses its digits in
+single precision. The angle form has no such difference (3.8e-07 nm at worst over the same
+positions), and `eps` bounds its gradient on the axis. The criterion is unchanged.
 Why: the same CVs as `d cos(angle)` / `d sin(angle)` but with a bounded gradient on the axis;
 explicit weights survive hydrogen mass repartitioning and massless test anchors; GPU platforms
 wrap molecules, so the distances must be minimum-image.

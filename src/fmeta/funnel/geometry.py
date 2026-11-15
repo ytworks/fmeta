@@ -156,18 +156,18 @@ def compute_cvs(funnel: Funnel, positions: np.ndarray, box: Optional[np.ndarray]
                 regularize: bool = True):
     """Numpy reference for the two collective variables: returns ``(s, rho)``.
 
-    It mirrors the OpenMM expressions exactly: three (optionally minimum-image)
-    centroid distances combined through the law of cosines.
+    The quantities of the OpenMM expressions, from the same two (optionally
+    minimum-image) vectors p0 -> ligand and p0 -> p1: the component of the first
+    along the second, and the length of its component across it.
     """
     positions = np.asarray(positions, dtype=float)
     p0 = centroid(positions, funnel.p0_atoms, funnel.p0_weights)
     p1 = centroid(positions, funnel.p1_atoms, funnel.p1_weights)
     lig = centroid(positions, funnel.ligand_atoms, funnel.ligand_weights)
-    d_l0 = np.linalg.norm(_minimum_image(lig - p0, box))
-    d_l1 = np.linalg.norm(_minimum_image(lig - p1, box))
-    d_01 = np.linalg.norm(_minimum_image(p1 - p0, box))
-    s = (d_l0**2 + d_01**2 - d_l1**2) / (2.0 * d_01)
-    rho_sq = max(d_l0**2 - s**2, 0.0)
+    to_ligand = _minimum_image(lig - p0, box)
+    axis = _minimum_image(p1 - p0, box)
+    axis = axis / np.linalg.norm(axis)
+    rho_sq = float(np.sum(np.cross(to_ligand, axis) ** 2))
     if regularize:
         rho_sq += funnel.eps**2
-    return float(s), float(np.sqrt(rho_sq))
+    return float(np.dot(to_ligand, axis)), float(np.sqrt(rho_sq))
