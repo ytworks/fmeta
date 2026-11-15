@@ -1,4 +1,10 @@
-"""Configuration: one YAML file, mapped onto the settings dataclasses."""
+"""Configuration: one YAML file, mapped onto the settings dataclasses.
+
+The official defaults are the defaults of the dataclasses. The presets (``presets/*.yaml``,
+written by ``fmeta init --preset NAME``) show every key with its default, its unit and what it
+does; a configuration may name one (``preset: membrane``) and hold only what it changes. The
+reasons for the values are in ``docs/configuration.md`` (FM-D16).
+"""
 
 from __future__ import annotations
 
@@ -14,6 +20,37 @@ from .engine.grid import BiasSettings
 from .engine.platform import check_devices
 from .funnel.autodetect import AutoFunnelSettings
 from .system.builder import MembraneSettings, SystemSettings
+from .system.ligand import DEFAULT_FORCEFIELD
+
+PRESETS = ("soluble", "membrane")
+
+
+def preset_text(name) -> str:
+    """The preset ``name`` as it is packaged: a full configuration with units and explanations."""
+    if name not in PRESETS:
+        raise ValueError(f"unknown preset {name!r}; choose from: {', '.join(PRESETS)}")
+    return (Path(__file__).parent / "presets" / f"{name}.yaml").read_text()
+
+
+def on_preset(name, data: dict) -> dict:
+    """The configuration ``data`` on top of the preset ``name``: the keys of ``data`` win."""
+    preset = yaml.safe_load(preset_text(name))
+    merged = dict(data)
+    for section, values in preset.items():
+        if section not in ("input", "membrane"):      # the file names of a preset are placeholders
+            merged[section] = {**values, **(data.get(section) or {})}
+    system = data.get("system") or {}
+    if "ligand_method" in system and "ligand_forcefield" not in system:
+        del merged["system"]["ligand_forcefield"]     # the pinned force field of that method
+    # membrane: absent: as the preset; true: the bilayer of the preset, or the default one;
+    # a mapping: on top of the bilayer of the preset; false or null: no bilayer
+    membrane = data["membrane"] if "membrane" in data else preset.get("membrane")
+    if membrane is True:
+        membrane = {}
+    if isinstance(membrane, dict):
+        membrane = {**(preset.get("membrane") or {}), **membrane}
+    merged["membrane"] = membrane
+    return merged
 
 
 @dataclass
@@ -44,7 +81,7 @@ class RunConfig:
     checkpoint_ps: float = 250.0
     trajectory_ps: float = 100.0             # 0 disables the trajectory
     trajectory_solute_only: bool = True
-    seed: int = 0                            # 0: random; otherwise replica i uses seed + i
+    seed: int = 0                            # 0: random; else replica i, walker w: seed + 1000 i + w
 
 
 @dataclass
@@ -65,10 +102,15 @@ class Config:
         if self.run.timestep_fs > 2.0 and not self.system.hydrogen_mass:
             raise ValueError("a time step above 2 fs needs system.hydrogen_mass (e.g. 1.5)")
         check_devices(self.run.mode, self.run.gpus)
+        # the ligand force field is named, so that a saved configuration says which one was used
+        if self.system.ligand_forcefield is None:
+            self.system.ligand_forcefield = DEFAULT_FORCEFIELD.get(self.system.ligand_method)
 
     @classmethod
     def from_dict(cls, data: dict, base_dir=None) -> "Config":
         data = dict(data or {})
+        if "preset" in data:
+            data = on_preset(data.pop("preset"), data)
         sections = {f.name: f for f in dataclasses.fields(cls)}
         unknown = set(data) - set(sections)
         if unknown:
@@ -120,6 +162,8 @@ class Config:
 
     def to_dict(self) -> dict:
         data = dataclasses.asdict(self)
+        if self.system.ligand_method not in DEFAULT_FORCEFIELD:     # xml: no generator ran
+            data["system"]["ligand_forcefield"] = None
         data["system"]["forcefields"] = list(data["system"]["forcefields"])
         data["system"]["ligand_xml"] = list(data["system"]["ligand_xml"])
         data["system"]["keep_hetero"] = list(data["system"]["keep_hetero"])
@@ -131,54 +175,3 @@ class Config:
     def save(self, path) -> None:
         with open(path, "w") as handle:
             yaml.safe_dump(self.to_dict(), handle, sort_keys=False, default_flow_style=None)
-
-
-TEMPLATE = """\
-# fmeta configuration. Every key is optional except the inputs; values shown are the defaults.
-input:
-  protein: protein.pdb        # for membrane proteins: oriented with the membrane normal along z
-  ligand: ligand.sdf          # bound pose with hydrogens, in the protein's frame
-  # A complex straight from the PDB instead (ligand cut out, hydrogens added from the SMILES):
-  # complex: 3ptb.pdb
-  # ligand_resname: BEN
-  # ligand_smiles: "NC(=[NH2+])c1ccccc1"
-
-system:
-  forcefields: [amber14-all.xml, amber14/tip3p.xml]
-  ligand_method: openff       # openff | gaff | xml (then list ligand_xml files)
-  # The protein file is reduced to its amino-acid residues (waters, ions, other ligands are
-  # removed) and, if PDBFixer is installed, repaired; hydrogens are completed automatically.
-  # keep_hetero: [ZN]         # residue names to keep; add force-field files that cover them
-  ligand_xml: []
-  temperature: 300.0
-  ionic_strength: 0.15
-  padding: 1.2                # nm of solvent (or lipid, in the membrane plane) around the solute
-  hydrogen_mass: 1.5          # amu; set to null (and run.timestep_fs: 2) to disable
-
-# membrane: {lipid: POPC, center_z: 0.0}    # uncomment to embed in a bilayer
-#   orient: check (default) warns if the input does not look oriented, auto re-orients the
-#   complex onto the membrane plane estimated from the protein, input trusts the file as is
-
-funnel:
-  method: clearance           # automatic placement from the pose
-  # exit_direction: [0, 0, 1] # override the exit search
-funnel_overrides: {}          # e.g. {upper: 4.0}
-
-metad:
-  bias_factor: 10.0
-  height: 1.5                 # kJ/mol
-  sigma_s: 0.025              # nm, along the funnel axis
-  sigma_rho: 0.05             # nm, away from the axis
-
-equilibration: {}             # heating_ps, release_ps, free_ps ...
-
-run:
-  length_ns: 500.0            # per replica (per walker, if walkers > 1)
-  replicas: 5                 # independent runs, for the error estimate
-  walkers: 1                  # >1: this many walkers share one bias in each replica
-  timestep_fs: 4.0
-  platform: auto              # CUDA if available
-  mode: auto                  # parallel: one replica per GPU, side by side; sequential: one GPU,
-                              # one replica after another; auto: parallel if gpus is set
-  # gpus: [0, 1]              # the GPUs to use (all: every GPU that is visible)
-"""

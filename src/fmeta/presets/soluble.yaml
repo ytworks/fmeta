@@ -1,0 +1,109 @@
+# fmeta preset "soluble": a protein-ligand complex in water.
+# Written by: fmeta init --preset soluble
+#
+# Every key is here with its official default, its [unit] and what it does. Only the input
+# files have to be given. Reasons and sources of the values: docs/configuration.md.
+#
+# A configuration may also hold only what it changes:
+#     preset: soluble
+#     input: {protein: my.pdb, ligand: my.sdf}
+#     run: {length_ns: 200.0}
+# Values are then taken from this preset, and the keys of the file replace them.
+#
+# Two values are derived and are not keys: the temperature of the bias (system.temperature)
+# and the number of steps between hills (run.pace_ps / run.timestep_fs).
+
+input:
+  protein: protein.pdb            # [path] the protein, PDB or mmCIF
+  ligand: ligand.sdf              # [path] the ligand in its bound pose with hydrogens, in the frame of the protein: SDF (MOL, MOL2)
+  complex: null                   # [path] instead of the two files above: one PDB or mmCIF with both; the ligand residue is cut out
+  ligand_resname: null            # [-] with complex: the residue name of the ligand
+  ligand_smiles: null             # [-] with complex: the SMILES of the ligand in the protonation state to simulate; adds its hydrogens
+  ligand_chain: null              # [-] with complex: the chain of the ligand, to pick one of several copies
+  ligand_resid: null              # [-] with complex: the residue number of the ligand, to pick one of several copies
+
+system:
+  forcefields: [amber14-all.xml, amber14/tip3p.xml]   # [-] OpenMM force-field files: protein and lipids, then water and ions
+  water_model: tip3p              # [-] the water that is added; the model of the water file in forcefields
+  ligand_method: openff           # [-] ligand parameters: openff or gaff (generated from the ligand file), or xml (the files of ligand_xml)
+  ligand_forcefield: openff-2.2.1 # [-] the force field of the generator; null: the pinned one of the method (openff-2.2.1, gaff-2.11)
+  ligand_charge_method: null      # [-] null: the charges the force field prescribes (AM1-BCC for both pins); or a method of the OpenFF toolkit
+  fix_protein: null               # [-] repair the protein with PDBFixer (missing atoms, non-standard residues); null: if it is installed
+  keep_hetero: []                 # [-] residue names of non-protein groups to keep, e.g. [ZN]; forcefields must cover them
+  ligand_xml: []                  # [path] ffxml file(s) with the residue template of the ligand, for ligand_method: xml
+  ligand_resname: LIG             # [-] the residue name the ligand gets in the system
+  keep_water: false               # [-] keep the water molecules of the protein file
+  add_hydrogens: true             # [-] complete the hydrogens of the protein with the force field
+  ph: 7.0                         # [pH] pH for the protonation states when hydrogens are added
+  ionic_strength: 0.15            # [mol/L] NaCl, in addition to the ions that neutralise the system
+  padding: 1.2                    # [nm] solvent around the solute (a lower bound: the box is sized from the funnel as well)
+  box_shape: dodecahedron         # [-] dodecahedron or cube; not used with a membrane
+  cutoff: 1.0                     # [nm] cutoff of the direct-space non-bonded interactions (PME)
+  hydrogen_mass: 1.5              # [amu] mass of the hydrogens (mass repartitioning); null: real masses, and run.timestep_fs at most 2
+  temperature: 300.0              # [K] temperature of equilibration, production and the bias
+  pressure: 1.0                   # [bar] pressure of the barostat
+
+# membrane: no bilayer in this preset. For a membrane protein: fmeta init --preset membrane
+
+funnel:
+  method: clearance               # [-] clearance: exit and lengths from the pocket; bss: grid average with the fixed lengths of BioSimSpace
+  n_directions: 1000              # [-] directions tried for the exit
+  max_path: 4.5                   # [nm] how far from the binding site the exit path is followed
+  step: 0.05                      # [nm] step along a path
+  probe: 0.3                      # [nm] a path nearer than this to an atom is squeezing through
+  contact_clearance: 0.6          # [nm] from this distance to the solute on, the ligand centre has left the surface
+  bulk_margin: 1.0                # [nm] distance between ligand atoms and solute that counts as bulk (the unbound region)
+  charged_bulk_margin: 1.5        # [nm] bulk_margin for a ligand with a net charge
+  anchor_min_atoms: 10            # [-] least number of alpha carbons in an anchor group (p0, p1)
+  anchor_radius: 1.0              # [nm] radius around an anchor point in which alpha carbons are taken
+  anchor_separation: 1.2          # [nm] distance between the anchor points p0 and p1
+  pose_margin: 0.2                # [nm] kept between the atoms of the bound pose and the wall
+  min_width: 0.6                  # [nm] lower limit of the funnel width
+  max_width: 1.5                  # [nm] upper limit of the funnel width
+  exit_direction: null            # [-] a vector such as [0, 0, 1] sets the exit by hand; null: search
+  check_channel: true             # [-] warn when a 0.3 nm probe cannot reach bulk from the site
+
+# Funnel parameters set by hand, after the placement. Lengths in nm, force constants in
+# kJ/mol/nm^2: width, buffer, steepness (1/nm), inflection, lower, upper, k_wall, k_lower,
+# k_upper, eps. Example: {upper: 4.0}
+funnel_overrides: {}
+
+metad:
+  bias_factor: 10.0               # [-] well-tempered bias factor; null: plain metadynamics
+  height: 1.5                     # [kJ/mol] height of the first hills
+  sigma_s: 0.025                  # [nm] hill width along the funnel axis (s)
+  sigma_rho: 0.05                 # [nm] hill width away from the axis (rho)
+  points_per_sigma: 3.0           # [-] grid points per hill width
+  grid_margin: 0.3                # [nm] how far the grid extends past the walls
+  reflect: true                   # [-] mirror the hills at rho = 0
+  s_min: null                     # [nm] lower grid limit in s; null: lower wall minus grid_margin
+  s_max: null                     # [nm] upper grid limit in s; null: upper wall plus grid_margin
+  rho_max: null                   # [nm] upper grid limit in rho; null: widest wall radius plus grid_margin
+
+equilibration:
+  minimize_iterations: 5000       # [-] most steps of the energy minimisation
+  restraint_k: 1000.0             # [kJ/mol/nm^2] position restraint on the heavy atoms of the solute
+  heating_ps: 100.0               # [ps] heating from 10 K at constant volume, restrained
+  release_ps: 400.0               # [ps] constant pressure, split evenly over the stages of release_factors
+  release_factors: [1.0, 0.5, 0.2, 0.05]   # [-] the restraint is scaled by these factors, one stage each
+  free_ps: null                   # [ps] without restraints, funnel walls on; null: 1000, with a membrane 10000
+  timestep_fs: 2.0                # [fs] time step of the equilibration
+  friction: 1.0                   # [1/ps] friction of the Langevin thermostat
+  seed: 0                         # [-] 0: random
+
+run:
+  length_ns: 500.0                # [ns] production length of each replica (of each walker, with walkers > 1)
+  replicas: 5                     # [-] independent runs, each with its own bias, for the error estimate
+  walkers: 1                      # [-] walkers that share one bias within a replica
+  walker_sync_hills: 1            # [-] a walker reads the hills of the others after every N of its own
+  timestep_fs: 4.0                # [fs] time step; above 2 fs it needs system.hydrogen_mass
+  friction: 1.0                   # [1/ps] friction of the Langevin thermostat
+  pace_ps: 1.0                    # [ps] time between hills
+  platform: auto                  # [-] auto: the first usable of CUDA, HIP, OpenCL, CPU, Reference; or one of these names
+  precision: mixed                # [-] precision of a GPU platform: single, mixed or double
+  mode: auto                      # [-] parallel: one replica per GPU; sequential: one after another on one GPU; auto: parallel if gpus is set
+  gpus: null                      # [-] the GPUs of the run: device numbers such as [0, 1], or all; null: one device, picked by the platform
+  checkpoint_ps: 250.0            # [ps] time between checkpoints (a restart continues from the last one)
+  trajectory_ps: 100.0            # [ps] time between trajectory frames; 0: no trajectory
+  trajectory_solute_only: true    # [-] write only the solute (protein, ligand, kept hetero groups) to the trajectory
+  seed: 0                         # [-] 0: random; otherwise replica i, walker w use seed + 1000 i + w
