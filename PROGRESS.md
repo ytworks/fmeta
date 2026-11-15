@@ -43,8 +43,9 @@ Everything below is on PR #1 (not merged).
 - CPU evidence: CI green on 171220a (Python 3.10 and 3.12: lint, PROGRESS budget, evidence
   index, `pytest`, 73 tests). `fmeta check --platform CPU --quick` on the same source tree:
   13 passed, 0 failed, 2 skipped (`pdb_sdf_openff`, `pdb_sdf_gaff`: generators not installed).
-  `pytest -m slow` (6 tests) passed on 6d6e85e; the head differs from it by lint fixes, CLI
-  error reporting and the harness, and has not repeated them yet.
+  `pytest -m slow` (6 tests) passed on 171220a. `scripts/gpu_gates.py --quick --platform CPU`
+  runs to the end and, as it must on a machine without a GPU, reports `gpu-tests` and the two
+  skipped items as not passed and records nothing.
 - Not verified anywhere yet:
   - any GPU platform (CUDA / OpenCL), including the periodic-image handling of the CVs there;
   - ligand parameters from the real OpenFF / GAFF generators — the conda-only packages could
