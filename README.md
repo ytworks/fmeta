@@ -17,13 +17,33 @@ fmeta auto --protein gpcr_oriented.pdb --ligand ligand.sdf --membrane POPC -o ru
 
 ## インストール
 
+公式の実行環境は Docker イメージです。テストと GPU での検証は、すべてこのイメージの中で行っています。必要なものは Docker と、GPU を使うための NVIDIA ドライバおよび NVIDIA Container Toolkit だけです。
+
+```bash
+git clone https://github.com/ytworks/fmeta && cd fmeta
+docker build -t fmeta .       # 約 6 GB。OpenMM（CUDA）、OpenFF / GAFF、RDKit、PDBFixer を含む
+
+# 入力ファイルのあるディレクトリで実行する。そこが /work にマウントされ、出力は自分の所有になる
+docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta \
+    auto --protein protein.pdb --ligand ligand.sdf -o run1
+```
+
+- イメージのエントリポイントは `fmeta` です。この README に出てくる `fmeta ...` のコマンドは、`docker run ... fmeta` の後ろに続けて書きます。`doctor` を付けると、使えるプラットフォームと同梱パッケージを確認できます。
+- 環境は `conda-linux-64.lock` で固定してあります。`environment.yml` から解いた明示的なロックで、イメージは常にこのロックからビルドします。検証した環境と配布する環境が同じになります。
+- 使う GPU は `--gpus '"device=2,3"'` のように絞れます。コンテナの中では、渡した GPU が 0 から番号づけされます。
+- 長い計算は `--rm` の代わりに `-d --name run1` を付けて切り離します。ログは `docker logs -f run1`、停止は `docker stop run1` です。`docker rm run1` のあと同じコマンドを実行すると、チェックポイントから再開します。
+
+### Docker を使わない場合
+
+conda でも環境を作れます。ただし、検証は公式イメージでしか行っていません。
+
 ```bash
 conda env create -f environment.yml      # openmm (CUDA), openmmforcefields, pdbfixer, rdkit, matplotlib
 conda activate fmeta
 pip install -e .
 ```
 
-コア部分（ファネル、エンジン、解析）だけなら `pip install -e .` で足ります（依存は openmm / numpy / scipy / pyyaml）。任意の依存は次の機能に使います。
+コア部分（ファネル、エンジン、解析）だけなら `pip install -e .` で足ります（依存は openmm / numpy / scipy / pyyaml）。CI の `cpu` ジョブがこの構成でテストしています。任意の依存は次の機能に使います。
 
 | パッケージ | 使う機能 |
 |---|---|
@@ -34,10 +54,10 @@ pip install -e .
 
 ## GPU マシンでの確認
 
-開発は GPU のない環境で行いました。GPU に依存する部分と conda 専用パッケージに依存する部分は、次の 1 コマンドでまとめて確認できます。
+GPU に依存する部分とリガンド力場の自動生成は、次の 1 コマンドでまとめて確認できます。新しいマシンや新しいドライバでは、最初にこれを実行してください。
 
 ```bash
-fmeta check                # 複数 GPU のランチャも試すなら --gpus 0,1
+docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta check     # 複数 GPU のランチャも試すなら --gpus 0,1
 ```
 
 OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系を自分で組み立て、項目ごとに PASS / FAIL / SKIP を表示します（結果は `fmeta_check/check_report.json`、失敗時のトレースバックも同じ場所）。
@@ -60,7 +80,7 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 
 所要時間は GPU で 10〜20 分程度の見込みです（未計測）。`fmeta check --platform CPU --quick` は同じ手順を最短の長さで流す動作確認で、開発環境ではこれが全項目通ることを確認しています。追加で `pytest -m gpu` も用意してあります。
 
-結果を証跡としてリポジトリに残すときは `python scripts/gpu_gates.py` を使います。GPU テストと `fmeta check` の全項目を実行し、すべて通ると `bench/results/<日付>-<コミット>-gpu-gates.json` と `index.json` を書き出します（手順は `docs/gpu-runbook.md`）。
+結果を証跡としてリポジトリに残すときは `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1` を使います。GPU テストと `fmeta check` の全項目を実行し、すべて通ると `bench/results/<日付>-<コミット>-gpu-gates.json` と `index.json` を書き出します。記録にはイメージの識別子、ロックのハッシュ、GPU の UUID が入り、公式イメージの外で実行した場合は記録しません（手順は `docs/gpu-runbook.md`）。
 
 このあと実在の系（`examples/`）で本計算を流せば検証は完了です。
 
@@ -224,16 +244,24 @@ GPU のない環境（OpenMM 8.6.1、Reference / CPU プラットフォーム）
 開発ルールはリポジトリに置いてあります（[kairyu](https://github.com/ytworks/kairyu) / [pypic](https://github.com/ytworks/pypic) と同じ構成）。
 
 - `CLAUDE.md`（`AGENTS.md` はこれを参照）: テスト方針、ファイルの置き場所、開発コマンド。
-- `.claude/rules/`: 進捗ログの書き方、自由エネルギーとファネルに関する不変条件。
+- `.claude/rules/`: Docker での実行規則、進捗ログの書き方、自由エネルギーとファネルに関する不変条件。
 - `PROGRESS.md`: 設計変更・マイルストーン・検証状況・ブロッカーの記録（セッションをまたぐメモ）。大きさは `scripts/check_progress_size.py` がセッション開始時と CI で検査します。
 - `docs/`: 設計判断（`design/`、FM-D 番号）、ロードマップ、計画、GPU 手順書。
-- CI（`.github/workflows/ci.yml`）: lint、PROGRESS.md の検査、GPU 証跡の整合性検査、CPU テスト。GPU を使う検証は CI では行わず、`scripts/gpu_gates.py` の記録を CI が検証します。
+- CI（`.github/workflows/ci.yml`）: `cpu` ジョブは pip で入れたコアだけで lint、PROGRESS.md の検査、GPU 証跡の整合性検査、CPU テストを行います。`docker` ジョブは公式イメージをビルドし、その中で lint と CPU テストを行います。GPU を使う検証は CI では行わず、`scripts/gpu_gates.py` の記録を CI が検証します。
+- `.github/workflows/image.yml`: 公式イメージを `ghcr.io/ytworks/fmeta` に公開します。バージョンタグか手動実行でだけ動きます。
+
+実行とテストは、CI を除いてすべて公式イメージのコンテナの中で行います（`.claude/rules/docker-execution.md`）。ホストに Python 環境は作りません。`scripts/in_docker.sh` はリポジトリを `/work` にマウントし、そのソースを使って、呼び出したユーザーとしてコマンドを実行します。イメージがなければ最初にビルドします。
 
 ```bash
-pip install -e ".[dev,prep,plots]"
-ruff check . && python scripts/check_progress_size.py && python scripts/verify_bench_results.py && pytest
-pytest -m slow        # 時間のかかる CPU テスト
+scripts/in_docker.sh ruff check .
+scripts/in_docker.sh python scripts/check_progress_size.py
+scripts/in_docker.sh python scripts/verify_bench_results.py
+scripts/in_docker.sh pytest
+scripts/in_docker.sh pytest -m slow                                       # 時間のかかる CPU テスト
+scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1    # GPU ゲート。ホストの GPU 6 と 7 を使う
 ```
+
+パッケージを変えるときは `environment.yml` を編集し、`scripts/update_lock.sh` でロックを作り直します。そのあとイメージを作り直し（`scripts/in_docker.sh --build ...`）、テストと GPU ゲートをやり直します。
 
 ## 参考文献
 

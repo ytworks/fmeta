@@ -12,8 +12,8 @@ for the budget). Do it as its own commit, before other work updates `PROGRESS.md
 3. If `## Current Status` or `## Product` is over budget, rewrite it more compactly in place
    (snapshots, not history). If a verbose status is worth preserving, snapshot it to
    `docs/progress/archive/status-YYYY-MM-DD.md` first.
-4. Verify with `python3 scripts/check_progress_size.py`, then commit as
-   `docs(progress): archive old change log entries`.
+4. Verify with `scripts/in_docker.sh python scripts/check_progress_size.py` (CI runs the same
+   check), then commit as `docs(progress): archive old change log entries`.
 
 Archive files are frozen history: never edit them except to insert trimmed entries at the
 marker, and never delete or reword archived entries.

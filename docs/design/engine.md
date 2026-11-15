@@ -1,8 +1,8 @@
 # Engine design
 
-Status: **Accepted** (2026-11-15, PR #1; FM-D11 amended twice the same day: an owner decision,
-and the first run with the real ligand-parameter packages).
-Applies to: `src/fmeta/` (all of it), `examples/`.
+Status: **Accepted** (2026-11-15, PR #1; FM-D11 amended and FM-D13 added the same day: owner
+decisions, and the first run with the real ligand-parameter packages).
+Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
 
@@ -104,3 +104,20 @@ four 20 ns runs reweighted errors of −0.12 to −0.27 kJ/mol. `fmeta check` /
 `bench/results/`.
 Why: the development machine has no GPU; correctness has to be established where it can be
 (exact answers on CPU) and the rest gated on the machine that runs production.
+
+### FM-D13 — Everything except CI runs in one official image built from a lock
+One image (`Dockerfile`): a micromamba base pinned by digest, the environment of
+`conda-linux-64.lock` (an explicit lock solved from `environment.yml` in a container; OpenMM
+built against CUDA 12.9), fmeta, and the test and lint tools. fmeta commands, simulations,
+tests, lint, the scripts, the GPU gates and the benchmarks run in a container of it, through
+`scripts/in_docker.sh`: the repository is mounted and its source is the one that runs, as the
+calling user, with only the GPUs named. No Python environment is made on the host. Exceptions:
+CI (the `cpu` job installs the core with pip and keeps it usable without the conda-only
+packages; the `docker` job builds the image and tests in it) and the SessionStart size check.
+`scripts/gpu_gates.py` records evidence only when the lock installed in the image is the lock
+of the repository; the record names the image, the hash of the lock and the UUIDs of the GPUs,
+and `scripts/verify_bench_results.py` requires that. Rule: `.claude/rules/docker-execution.md`.
+Why: owner rule of 2026-11-15 (execution and tests run on Docker, except CI). `environment.yml`
+pins nothing, so it resolves differently over time: evidence taken in a conda environment does
+not describe the environment a later user gets. With one locked image, the environment that is
+verified is the one that is distributed, and a record says which one it was.

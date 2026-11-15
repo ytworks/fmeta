@@ -10,6 +10,10 @@ standard binding free energy. Package: `src/fmeta/`.
 ALWAYS read `PROGRESS.md` first — it is the cross-session memory of design changes,
 milestone status, gate evidence and blockers.
 
+## Execution: Docker only
+
+@.claude/rules/docker-execution.md
+
 ## Progress log rules
 
 @.claude/rules/progress-log.md
@@ -30,9 +34,10 @@ Apply these rules whenever a change adds, removes, moves or reclassifies behavio
    with numpy references and finite differences, with `openmm.app.Metadynamics`, bit-exact
    restarts, end-to-end behavior of prepare / equilibrate / run / analyze.
 3. `pytest` (the default selection) must pass on a CPU-only machine without conda-only
-   packages: that is what CI runs. `-m slow` holds the long CPU runs (multi-replica toy runs,
-   the full pipeline, the real `addMembrane` build); run the ones a change touches before
-   merging. `-m gpu` needs a GPU and is verified with the GPU gates, not by CI.
+   packages: that is what the `cpu` job of CI runs. `-m slow` holds the long CPU runs
+   (multi-replica toy runs, the full pipeline, the real `addMembrane` build); run the ones a
+   change touches before merging. `-m gpu` needs a GPU and is verified with the GPU gates, not
+   by CI.
 4. A verdict depends only on the code under test: never on wall-clock time, speed ratios or
    runner load. Use deterministic quantities (fixed seeds, exact identities, counts); use
    timeouts only to detect hangs; record timing as a diagnostic (the `benchmark` item of
@@ -51,15 +56,19 @@ Apply these rules whenever a change adds, removes, moves or reclassifies behavio
 - Example configurations for real targets: `examples/<name>/`
 - Design decisions (D-IDs, `Status:` lines): `docs/design/*.md`
 - Roadmap: `docs/roadmap.md`; implementation plans: `docs/plans/YYYY-MM-DD-<topic>.md`
+- The official image: `Dockerfile`, `conda-linux-64.lock` (solved from `environment.yml`),
+  `docker/`; wrapper `scripts/in_docker.sh`
 - GPU gate procedure: `docs/gpu-runbook.md`; recorded evidence: `bench/results/` (`index.json`)
 - Archived progress history: `docs/progress/archive/`
 
 ## Dev commands
 
-- CPU (any machine): `pip install -e ".[dev,prep,plots]"`, then `ruff check .`,
-  `python scripts/check_progress_size.py`, `python scripts/verify_bench_results.py`, `pytest`
-  (what CI runs). Long CPU tests: `pytest -m slow`.
-- GPU (conda environment from `environment.yml`): `python scripts/gpu_gates.py`
+Every command runs in the official image (rule above); write `scripts/in_docker.sh` in front.
+
+- CPU: `scripts/in_docker.sh ruff check .`, `... python scripts/check_progress_size.py`,
+  `... python scripts/verify_bench_results.py`, `... pytest` (the four checks of CI).
+  Long CPU tests: `scripts/in_docker.sh pytest -m slow`.
+- GPU: `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`
   (see `docs/gpu-runbook.md`).
 - Before a commit: run the commands above and read the exit status of the command itself.
   A pipe (`pytest | tail`) reports the status of its last stage and hides a failure.
