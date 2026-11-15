@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fmeta"
+version = "0.1.0"
+description = "Funnel metadynamics framework on top of OpenMM (GPU-ready, membrane-aware)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openmm>=8.1",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# Ligand parameterisation (openmmforcefields / openff-toolkit) is conda-forge only;
+# see environment.yml.
+plots = ["matplotlib"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+fmeta = "fmeta.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running tests (membrane building, multi-seed convergence)",
+    "gpu: requires a CUDA or OpenCL device",
+]
+addopts = "-m 'not slow and not gpu'"

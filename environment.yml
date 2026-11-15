@@ -1,0 +1,18 @@
+# Full environment for production use (GPU + automatic ligand parameterisation).
+#   conda env create -f environment.yml && conda activate fmeta && pip install -e .
+name: fmeta
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - openmm>=8.1          # conda-forge builds ship the CUDA/OpenCL platforms
+  - numpy
+  - scipy
+  - pyyaml
+  - pdbfixer
+  - openmmforcefields    # GAFF / OpenFF template generators
+  - openff-toolkit
+  - rdkit
+  - matplotlib
+  - pytest
+  - pip
