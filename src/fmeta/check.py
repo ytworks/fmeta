@@ -54,6 +54,33 @@ PROFILES = {
 }
 
 
+# What each item has to show. scripts/gpu_gates.py stores these with the recorded evidence.
+CRITERIA = {
+    "platform": "a GPU platform (CUDA, HIP or OpenCL) is selected and usable",
+    "forces": "funnel-wall and bias energies, forces and CVs match the Reference platform at 7 "
+              "positions incl. a periodic image: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3 (relative)",
+    "toy_restart": "80 time-ordered hills after a restart at 40; CVs finite and inside the walls",
+    "toy_free_energy": "solvable toy system, 10 ns: reweighted dG0 within 2.0 kJ/mol and plateau "
+                       "mean within 3.0 kJ/mol of the exact value",
+    "pdb_sdf_openff": "system built from the protein PDB and the ligand SDF alone with OpenFF ligand "
+                      "parameters: finite energy, neutral benzene, funnel checks pass",
+    "pdb_sdf_gaff": "the same with GAFF ligand parameters",
+    "prepare": "solvated system built, funnel placed automatically, no funnel check fails",
+    "periodic_images": "CVs of the solvated complex change by <= 2e-3 nm when the whole system or "
+                       "the ligand is moved to another periodic image; wall energy stays zero",
+    "equilibrate": "staged equilibration completes; funnel checks pass on the equilibrated structure",
+    "production": "2 replicas reach the requested number of hills and continue from their "
+                  "checkpoints without changing earlier hills; CVs finite, inside the funnel, "
+                  "no jump above 1 nm between samples",
+    "walkers": "2 walkers deposit the requested hills each and the analysis merges them",
+    "analysis": "analysis of the replicas produces a finite result and summary.json",
+    "benchmark": "throughput with and without the bias is measured (diagnostic: decides nothing)",
+    "membrane_build": "POPC bilayer built with Modeller.addMembrane; funnel and membrane checks pass",
+    "membrane_run": "membrane system equilibrates with the semi-isotropic barostat and reaches the "
+                    "requested number of hills",
+}
+
+
 @dataclass
 class Item:
     name: str
@@ -81,6 +108,7 @@ class Checker:
         self.done: set[str] = set()
         self.platform: Optional[mm.Platform] = None
         self.properties: dict = {}
+        self.device_name: Optional[str] = None
 
     # ---- plumbing ---------------------------------------------------------
     def run(self, name: str, function: Callable[[], str], needs: tuple = ()) -> None:
@@ -130,9 +158,12 @@ class Checker:
         device = ""
         for key in ("DeviceName", "DeviceIndex", "Precision"):
             try:
-                device += f" {key}={self.platform.getPropertyValue(context, key)}"
+                value = self.platform.getPropertyValue(context, key)
             except Exception:
-                pass
+                continue
+            device += f" {key}={value}"
+            if key == "DeviceName":
+                self.device_name = value
         text = f"OpenMM {mm.__version__}, platform {name}{device}; available: {', '.join(available_platforms())}"
         if name not in GPU_PLATFORMS:
             if self.requested == "auto":
