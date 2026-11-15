@@ -11,3 +11,6 @@ dist/
 # work directories of the acceptance checks
 fmeta_check/
 gates_work/
+
+# work directories of production runs
+runs/

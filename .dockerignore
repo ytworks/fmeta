@@ -1,0 +1,9 @@
+# Allowlist: the image is built from the lock, the entry script and the package source only.
+*
+!conda-linux-64.lock
+!docker
+!pyproject.toml
+!README.md
+!src
+**/__pycache__
+**/*.egg-info
