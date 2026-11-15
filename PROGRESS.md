@@ -42,18 +42,19 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
-| GPU plan M1: run modes and the scheduler (R7, FM-D14) | Implemented; `pytest` 102 passed; GPU gates (now 18) not run yet on this code |
-| GPU plan M2–M7: real inputs, presets, examples, benchmarks (R2, R3, R8–R10) | Not started |
+| GPU plan M1: run modes and the scheduler (R7, FM-D14) | Gated: all 18 gates on 8d1f10a. Open: `docker stop` of a parallel run and its continuation |
+| GPU plan M2, M3, M5 infrastructure: real inputs, presets, benchmark commands (R8–R10) | In progress on separate branches; not merged, not gated |
+| GPU plan M4, M6, M7: real-system runs, examples, benchmark runs (R2, R3, R9, R10) | Not started |
 
-- GPU gates: **all 16 passed** on clean 2c4ad4e (CUDA, mixed precision, 2 GPUs, in the image):
-  `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` (dated in UTC). The run modes (FM-D14)
-  change gated paths (runner, platform handling) and add the items `replicas_sequential` and
-  `replicas_parallel`: not run yet on that code.
+- GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 8d1f10a
+  (CUDA, mixed precision, 2 GPUs, in the image):
+  `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
+  (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 102 passed on
   the code of FM-D14. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
-- CI: green on 171220a. The commits up to c5fc36c were pushed on 2026-11-16; the result of CI
+- CI: green on 171220a. The commits up to 4f54e0f were pushed on 2026-11-16; the result of CI
   on them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
@@ -71,6 +72,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] GPU gates passed on the run modes (FM-D14): M1 of the GPU plan gated
+- What: `scripts/gpu_gates.py` in the official image on two GPUs (host 6 and 7), clean 8d1f10a: `gpu-tests` and all 17 items passed, none skipped (234 s). `replicas_sequential`: 2 replicas one after another on one GPU. `replicas_parallel`: 3 replicas on 2 GPUs, the third on the GPU that became free. Each replica raised the memory in use on its GPU by 595–596 MiB, and `schedule.jsonl` and `device.json` agree with the assignment. Other values: forces CV 3.8e-07 nm; `periodic_images` CVs 8.4e-07 nm, wall energy 1.3e-04 kJ/mol; toy 10 ns reweighted −2.99, plateau −3.46 (exact −4.95 kJ/mol); 1371 ns/day plain, 1312 with the bias (24062 atoms); membrane 35483 atoms, 812 ns/day.
+- Not verified yet: `docker stop` of a parallel run on GPUs and its continuation.
+- Refs: FM-D14, roadmap R7, `bench/results/2026-11-15-8d1f10a89-gpu-gates.json`, `README.md`.
 
 ### 2026-11-16 — [amendment] FM-D12 (owner): operation on a CPU platform is not guaranteed and not confirmed
 - What: from FM-D14 on, the pipeline and the run modes are verified by the GPU gates alone. `fmeta check --platform CPU` and the pipeline runs of `pytest -m slow` are not rerun as verification (last run on the source of 2c4ad4e), and a new feature gets no test that runs dynamics on a CPU platform. The default `pytest` stays the test of logic and numerics. Unchanged until the owner decides: item 3 of the test policy in `CLAUDE.md` (the default `pytest` passes on a CPU-only machine) and the `cpu` job of CI.

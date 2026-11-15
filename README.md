@@ -57,7 +57,7 @@ pip install -e .
 GPU に依存する部分とリガンド力場の自動生成は、次の 1 コマンドでまとめて確認できます。新しいマシンや新しいドライバでは、最初にこれを実行してください。
 
 ```bash
-docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta check     # 複数 GPU のランチャも試すなら --gpus 0,1
+docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta check --gpus 0,1     # 並列モードの項目は GPU 2 枚を使う。1 枚なら --gpus を省く
 ```
 
 OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系を自分で組み立て、項目ごとに PASS / FAIL / SKIP を表示します（結果は `fmeta_check/check_report.json`、失敗時のトレースバックも同じ場所）。
@@ -74,11 +74,12 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 | `periodic_images` | 溶媒和した実系で、GPU が複合体を別の周期セルへ移しても、またファネルの先端が箱の最も狭い方向を向いても、集団変数と壁のエネルギーが座標から計算した値と一致する |
 | `production` | レプリカ 2 本の本計算、チェックポイントからの継続、集団変数に飛びがないこと |
 | `walkers` | 2 ウォーカーでのバイアス共有 |
+| `replicas_sequential`, `replicas_parallel` | 実行モード: 子プロセスとして起動したレプリカが、1 枚の GPU で順に、2 枚の GPU で同時に走ること。割り当ての記録 `schedule.jsonl`、各レプリカの `device.json`、割り当てた GPU でのメモリ使用の増加を確認（GPU がなければ SKIP、`replicas_parallel` は GPU 2 枚が必要） |
 | `analysis` | 解析と図の出力 |
 | `benchmark` | バイアスあり／なしの ns/day、チェックポイント 1 回の時間、500 ns のレプリカにかかる日数の見積もり（参考値で、合否には使わない） |
 | `membrane_build`, `membrane_run` | `Modeller.addMembrane` による POPC 膜の構築と、半等方バロスタットでの平衡化・本計算 |
 
-所要時間は、RTX PRO 6000 Blackwell 2 枚のマシンで約 3 分でした（15 項目の合計 192 秒）。`fmeta check --platform CPU --quick` は同じ手順を最短の長さで流す動作確認です。追加で `pytest -m gpu` も用意してあります。
+所要時間は、RTX PRO 6000 Blackwell 2 枚のマシンで約 4 分でした（17 項目の合計 234 秒）。`fmeta check --quick` は同じ手順を最短の長さで流す動作確認です。追加で `pytest -m gpu` も用意してあります。
 
 結果を証跡としてリポジトリに残すときは `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1` を使います。GPU テストと `fmeta check` の全項目を実行し、すべて通ると `bench/results/<日付>-<コミット>-gpu-gates.json` と `index.json` を書き出します。記録にはイメージの識別子、ロックのハッシュ、GPU の UUID が入り、公式イメージの外で実行した場合は記録しません（手順は `docs/gpu-runbook.md`）。
 
@@ -93,7 +94,8 @@ fmeta init fmeta.yaml              # 設定ファイルのひな形
 fmeta prepare fmeta.yaml -o run1   # 系の構築とファネルの自動配置
 fmeta funnel run1                  # ファネルの検証レポート（funnel.pdb を構造と重ねて目視確認）
 fmeta equilibrate run1
-fmeta run run1 --gpus 0,1          # レプリカを GPU に割り振って実行。再実行すると続きから再開
+fmeta run run1 --mode parallel     # 見えている GPU に 1 本ずつ割り振って同時に実行。再実行すると続きから再開
+fmeta status run1                  # レプリカごとの状態、進んだ時間、使った GPU
 fmeta analyze run1 --plot          # ΔG°、収束診断、図
 ```
 
@@ -122,7 +124,22 @@ fmeta analyze run1 --plot          # ΔG°、収束診断、図
 
 - `run.replicas`（既定 5）: 独立した計算。レプリカ間のばらつきから 95% 信頼区間を出します。
 - `run.walkers`（既定 1）: 1 つのレプリカの中でバイアスを共有するウォーカーの数。各ウォーカーは他のウォーカーの `HILLS` を読み込みます。
-- `fmeta run --gpus 0,1,2,3` で GPU に割り振ります。レプリカはウォーカー数ぶんの GPU を取り、空きがあれば並行して走ります。
+
+### 実行モード
+
+レプリカを複数の GPU で同時に走らせるか、1 枚の GPU で順に走らせるかを選べます。
+
+| モード | 動作 |
+|---|---|
+| `parallel` | `gpus` の各 GPU にレプリカを 1 本ずつ割り当てて同時に実行する。`gpus` がなければ見えている GPU をすべて使う。レプリカ数が GPU 数を超えたら、空いた GPU から次を始める |
+| `sequential` | 1 枚の GPU で、レプリカを 0 から順に実行する。GPU は `--gpus 3` のように 1 つだけ指定できる |
+| `auto`（既定） | `gpus` があれば `parallel`、なければ `sequential` |
+
+- 設定ファイルでは `run.mode` と `run.gpus`（番号のリストか `all`）で指定します。コマンドラインの `--mode` と `--gpus` はその実行だけに効き、保存済みの設定は書き換えません。
+- ウォーカーを使うレプリカは、ウォーカー数ぶんの GPU を取ります。
+- レプリカは子プロセスとして起動します。`Ctrl-C` や `docker stop` で止めると、子プロセスも一緒に終わります。同じコマンドをもう一度実行すると、最後のチェックポイントから続きます。
+- どのレプリカがどの GPU でいつ走ったかは `schedule.jsonl` に、各レプリカが実際に使った GPU は `device.json` に残ります。`fmeta status run1` で進み具合を確認できます。
+- Docker では、コンテナに渡した GPU が「見えている GPU」です。`scripts/in_docker.sh --gpus 0,1,2,3 … fmeta run run1 --mode parallel` は、ホストの GPU 0〜3 だけを使います。
 
 ### Python から
 
@@ -203,7 +220,8 @@ run1/config.yaml
 run1/inputs/     水素を付加した SDF、切り出した protein.pdb / ligand.sdf（該当するとき）
 run1/prepared/   system.xml  topology.cif  funnel.yaml  funnel.pdb  report.json
 run1/equil/      state.xml  equil.json  equilibrated.cif
-run1/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  result.json  fes.npz  analysis.png
+run1/schedule.jsonl  rep0.log ...   レプリカの割り当ての記録と、子プロセスごとのログ
+run1/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  device.json  result.json  fes.npz  analysis.png
 run1/rep0/w0 ... （ウォーカーを使うとき。HILLS などはウォーカーごと、result.json はレプリカに 1 つ）
 run1/summary.json  summary.png
 ```
@@ -212,8 +230,11 @@ run1/summary.json  summary.png
 
 検証は 2 段です。CPU のテストは厳密な答えのある系で正しさを確かめ、GPU ゲートは同じ内容を本計算に使うプラットフォームで確かめます。どちらも公式イメージの中で実行しています（OpenMM 8.6.1）。
 
-**CPU で確認済み**（`pytest`、`pytest -m slow`）
+**テストで確認済み**（`pytest`、`pytest -m slow`）
 
+2026-11-16 以降、CPU プラットフォームでの動作は保証の対象外です（オーナーの判断、FM-D12）。`pytest -m slow` と `fmeta check --platform CPU` は 2c4ad4e のソースで実行したのが最後で、その後は再実行していません。既定の `pytest` は論理と数値の回帰テストとして、コードを変えるたびに実行しています。
+
+- 実行モード: レプリカの割り当て順、同時に走る本数が GPU の数を超えないこと、失敗の伝わり方、停止要求のあとは何も始まらないことを、起動部分を差し替えたテストで確認（実行時間に依存しない）。
 - 集団変数と壁: numpy 参照値・数値微分と一致、周期ボックスの形や位置に依存しない、軸上でも力が有限。
 - バイアス: 同じ hill 列で `openmm.app.Metadynamics` と同じテーブルになる。同じ乱数種なら同じ軌跡をたどる。
 - 再開: 2 回に分けた実行と 1 回の実行で HILLS / COLVAR / 軌跡が完全に一致。チェックポイント後に「クラッシュ」させても巻き戻して一致。
@@ -227,15 +248,17 @@ run1/summary.json  summary.png
 
 **GPU で確認済み**（`scripts/gpu_gates.py`、CUDA、混合精度、RTX PRO 6000 Blackwell 2 枚）
 
-証跡は `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` です（日付は UTC）。GPU テストと `fmeta check` の 15 項目がすべて通りました。主な実測値は次のとおりです。
+最新の証跡は `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` です（日付は UTC）。GPU テストと `fmeta check` の 17 項目がすべて通りました。主な実測値は次のとおりです。
 
 | 項目 | 実測 | 基準 |
 |---|---|---|
 | 力とエネルギー（Reference との差、6 配置） | 集団変数 3.8e-07 nm、エネルギー 7.2e-06、力 5.6e-06（相対） | 2e-5 nm、1e-4、2e-3 |
-| 周期セルをまたぐ移動 | 集団変数 2.3e-06 nm、壁のエネルギー 5.1e-03 kJ/mol | 2e-3 nm、0.1 kJ/mol |
+| 周期セルをまたぐ移動 | 集団変数 8.4e-07 nm、壁のエネルギー 1.3e-04 kJ/mol | 2e-3 nm、0.1 kJ/mol |
 | トイ系 10 ns の ΔG°（厳密値 −4.95 kJ/mol） | 再重み付け −2.99、プラトー −3.46 kJ/mol（誤差 1.96、1.49） | 2.0、3.0 kJ/mol |
-| 速度（24062 原子、4 fs） | バイアスなし 1343 ns/day、あり 1293 ns/day（差 3.8%） | 参考値 |
-| 速度（POPC 膜、35500 原子、4 fs） | 803 ns/day | 参考値 |
+| 逐次モード（レプリカ 2 本、GPU 1 枚） | 順に実行。割り当てた GPU のメモリ使用が 1 本あたり 596 MiB 増加 | 記録と割り当てが一致 |
+| 並列モード（レプリカ 3 本、GPU 2 枚） | 2 本が同時に走り、3 本目は空いた GPU で開始 | 記録と割り当てが一致 |
+| 速度（24062 原子、4 fs） | バイアスなし 1371 ns/day、あり 1312 ns/day（差 4.5%） | 参考値 |
+| 速度（POPC 膜、35483 原子、4 fs） | 812 ns/day | 参考値 |
 
 - OpenFF と GAFF によるリガンド力場の自動生成、溶媒和、平衡化、本計算、再開、2 ウォーカー、膜の構築と実行を、実物のパッケージと GPU で通しました。
 - トイ系の再重み付けの誤差 1.96 kJ/mol は、基準 2.0 kJ/mol に対して余裕がほとんどありません。同じ 10 ns の計算を別の乱数種 48 個で繰り返すと、誤差の平均と標準偏差は CUDA 混合精度で +0.48 ± 0.83、CUDA 倍精度で +0.51 ± 0.83、Reference で +0.46 ± 0.83 kJ/mol でした。プラットフォームによる差はなく、基準を超えたのは 144 本のうち 5 本です。40 ns にすると誤差は +0.12 ± 0.33 kJ/mol（36 本）に縮みます。10 ns は短く、結合を弱めに見積もる傾向があります。ゲートの乱数種はその分布の端にあります。基準は変えていません（`docs/design/engine.md` の FM-D12）。
@@ -244,6 +267,7 @@ run1/summary.json  summary.png
 
 - 実在の結合系での ΔG°（数百 ns × 複数レプリカの GPU 計算が必要）。`examples/` に設定があります。
 - PDB の実エントリを入力にした実行、実在の膜タンパク質での膜面推定。いまは OpenMM 同梱のタンパク質と合成データで確認しています。
+- 並列実行を `docker stop` で止めたあと、子プロセスが GPU に残らないことと、同じコマンドで続きから再開すること（GPU 上では未確認）。
 - `HILLS` を PLUMED 本体で読むこと（書式は PLUMED に合わせていますが、PLUMED は `ρ = 0` の鏡映を知らないので、`metad: {reflect: false}` の実行でのみ意味が合います）。
 - CI の `docker` ジョブと公開ワークフロー（まだ一度も実行されていません）。
 
