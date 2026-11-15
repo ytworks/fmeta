@@ -2,9 +2,9 @@
 """Validate bench/results/index.json against the result files (run on CPU CI).
 
 Every index entry must point to an existing gate record (scripts/gpu_gates.py) whose commit
-and verdicts agree with the entry; every record must be indexed; every file is strict JSON
-(NaN / Infinity are rejected: unmeasured values are null). This keeps the committed GPU
-evidence consistent and reviewable.
+and verdicts agree with the entry and that names the image and lock it was taken in; every
+record must be indexed; every file is strict JSON (NaN / Infinity are rejected: unmeasured
+values are null). This keeps the committed GPU evidence consistent and reviewable.
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from pathlib import Path
 RESULTS = Path(__file__).resolve().parent.parent / "bench" / "results"
 ENTRY_KEYS = {"file", "date", "commit", "dirty", "gpus", "gpu_name", "all_passed"}
 GATE_KEYS = {"name", "passed", "metrics", "criteria"}
+ENVIRONMENT_KEYS = ("image", "lock_sha256")      # evidence comes from the official image only
 
 
 def loads_strict(text: str):
@@ -58,6 +59,9 @@ def verify(results: Path) -> tuple[list[str], int]:
                               f"and file ({record.get(key)})")
         if not entry["file"].startswith(f"{entry['date']}-{entry['commit'][:9]}-"):
             errors.append(f"{entry['file']}: file name does not carry the date and commit")
+        where = record.get("environment") or {}
+        if not all(where.get(key) for key in ENVIRONMENT_KEYS):
+            errors.append(f"{entry['file']}: no environment (image and lock of the official image)")
         gates = record.get("gates", [])
         if not gates:
             errors.append(f"{entry['file']}: no gates")

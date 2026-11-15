@@ -1,6 +1,7 @@
 """The development harness: progress-log budget, and GPU evidence that the recorder writes
 and the CI verifier accepts (and rejects once it is inconsistent)."""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ import verify_bench_results  # noqa: E402
 from fmeta.check import Item  # noqa: E402
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
+WHERE = dict(image="sha256:" + "a" * 64, lock_sha256="b" * 64, gpu_uuids=["GPU-0", "GPU-1"])
 
 
 def test_progress_log_budget():
@@ -33,7 +35,7 @@ def record(items):
     tests = dict(name="gpu-tests", passed=True, metrics=dict(summary="2 passed", n_passed=2),
                  criteria="pytest -m gpu")
     return gpu_gates.make_record(items, [tests], COMMIT, False, "2026-11-15", 2, "Test GPU", "CUDA",
-                                 "8.6.1", criteria)
+                                 "8.6.1", criteria, WHERE)
 
 
 def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
@@ -50,10 +52,15 @@ def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
     skipped = record(passed + [Item("pdb_sdf_openff", "SKIP", "not installed", 0.0)])
     assert not skipped["all_passed"]
     with pytest.raises(KeyError):                                # every gate needs a stated criterion
-        gpu_gates.make_record(passed, [], COMMIT, False, "2026-11-15", 1, "g", "CUDA", "8", {})
+        gpu_gates.make_record(passed, [], COMMIT, False, "2026-11-15", 1, "g", "CUDA", "8", {}, WHERE)
+
+    # evidence must name the image it was taken in
+    data = json.loads(path.read_text())
+    path.write_text(json.dumps({**data, "environment": {**WHERE, "image": None}}))
+    errors, _ = verify_bench_results.verify(tmp_path)
+    assert any("no environment" in e for e in errors)
 
     # the verifier notices a record edited after the fact, and files that are not indexed
-    data = json.loads(path.read_text())
     data["gates"][1]["passed"] = False
     path.write_text(json.dumps(data))
     errors, _ = verify_bench_results.verify(tmp_path)
@@ -65,3 +72,21 @@ def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
     errors, _ = verify_bench_results.verify(tmp_path)
     assert any("not strict JSON" in e for e in errors)
     assert verify_bench_results.verify(tmp_path / "empty") == ([], -1)   # no evidence yet is fine
+
+
+def test_only_the_image_built_from_the_repository_lock_is_official(tmp_path, monkeypatch):
+    monkeypatch.delenv("FMETA_IMAGE_ID", raising=False)
+    monkeypatch.setattr(gpu_gates, "gpu_uuids", lambda: ["GPU-0"])
+    repo, installed = tmp_path / "repo", tmp_path / "image" / gpu_gates.LOCK
+    repo.mkdir()
+    installed.parent.mkdir()
+    (repo / gpu_gates.LOCK).write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # not inside an image
+    installed.write_text("@EXPLICIT\nopenmm-8.5.0\n")
+    assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # an image of another lock
+    installed.write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    assert not gpu_gates.environment(repo, installed)[1]                 # the image is not known
+    where, official = gpu_gates.environment(repo, installed, "sha256:1")
+    assert official
+    assert where == dict(image="sha256:1", gpu_uuids=["GPU-0"],
+                         lock_sha256=hashlib.sha256(installed.read_bytes()).hexdigest())

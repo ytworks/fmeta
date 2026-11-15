@@ -8,21 +8,29 @@ walkers, a membrane build and run). On ALL PASSED the result is written to
 ``bench/results/<date>-<commit>-gpu-gates.json`` and added to ``bench/results/index.json``;
 commit both. Procedure: docs/gpu-runbook.md.
 
-``--quick`` and runs on a CPU platform exercise the steps but are never recorded.
+Evidence is recorded only inside the official image built from the repository's lock (run
+this script through scripts/in_docker.sh). ``--quick`` and runs on a CPU platform exercise the
+steps but are never recorded.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "bench" / "results"
-TRACKED = ["src", "tests", "scripts", "examples", "pyproject.toml", "environment.yml"]
+LOCK = "conda-linux-64.lock"
+IMAGE_LOCK = Path("/opt/fmeta") / LOCK          # the Dockerfile copies the lock it installs here
+TRACKED = ["src", "tests", "scripts", "examples", "pyproject.toml", "environment.yml", LOCK,
+           "Dockerfile", ".dockerignore", "docker"]
 
 
 def provenance(root: Path = ROOT) -> tuple[str, bool]:
@@ -30,6 +38,32 @@ def provenance(root: Path = ROOT) -> tuple[str, bool]:
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     status = subprocess.check_output(["git", "status", "--porcelain", "--", *TRACKED], cwd=root, text=True)
     return commit, bool(status.strip())
+
+
+def gpu_uuids() -> list[str]:
+    """UUIDs of the GPUs this process can see, in index order (empty without nvidia-smi)."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=uuid", "--format=csv,noheader"],
+                             capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def environment(root: Path = ROOT, image_lock: Path = IMAGE_LOCK,
+                image: Optional[str] = None) -> tuple[dict, bool]:
+    """Where the gates run, and whether that is the official image.
+
+    Official means: the lock installed in the image is the lock of the repository, and the
+    image is known (scripts/in_docker.sh passes its identifier as FMETA_IMAGE_ID).
+    """
+    def digest(path: Path) -> Optional[str]:
+        return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+    image = image or os.environ.get("FMETA_IMAGE_ID")
+    installed = digest(image_lock)
+    official = bool(image) and installed is not None and installed == digest(root / LOCK)
+    return dict(image=image, lock_sha256=installed, gpu_uuids=gpu_uuids()), official
 
 
 def run_gpu_tests(root: Path = ROOT) -> dict:
@@ -45,7 +79,7 @@ def run_gpu_tests(root: Path = ROOT) -> dict:
 
 
 def make_record(items, extra_gates, commit: str, dirty: bool, date: str, gpus: int, gpu_name: str,
-                platform: str, openmm_version: str, criteria: dict) -> dict:
+                platform: str, openmm_version: str, criteria: dict, environment: dict) -> dict:
     """The evidence record: one gate per check item. A skipped item is not a pass."""
     gates = list(extra_gates)
     for item in items:
@@ -54,7 +88,7 @@ def make_record(items, extra_gates, commit: str, dirty: bool, date: str, gpus: i
                                        seconds=round(item.seconds, 1)),
                           criteria=criteria[item.name]))   # every gate states its criterion
     return dict(date=date, commit=commit, dirty=dirty, gpus=gpus, gpu_name=gpu_name,
-                platform=platform, openmm=openmm_version,
+                platform=platform, openmm=openmm_version, environment=environment,
                 all_passed=all(gate["passed"] for gate in gates), gates=gates)
 
 
@@ -89,6 +123,7 @@ def main() -> int:
     from fmeta.engine.platform import GPU_PLATFORMS
 
     commit, dirty = provenance()
+    where, official = environment()
     gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else None
     extra = []
     if not args.skip_tests:
@@ -103,9 +138,9 @@ def main() -> int:
     record = make_record(checker.items, extra, commit, dirty,
                          datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
                          len(gpus) if gpus else 1, checker.device_name or platform, platform,
-                         openmm.__version__, CRITERIA)
+                         openmm.__version__, CRITERIA, where)
     failed = [gate["name"] for gate in record["gates"] if not gate["passed"]]
-    recordable = platform in GPU_PLATFORMS and not args.quick and not args.skip_tests
+    recordable = platform in GPU_PLATFORMS and not args.quick and not args.skip_tests and official
     if record["all_passed"] and recordable:
         path = write_record(record)
         note = " (DIRTY: the code differs from the commit)" if dirty else ""
@@ -117,8 +152,9 @@ def main() -> int:
     if failed:
         print(f"\nNOT PASSED: {', '.join(failed)}. Details: {out} and the traceback files beside it.")
         return 1
-    print(f"\nAll items passed, but this run is not evidence (quick mode, skipped tests or no GPU "
-          f"platform) and was not recorded: {out}")
+    reason = ("quick mode, skipped tests or no GPU platform" if official else
+              "not inside the official image built from this repository's lock: use scripts/in_docker.sh")
+    print(f"\nAll items passed, but this run is not evidence ({reason}) and was not recorded: {out}")
     return 0
 
 
