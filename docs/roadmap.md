@@ -21,14 +21,15 @@ Verified on CPU only (see `PROGRESS.md`).
 - **R4 — Throughput** (2026-11-16, FM-D4 amendment). With the table refit by OpenMM at every
   hill the bias ran at 73.4% of the speed of plain MD on the GPU. With the spline coefficients
   fitted by fmeta it runs at 96–97% (24062 atoms, one hill per ps).
+- **R1 — First GPU gate record** (2026-11-16). `scripts/gpu_gates.py` in the official image on
+  two GPUs: all 16 gates passed on 2c4ad4e
+  (`bench/results/2026-11-15-2c4ad4e50-gpu-gates.json`, dated in UTC). Closes: GPU platform,
+  OpenFF / GAFF route. The first GPU runs changed FM-D2, D4, D5, D6, D7 and D11 on the way.
 
 ## Next
 
-Plan for R1–R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
+Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
-- **R1 — First GPU gate record.** Run `scripts/gpu_gates.py` in the official image on the GPU
-  machine (`docs/gpu-runbook.md`); commit the evidence. Closes: GPU platform, OpenFF / GAFF
-  route.
 - **R2 — Real-system validation.** Trypsin-benzamidine (`examples/trypsin_benzamidine`): five
   replicas to convergence, compared with experiment and published funnel-metadynamics values.
   Reported, not gated.

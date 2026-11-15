@@ -41,21 +41,16 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
-| GPU plan M0: first gate record (R1) | In progress: the first full gate run failed in 1 of 15 items (`membrane_run`); its check was amended (FM-D7); rerun pending |
+| GPU plan M0: first gate record (R1) | Gate record done (all 16 gates on 2c4ad4e). Remaining: a run with the fmeta inside the image, without the mounted source |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
-- GPU gates: **none recorded** (`bench/results/` is empty). The first full run (clean 81efa0d,
-  CUDA, 2 GPUs, in the image, 193 s): 14 passed, 1 failed (`membrane_run`), so nothing was
-  written. The failing check was amended (FM-D7); the gates have not run on this commit.
-- CPU evidence, in the image (lock d061e45a…, the source of this commit before it was
-  committed): `ruff check .` passes; `pytest` 81 passed; the slow tests of
-  `tests/test_system.py` and `tests/test_membrane.py` 3 passed (the other 3 slow tests: not run
-  on this commit, 6 of 6 passed on b9edcc8). CI has not run on the commits after aadd0ad (see
-  Blockers); it was green on 171220a.
-- Seen for the first time on this machine (quick check and diagnostics, not evidence): the
-  CUDA platform, the real OpenFF / GAFF generators, a membrane build and run on a GPU.
+- GPU gates: **all 16 passed** on clean 2c4ad4e (CUDA, mixed precision, 2 GPUs, in the image):
+  `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` (dated in UTC). The commits after
+  2c4ad4e change no gated path (documents and evidence only).
+- CPU evidence, in the image (lock d061e45a…, the source of 2c4ad4e): `ruff check .` passes;
+  `pytest` 81 passed; `pytest -m slow` 6 passed. CI has not run on the commits after aadd0ad
+  (see Blockers); it was green on 171220a.
 - Not verified yet:
-  - recorded gate evidence (R1), including the 10 ns toy free energy on a GPU;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself;
@@ -63,11 +58,17 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
-  must be prepared again.
+  must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare (its
+  seed is the worst of 12 on CUDA mixed, see the Change Log), so a change of the trajectory
+  (another GPU, another OpenMM) can fail it without a defect.
 - Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-16 — [progress] First GPU gate record (R1): all 16 gates passed on 2c4ad4e
+- What: `scripts/gpu_gates.py` in the official image (image 6f68772d…, lock d061e45a…) on two RTX PRO 6000 Blackwell (host GPUs 6 and 7), CUDA, mixed precision, clean 2c4ad4e, 211 s: `pytest -m gpu` 2 passed and the 15 items of `fmeta check` passed. Measured: forces against Reference CV 3.8e-07 nm, energy 7.2e-06, force 5.6e-06; `periodic_images` CVs 2.3e-06 nm, wall energy 5.1e-03 kJ/mol; toy 10 ns reweighted 1.96 and plateau 1.49 kJ/mol from exact (criteria 2.0 and 3.0), 24 rebinding events; 24062 atoms at 1343 ns/day plain and 1293 with the bias; membrane (35500 atoms) 803 ns/day. Because the toy margin is 0.04 kJ/mol, the same 10 ns run was repeated with 12 seeds per platform (diagnostic, not evidence). Error of the reweighted estimate, mean ± sd and largest: CUDA mixed +0.96 ± 0.64, 1.96; CUDA double +0.61 ± 0.52, 1.18; Reference +0.44 ± 0.59, 1.52 kJ/mol. The gate's seed is the worst of the 12 on CUDA mixed. The criterion is unchanged. `pytest` 81 passed, `pytest -m slow` 6 passed on the same source.
+- Refs: `bench/results/2026-11-15-2c4ad4e50-gpu-gates.json` (dated in UTC), `bench/results/index.json`; `docs/roadmap.md` (R1 done); `README.md` (検証状況).
 
 ### 2026-11-16 — [amendment] FM-D7: after dynamics the ligand is judged by the funnel walls, not atom by atom
 - What: the first full gate run (clean 81efa0d, CUDA, 2 GPUs, 193 s) gave 14 passed, 1 failed (`membrane_run`); nothing was recorded. The stage `equilibrate` had stopped with "ligand atoms lie 0.02 nm outside the funnel wall". Now `validate_funnel(..., sample_kT=...)` judges a structure from dynamics by the wall energy of the ligand centre: an error above 10 kT (`WALL_BREACH_KT`); atoms beyond the wall and a centre within 0.2 nm of the lower wall are warnings. The checks of the input pose at preparation and the gate criteria are unchanged. `pytest` 81 passed; the two new tests fail on the code before. Gates not rerun yet.
