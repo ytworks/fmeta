@@ -15,9 +15,11 @@ import openmm.app as app
 
 METHODS = ("xml", "openff", "gaff")
 
-# The ligand force field when the settings name none. The generators have no default of their
-# own (openmmforcefields 0.16 refuses to guess), and a result must not depend on which versions
-# happen to be installed. Both assign AM1-BCC charges.
+# The ligand force field when the settings name none (FM-D16). The generators have no default
+# of their own (openmmforcefields 0.16 refuses to guess), and a result must not depend on which
+# versions happen to be installed. Both prescribe AM1-BCC charges, and without a charge method
+# in the settings the generator computes them: in the official image with sqm of AmberTools,
+# the only AM1-BCC implementation there (no OpenEye toolkit).
 DEFAULT_FORCEFIELD = {"openff": "openff-2.2.1", "gaff": "gaff-2.11"}
 
 
@@ -31,8 +33,9 @@ def register_ligand(forcefield: app.ForceField, ligand_path, method: str = "open
     generator knows (``DEFAULT_FORCEFIELD`` of the method when None).
     ``charge_method`` (e.g. ``"am1bcc"``, ``"gasteiger"``, or a NAGL model name)
     assigns partial charges with the OpenFF toolkit before the generator sees the
-    molecule; by default the generator computes AM1-BCC charges itself. The
-    ligand file should be an SDF, which carries bond orders and formal charges.
+    molecule; by default the generator assigns the charges its force field
+    prescribes (AM1-BCC for both ``DEFAULT_FORCEFIELD``). The ligand file should
+    be an SDF, which carries bond orders and formal charges.
     """
     if method == "xml":
         return

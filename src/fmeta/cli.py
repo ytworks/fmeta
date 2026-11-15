@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from .config import TEMPLATE, Config
+from .config import PRESETS, Config, preset_text
 from .engine.platform import MODES, check_devices, resolve_devices
 
 
@@ -89,8 +89,8 @@ def cmd_init(args) -> None:
     path = Path(args.path)
     if path.exists():
         sys.exit(f"{path} already exists")
-    path.write_text(TEMPLATE)
-    print(f"wrote {path}")
+    path.write_text(preset_text(args.preset))
+    print(f"wrote {path} (preset {args.preset})")
 
 
 def cmd_split(args) -> None:
@@ -210,8 +210,10 @@ def main(argv=None) -> None:
     parser.add_argument("-v", "--verbose", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    sub = commands.add_parser("init", help="write a template configuration")
+    sub = commands.add_parser("init", help="write a configuration with every key and its official default")
     sub.add_argument("path", nargs="?", default="fmeta.yaml")
+    sub.add_argument("--preset", choices=PRESETS, default="soluble",
+                     help="soluble (default): a complex in water; membrane: in a lipid bilayer")
     sub.set_defaults(func=cmd_init)
 
     sub = commands.add_parser("split", help="cut a complex into protein.pdb and ligand.sdf")

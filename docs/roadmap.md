@@ -32,6 +32,12 @@ Verified on CPU only (see `PROGRESS.md`).
   (`bench/results/2026-11-15-8d1f10a89-gpu-gates.json`). `docker stop` of a parallel run on five
   GPUs left no process behind, and the same command continued every replica from its checkpoint
   (trypsin-benzamidine, 2026-11-16).
+- **R9 — Official presets** (2026-11-16, FM-D16). The official defaults are the defaults of the
+  code; the presets `soluble` and `membrane` of the package show every key with its default and
+  unit (`fmeta init --preset`); a configuration may hold only its difference from a preset;
+  `docs/configuration.md` gives the origin of every value. Tests hold the three together. The
+  defaults that differ from the literature are listed there and are the questions of the scan
+  on trypsin-benzamidine (R2). GPU gates on this code: not run yet.
 
 ## Next
 
@@ -48,8 +54,6 @@ Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchm
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.
 - **R8 — Real inputs.** Chain breaks capped; caps and protonation states of a prepared
   structure kept; kept non-protein components restrained and seen by the funnel placement.
-- **R9 — Official presets.** `soluble` and `membrane` presets that hold every key with its
-  default; a configuration reference.
 - **R10 — Examples and benchmarks.** A kinase (TYK2, 4GIH) and a GPCR (A2A, 5MZJ) example with
   experimental values; `fmeta benchmark` on a TYK2 and an A2A set that have experimental and
   FEP values; reports in `bench/reports/`.

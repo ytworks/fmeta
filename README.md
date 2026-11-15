@@ -90,7 +90,7 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 段階ごとに実行することもできます。各段階は前段の出力を読むので、途中からやり直せます。
 
 ```bash
-fmeta init fmeta.yaml              # 設定ファイルのひな形
+fmeta init fmeta.yaml              # 全キーと公式既定値を書いた設定ファイル（--preset soluble | membrane）
 fmeta prepare fmeta.yaml -o run1   # 系の構築とファネルの自動配置
 fmeta funnel run1                  # ファネルの検証レポート（funnel.pdb を構造と重ねて目視確認）
 fmeta equilibrate run1
@@ -101,12 +101,33 @@ fmeta analyze run1 --plot          # ΔG°、収束診断、図
 
 ### 入力
 
-必要なのはタンパク質の PDB（mmCIF も可）とリガンドの SDF（MOL、MOL2 も可）だけです。設定ファイルなしで `fmeta auto --protein … --ligand …` と実行でき、細かく指定したいときだけ `fmeta init` のひな形を使います。
+必要なのはタンパク質の PDB（mmCIF も可）とリガンドの SDF（MOL、MOL2 も可）だけです。設定ファイルなしで `fmeta auto --protein … --ligand …` と実行でき、細かく指定したいときだけ設定ファイルを書きます（下の「設定ファイルと公式既定値」）。
 
 - 取り除きたくない非タンパク質成分（金属イオンなど）は `system.keep_hetero: [ZN]` のように残基名で指定し、それを扱える力場ファイルを `system.forcefields` に加えます。結晶水を残すなら `system.keep_water: true`。
 - リガンドの力場は `system.ligand_method` で選びます: `openff`（既定）、`gaff`、`xml`（自分の ffxml を `ligand_xml` に指定）。
 - リガンドの SDF が手元になく PDB エントリの中にあるだけなら、`fmeta split entry.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1"` で `protein.pdb` と `ligand.sdf` に切り出せます（SMILES に書いたプロトン化状態どおりに水素を付けます。重原子座標はそのまま）。`input: {complex:, ligand_resname:, ligand_smiles:}` と書けば構築時に同じ処理をします。
 - すでに OpenMM の `System` と `Topology` として組み上がった系には、Python から `fmeta.system.builder.prepare_from_system()` でファネルだけを付けられます。他の MD プログラム（GROMACS、AMBER、CHARMM）の入力形式は扱いません。
+
+### 設定ファイルと公式既定値
+
+MD の条件、レプリカ数、実行時間などはすべて 1 つの YAML で指定します。結合自由エネルギーの計算に使う公式の既定値は、プリセットとしてパッケージに入っています。
+
+- `fmeta init --preset soluble`（水中）または `--preset membrane`（脂質二重膜）で、全キーを既定値、単位、説明つきで書き出します。入力ファイル名だけ書き換えれば動きます。
+- 設定ファイルには、プリセットとの差分だけを書くこともできます。
+
+```yaml
+preset: soluble
+input: {protein: protein.pdb, ligand: ligand.sdf}
+system: {temperature: 310.0}   # MD の条件
+run:
+  replicas: 5                  # レプリカ数
+  length_ns: 500.0             # レプリカ 1 本あたりの実行時間
+```
+
+- 主な既定値: 5 レプリカ × 500 ns、300 K、時間刻み 4 fs（水素質量 1.5 amu）、バイアス係数 10、ヒルの高さ 1.5 kJ/mol、ヒルの間隔 1 ps、ff14SB と TIP3P、リガンドは OpenFF 2.2.1（AM1-BCC 電荷）。
+- 全キーの単位、既定値、その値の出どころは `docs/configuration.md` にあります。文献と違う値もそこに一覧にしています。
+- 作業ディレクトリの `config.yaml` には、プリセットを展開したあとの実際に使った値が残ります。
+- 既定値、プリセット、`docs/configuration.md` の 3 つが一致していることをテストで確認しています。
 
 ### 膜タンパク質
 

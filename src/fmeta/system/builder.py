@@ -49,8 +49,9 @@ class SystemSettings:
     forcefields: Sequence[str] = ("amber14-all.xml", "amber14/tip3p.xml")
     water_model: str = "tip3p"
     ligand_method: str = "openff"            # "openff", "gaff" or "xml"
-    ligand_forcefield: Optional[str] = None  # e.g. "openff-2.3.0"; None: ligand.DEFAULT_FORCEFIELD
-    ligand_charge_method: Optional[str] = None   # e.g. "am1bcc", "gasteiger"; default: generator's choice
+    ligand_forcefield: Optional[str] = None  # None: ligand.DEFAULT_FORCEFIELD (the pinned one of the method)
+    ligand_charge_method: Optional[str] = None   # None: the charges the force field prescribes (AM1-BCC
+                                             # for both pins); or a method of the OpenFF toolkit
     fix_protein: Optional[bool] = None       # repair with PDBFixer (missing atoms, non-standard
                                              # residues); None: whenever PDBFixer is installed
     keep_hetero: Sequence[str] = ()          # non-protein residue names to keep (need force-field files)

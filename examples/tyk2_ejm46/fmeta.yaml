@@ -4,8 +4,12 @@
 #   4gih.pdb     - the entry as downloaded
 #   ejm_46.sdf   - the ligand in its bound pose, cut out of the entry by `fmeta split`
 #
-# Every other key keeps its official default (5 replicas x 500 ns, 300 K, OpenFF ligand
-# parameters, bias factor 10).
+# Only the difference from the preset is here. Every other value is the official default
+# (5 replicas of 500 ns, 300 K, OpenFF ligand parameters, bias factor 10, ...):
+# "fmeta init --preset soluble" writes them all, docs/configuration.md gives the reasons, and
+# run/config.yaml records the values that were used.
+preset: soluble
+
 input:
   protein: 4gih.pdb
   ligand: ejm_46.sdf

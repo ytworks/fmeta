@@ -30,6 +30,7 @@ fmeta = "fmeta.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"fmeta" = ["presets/*.yaml"]
 "fmeta.testing" = ["data/*.xml"]
 
 [tool.pytest.ini_options]

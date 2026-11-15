@@ -10,30 +10,33 @@
 # it points into the extracellular or intracellular water. Check it before running:
 #   fmeta prepare fmeta.yaml -o run && fmeta funnel run
 # and load run/prepared/funnel.pdb together with run/prepared/topology.cif.
+#
+# Only the difference from the preset is here. The preset gives the POPC bilayer with its
+# midplane at z = 0, the orientation check and every other official default (5 replicas,
+# 10 ns of free equilibration with a membrane, ...): "fmeta init --preset membrane" writes
+# them all, docs/configuration.md gives the reasons, and run/config.yaml records the values
+# that were used.
+preset: membrane
+
 input:
   protein: protein.pdb
   ligand: ligand.sdf
 
 system:
-  ligand_method: openff
   temperature: 310.0
   padding: 1.5                 # nm of lipid around the receptor in the membrane plane
 
-membrane:
-  lipid: POPC                  # POPC, POPE, DLPC, DLPE, DMPC, DOPC or DPPC
-  center_z: 0.0
-  orient: check                # warn if the input does not look oriented; "auto" re-orients it
-                               # from the protein's hydrophobic belt (a coarse estimate)
+# Another lipid (POPE, DLPC, DLPE, DMPC, DOPC or DPPC), or a protein that is not oriented yet
+# (auto re-orients it from its hydrophobic belt: a coarse estimate):
+# membrane:
+#   lipid: POPE
+#   orient: auto
 
 # For ligands that leave sideways into the bilayer, or to pick the vestibule by hand:
 # funnel:
 #   exit_direction: [0, 0, 1]
 
-equilibration:
-  free_ps: 10000               # 10 ns unrestrained, with the funnel walls on
-
 run:
   length_ns: 1000.0
-  replicas: 5
   # walkers: 4                 # share one bias between 4 walkers per replica
   # gpus: [0, 1, 2, 3]

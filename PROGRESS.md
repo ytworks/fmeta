@@ -17,16 +17,16 @@ that runs on GPUs, end to end, from two files.
 - Result: standard binding free energy (plateau mean, 95 % confidence interval over replicas)
   with convergence diagnostics that say NOT CONVERGED or "no binding" when that is the case.
 - OpenMM only: no input from other MD programs.
-- Planned (owner request 2026-11-15, roadmap R7–R10): replicas side by side on several GPUs or
-  one after another on one GPU; official presets; a kinase and a GPCR example; benchmarks
-  against experiment and FEP.
+- Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
+  after another on one GPU (R7); official presets (R9). Planned: real inputs (R8); a kinase and
+  a GPCR example, benchmarks against experiment and FEP (R10).
 - Hardware: an 8-GPU machine (since 2026-11-15). Everything except CI runs in the official
   Docker image (FM-D13).
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D14 Accepted; FM-D2, D4,
-D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D14 and D16 Accepted;
+FM-D2, D4, D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -43,7 +43,8 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
-| GPU plan M2, M3, M5 infrastructure: real inputs, presets, benchmark commands (R8–R10) | In progress on separate branches; not merged, not gated |
+| GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`; `pytest` 109 passed. GPU gates not run on this code yet. The scan of the defaults (M4) is not started |
+| GPU plan M2, M5 infrastructure: real inputs, benchmark commands (R8, R10) | In progress on separate branches; not merged, not gated |
 | GPU plan M4: trypsin-benzamidine (R2) | Running: 5 replicas × 500 ns from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, about 18 h at 685 ns/day. No result yet |
 | GPU plan M5: kinase example (R10) | Running: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms), replica 0 on GPU 5 (container `fmeta-tyk2`, commit 8d1f10a) since 2026-11-15 23:30 UTC; the other replicas follow when GPUs 0–4 are free. No result yet |
 | GPU plan M6, M7: GPCR example, benchmark runs (R3, R9, R10) | Not started |
@@ -52,8 +53,8 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   (CUDA, mixed precision, 2 GPUs, in the image):
   `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
   (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 102 passed on
-  the code of FM-D14. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 109 passed on
+  the code of FM-D16. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
@@ -73,6 +74,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [design] FM-D16: official defaults as packaged presets, one reference of the keys
+- What: presets `soluble` / `membrane` in the package, written by `fmeta init --preset`; a configuration may hold only its difference (`preset:`), and the one saved in a work directory is resolved and names the ligand force field. Examples reduced to that. `docs/configuration.md`: every key with unit, default and origin. Ligand pins kept (openff-2.2.1 / gaff-2.11, AM1-BCC by `sqm`; charges identical to pre-assigned `am1bcc` for benzamidinium and theophylline). No default changed. `ruff` passes, `pytest` 109 passed. GPU gates not run on this code yet.
+- Why: owner request of 2026-11-15 for a configuration YAML with official defaults. One copy of the defaults, held equal by tests; every value has a stated origin. Values that differ from the literature read (hills every 1 ps against 2 ps, `sigma_rho` 0.05 against 0.03 nm, 4 fs against 2 fs, wall constants) are listed for the scan on trypsin-benzamidine and are never tuned on a benchmark.
+- Refs: FM-D16, FM-D11, roadmap R9, `docs/configuration.md`, `src/fmeta/presets/`, `tests/test_config.py`. Also in this merge: FM-D14 now holds the measurement of several runs on one GPU (at most 9% more in total, so no key).
 
 ### 2026-11-16 — [progress] Kinase example added and started: TYK2 with ejm_46 from PDB entry 4GIH (R10)
 - What: `examples/tyk2_ejm46/` (README with the experimental Ki of 4.8 nM, −11.3 kcal/mol, and the steps; a configuration that only names the two input files). On gated commit 8d1f10a in the image, `fmeta split`, `prepare`, `funnel` and `equilibrate` passed without a change: 0X5 and 119 waters removed, 1 heavy atom rebuilt, no chain break, funnel placed automatically (path to bulk 2.65 nm, bound pose at s = 1.20 nm), 88476 atoms, wall energy 0.000 kJ/mol in equilibration. Run started with `--mode sequential` on GPU 5 (container `fmeta-tyk2`): replica 0 at about 570 ns/day. It moves to the parallel mode when GPUs 0–4 are free.
