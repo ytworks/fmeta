@@ -29,8 +29,9 @@ Verified on CPU only (see `PROGRESS.md`).
   another on one GPU (`run.mode`, `run.gpus`, `--mode`); one scheduler that starts the replicas
   as child processes, records the assignment in `schedule.jsonl` and stops the children on a
   signal; `fmeta status`. All 18 gates passed on 8d1f10a
-  (`bench/results/2026-11-15-8d1f10a89-gpu-gates.json`). Still open: `docker stop` of a
-  parallel run on GPUs and its continuation, checked with the first production run.
+  (`bench/results/2026-11-15-8d1f10a89-gpu-gates.json`). `docker stop` of a parallel run on five
+  GPUs left no process behind, and the same command continued every replica from its checkpoint
+  (trypsin-benzamidine, 2026-11-16).
 
 ## Next
 
