@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -239,8 +240,83 @@ def ensure_ligand_hydrogens(path, out_dir) -> tuple[str, list[str]]:
                       f"(net charge {charge:+d}); check that this is the protonation state you want"]
 
 
+_DROP = re.compile(r"(?P<chain>[^:]*)(?::(?P<first>-?\d+)(?P<first_code>[A-Za-z]?)"
+                   r"(?:-(?P<last>-?\d+)(?P<last_code>[A-Za-z]?))?)?")
+_LAST_CODE = "￿"      # sorts after every insertion code: a bound without a code takes them all
+
+
+def _parse_drop(selection: str):
+    """``CHAIN``, ``CHAIN:NUMBER`` or ``CHAIN:FIRST-LAST`` -> (chain, first key, last key).
+
+    A key is (residue number, insertion code). A bound written without an insertion code
+    stands for every residue of that number; ``52A`` is that one residue."""
+    text = selection.strip()
+    match = _DROP.fullmatch(text)
+    if not text or match is None:
+        raise ValueError(f"cannot read the drop selection {selection!r}: write CHAIN, CHAIN:NUMBER "
+                         "or CHAIN:FIRST-LAST, e.g. A:1001-1106")
+    chain = match["chain"].strip()
+    if match["first"] is None:
+        return chain, None, None
+    first = (int(match["first"]), match["first_code"].upper())
+    if match["last"] is None:
+        last = (first[0], first[1] or _LAST_CODE)
+    else:
+        last = (int(match["last"]), match["last_code"].upper() or _LAST_CODE)
+    if last < first:
+        raise ValueError(f"the drop selection {selection!r} ends before it starts")
+    return chain, first, last
+
+
+def _residue_key(residue):
+    """(number, insertion code) of a residue, or None if its id is not a number."""
+    try:
+        return int(residue.id), residue.insertionCode.strip().upper()
+    except ValueError:
+        return None
+
+
+def drop_residues(topology: app.Topology, positions: np.ndarray,
+                  selections: Sequence[str]) -> tuple[app.Topology, np.ndarray, list[str]]:
+    """Remove the residues named by ``selections`` (see ``_parse_drop``).
+
+    Residue numbers are compared as integers with the insertion code as a tie-break, so
+    ``A:1001-1106`` takes 1050A with it and leaves residue 11 alone. A selection takes every
+    residue of the chain in its range, protein or not. One that matches nothing is an error:
+    a part that was meant to go must not stay unnoticed.
+
+    Returns the new topology, the positions in nm and one note per selection."""
+    doomed, notes = [], []
+    for selection in selections:
+        chain, first, last = _parse_drop(selection)
+        matches = []
+        for residue in topology.residues():
+            if residue.chain.id.strip() != chain:
+                continue
+            key = _residue_key(residue)
+            if first is None or (key is not None and first <= key <= last):
+                matches.append(residue)
+        if not matches:
+            spans = []
+            for candidate in topology.chains():
+                numbers = [key[0] for key in map(_residue_key, candidate.residues()) if key]
+                span = f" (residues {min(numbers)} to {max(numbers)})" if numbers else ""
+                spans.append(f"{candidate.id.strip() or 'blank'}{span}")
+            raise ValueError(f"the drop selection {selection!r} matches no residue; chains in the "
+                             f"file: {', '.join(dict.fromkeys(spans))}")
+        doomed += matches
+        ends = " to ".join(dict.fromkeys(f"{r.name}{r.id}{r.insertionCode.strip()}"
+                                         for r in (matches[0], matches[-1])))
+        count = f"{len(matches)} residue{'' if len(matches) == 1 else 's'}"
+        notes.append(f"dropped {selection.strip()}: {count} ({ends})")
+    modeller = app.Modeller(topology, positions * unit.nanometer)
+    modeller.delete(doomed)
+    return modeller.topology, _nm(modeller.positions), notes
+
+
 def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
-                  chain: Optional[str] = None, resid: Optional[str] = None) -> tuple[str, str]:
+                  chain: Optional[str] = None, resid: Optional[str] = None,
+                  drop: Sequence[str] = (), notes: Optional[list] = None) -> tuple[str, str]:
     """Split a complex (PDB or mmCIF) into ``protein.pdb`` and ``ligand.sdf``.
 
     The ligand is the residue called ``resname`` (narrow it down with ``chain``
@@ -248,9 +324,18 @@ def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
     ligand hydrogens or bond orders, so give its SMILES in the protonation state
     you want to simulate; RDKit then assigns bond orders from it and adds the
     hydrogens. Without ``smiles`` the ligand must already have hydrogens and bonds.
+
+    ``drop`` removes parts of the file first (``drop_residues``), e.g. a fusion partner
+    such as ``A:1001-1106``: nothing after this point sees them, neither the ligand search
+    nor the membrane orientation estimate that reads ``protein.pdb``. What was dropped is
+    appended to ``notes`` if a list is given.
     Returns the two file paths.
     """
     topology, positions = read_structure(path)
+    if drop:
+        topology, positions, dropped = drop_residues(topology, positions, drop)
+        if notes is not None:
+            notes += dropped
     wanted = resname.strip().upper()
     matches = [r for r in topology.residues() if r.name.strip().upper() == wanted
                and (chain is None or r.chain.id == chain)
