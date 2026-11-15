@@ -45,6 +45,7 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M2, M3, M5 infrastructure: real inputs, presets, benchmark commands (R8–R10) | In progress on separate branches; not merged, not gated |
 | GPU plan M4: trypsin-benzamidine (R2) | Running: 5 replicas × 500 ns from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, about 18 h at 685 ns/day. No result yet |
+| GPU plan M5: kinase example (R10) | Running: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms), replica 0 on GPU 5 (container `fmeta-tyk2`, commit 8d1f10a) since 2026-11-15 23:30 UTC; the other replicas follow when GPUs 0–4 are free. No result yet |
 | GPU plan M6, M7: GPCR example, benchmark runs (R3, R9, R10) | Not started |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 8d1f10a
@@ -55,8 +56,8 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   the code of FM-D14. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
-- CI: green on 171220a. The commits up to 4f54e0f were pushed on 2026-11-16; the result of CI
-  on them, with the first run of the job `docker`, is not checked here.
+- CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
+  them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system (the first run is in progress);
     the membrane-plane estimate on a real membrane protein;
@@ -72,6 +73,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] Kinase example added and started: TYK2 with ejm_46 from PDB entry 4GIH (R10)
+- What: `examples/tyk2_ejm46/` (README with the experimental Ki of 4.8 nM, −11.3 kcal/mol, and the steps; a configuration that only names the two input files). On gated commit 8d1f10a in the image, `fmeta split`, `prepare`, `funnel` and `equilibrate` passed without a change: 0X5 and 119 waters removed, 1 heavy atom rebuilt, no chain break, funnel placed automatically (path to bulk 2.65 nm, bound pose at s = 1.20 nm), 88476 atoms, wall energy 0.000 kJ/mol in equilibration. Run started with `--mode sequential` on GPU 5 (container `fmeta-tyk2`): replica 0 at about 570 ns/day. It moves to the parallel mode when GPUs 0–4 are free.
+- Not verified yet: the free energy; whether a ligand this tight rebinds within 500 ns (the convergence criterion of 3 rebinding events is unchanged).
+- Refs: roadmap R10, `examples/tyk2_ejm46/README.md`.
 
 ### 2026-11-16 — [progress] First run from a real PDB entry started (R2); stop and continuation of a parallel run verified
 - What: trypsin-benzamidine from entry 3PTB, on gated commit 8d1f10a in the image. `fmeta split`, `prepare`, `funnel` and `equilibrate` passed without a change: BEN, CA and 62 waters removed, 6 disulfide bonds in the topology, no chain break, funnel placed automatically (path to bulk 2.30 nm), 72434 atoms, wall energy 0.000 kJ/mol in equilibration. `fmeta run --mode parallel` on GPUs 0–4: 5 replicas on 5 GPUs at once, 660–700 ns/day each (`fmeta status`, `nvidia-smi`). `docker stop` returned within 1 s, left no process on the GPUs and recorded every replica as stopped in `schedule.jsonl`; the same command continued all five from their checkpoints (HILLS without a repeated or missing hill).
