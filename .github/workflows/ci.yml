@@ -14,10 +14,11 @@ permissions:
 
 jobs:
   cpu:
-    # GitHub-hosted runners have no GPU and no conda-only packages: this job checks everything
-    # that runs on the OpenMM Reference / CPU platforms. GPU verification is scripts/gpu_gates.py
-    # on a GPU machine (docs/gpu-runbook.md); its recorded evidence in bench/results/ is
-    # validated here.
+    # GitHub-hosted runners have no GPU. This job installs the core with pip, without the
+    # conda-only packages, and checks everything that runs on the OpenMM Reference / CPU
+    # platforms: it is what keeps the core usable outside the official image. GPU verification
+    # is scripts/gpu_gates.py on a GPU machine (docs/gpu-runbook.md); its recorded evidence in
+    # bench/results/ is validated here.
     name: CPU checks (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -44,3 +45,21 @@ jobs:
         run: python scripts/verify_bench_results.py
       - name: CPU tests
         run: python -m pytest -q -ra
+
+  docker:
+    # The official image (Dockerfile, built from conda-linux-64.lock) and the same checks inside
+    # it, through the wrapper everything outside CI uses. The image holds the OpenFF / GAFF
+    # generators, so the tests that need them run here and are not skipped.
+    name: Official image (build, lint, CPU tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the image (about 6 GB)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android
+      - name: Build the image from the lock
+        run: scripts/in_docker.sh --build fmeta --help
+      - name: Lint
+        run: scripts/in_docker.sh ruff check .
+      - name: CPU tests
+        run: scripts/in_docker.sh python -m pytest -q -ra

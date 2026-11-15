@@ -40,7 +40,7 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow follow |
+| Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
 | GPU plan M0: first gate record (R1) | In progress |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
@@ -56,7 +56,8 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
     their fixes follow in the next commits; nothing is recorded;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
-  - reading HILLS with PLUMED itself.
+  - reading HILLS with PLUMED itself;
+  - the CI job `docker` and the publish workflow (never run).
 - Known gaps: the bias table is refit on the CPU at every hill (about 0.5 µs per grid point;
   R4); ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`.
