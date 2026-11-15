@@ -16,17 +16,13 @@
 #
 # Not run against the real entry during development (no access to the PDB from there);
 # the same steps are tested on a small bundled system.
+#
+# Only the difference from the preset is here. Every other value is the official default
+# (5 replicas of 500 ns, OpenFF ligand parameters, ...): "fmeta init --preset soluble" writes
+# them all, docs/configuration.md gives the reasons, and run/config.yaml records the values
+# that were used. In the analysis, watch dG(t) and the rebinding count.
+preset: soluble
+
 input:
   protein: 3ptb.pdb
   ligand: benzamidine.sdf
-
-system:
-  temperature: 300.0           # ligand parameters: OpenFF by default (conda environment)
-
-metad:
-  bias_factor: 10.0
-  height: 1.5
-
-run:
-  length_ns: 500.0             # per replica; watch dG(t) and the rebinding count in the analysis
-  replicas: 5
