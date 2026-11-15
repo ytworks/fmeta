@@ -1,5 +1,7 @@
-"""The presets, and a configuration on top of a preset."""
+"""The presets, a configuration on top of a preset, and the documentation of the keys."""
 
+import dataclasses
+import re
 from pathlib import Path
 
 import pytest
@@ -7,6 +9,7 @@ import yaml
 
 from fmeta.cli import main as cli
 from fmeta.config import PRESETS, Config, InputConfig, RunConfig
+from fmeta.funnel.geometry import Funnel
 from fmeta.system.builder import MembraneSettings, SystemSettings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,3 +75,18 @@ def test_configuration_on_a_preset(tmp_path):
                          ids=lambda path: path.parent.name)
 def test_example_loads(path):
     Config.load(path)
+
+
+def test_documentation_has_every_key():
+    """docs/configuration.md: a row for every key and for no other, with the default of the code."""
+    text = (ROOT / "docs" / "configuration.md").read_text()
+    rows = re.findall(r"^\| `([\w.]+)` \|[^|]*\| `([^`]*)` \|", text, flags=re.MULTILINE)
+    documented = {key: yaml.safe_load(default) for key, default in rows}
+    assert len(documented) == len(rows)                 # no key twice
+
+    expected = {f"funnel_overrides.{f.name}": f.default
+                for f in dataclasses.fields(Funnel) if isinstance(f.default, float)}
+    for section, values in defaults(membrane=True).items():
+        if section != "funnel_overrides":
+            expected.update({f"{section}.{key}": value for key, value in values.items()})
+    assert documented == expected
