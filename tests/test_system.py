@@ -198,3 +198,32 @@ def test_full_pipeline_with_restart(inputs, tmp_path):
     assert result["n_replicas"] == 1 and not result["converged"]
     assert "NOT CONVERGED" in format_summary(result)
     assert json.loads((work / "summary.json").read_text())["dG"] == result["dG"]
+
+
+def test_amber_input_through_prepare_stage(prepared, tmp_path):
+    """An AMBER prmtop/inpcrd pair (written here with ParmEd) goes through the
+    pre-parameterised route: ligand found, funnel placed, box checked."""
+    parmed = pytest.importorskip("parmed")
+    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3p.xml", BENZENE_XML)
+    system = forcefield.createSystem(prepared.topology, nonbondedMethod=app.PME,
+                                     constraints=None, rigidWater=False)
+    structure = parmed.openmm.load_topology(prepared.topology, system,
+                                            xyz=prepared.positions * unit.nanometer)
+    structure.save(str(tmp_path / "complex.prmtop"))
+    structure.save(str(tmp_path / "complex.inpcrd"))
+
+    config = Config.from_dict({"input": {"amber": {"prmtop": "complex.prmtop",
+                                                    "coordinates": "complex.inpcrd"}},
+                               "run": {"platform": "CPU"}}, base_dir=tmp_path)
+    loaded = prepare_stage(config, tmp_path / "work")
+    assert loaded.report.ok, str(loaded.report)
+    assert loaded.topology.getNumAtoms() == prepared.topology.getNumAtoms()
+    atoms = list(loaded.topology.atoms())
+    assert {atoms[i].residue.name for i in loaded.selection.ligand} == {"BNZ"}
+    assert {c.name: c.status for c in loaded.report.checks}["box_cv"] == "ok"
+    direction = np.array(loaded.funnel.metadata["exit_direction"])
+    assert direction @ np.array(prepared.funnel.metadata["exit_direction"]) > np.cos(np.radians(15))
+    # hydrogen mass repartitioning is applied to pre-parameterised input as well
+    hydrogen = next(a.index for a in atoms if a.element.symbol == "H" and a.residue.name == "LEU")
+    assert loaded.system.getParticleMass(hydrogen).value_in_unit(unit.amu) == pytest.approx(1.5)
+    assert (tmp_path / "work" / "prepared" / "funnel.pdb").exists()

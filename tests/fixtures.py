@@ -61,3 +61,34 @@ def write_complex_inputs(directory) -> tuple[str, str]:
     heavy = write_protein(directory / "protein.pdb")
     write_benzene(directory / "benzene.sdf", pocket_point(heavy))
     return str(directory / "protein.pdb"), str(directory / "benzene.sdf")
+
+
+def write_membrane_inputs(directory, centre_z: float = 1.5) -> tuple[str, str]:
+    """The same protein and benzene, turned so the pocket faces +z and lifted so
+    the lower half of the protein sits in a bilayer centred on z = 0 while the
+    pocket opens to the water above it. Not a real membrane protein: it only
+    gives ``addMembrane`` something to pack lipids around."""
+    directory = Path(directory)
+    source = app.PDBFile(os.path.join(os.path.dirname(app.__file__), "data", "test.pdb"))
+    modeller = app.Modeller(source.topology, source.positions)
+    modeller.delete([r for r in modeller.topology.residues() if r.name in ("HOH", "Cl")])
+    modeller.topology.setPeriodicBoxVectors(None)
+    positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
+    heavy = np.array([a.index for a in modeller.topology.atoms() if a.element.symbol != "H"])
+    pocket = pocket_point(positions[heavy])
+    centre = positions[heavy].mean(axis=0)
+
+    # rotation taking (centre -> pocket) onto +z (Rodrigues)
+    u = (pocket - centre) / np.linalg.norm(pocket - centre)
+    z = np.array([0.0, 0.0, 1.0])
+    v, c = np.cross(u, z), float(u @ z)
+    k = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    rotation = np.eye(3) + k + k @ k / (1.0 + c)
+    shift = np.array([0.0, 0.0, centre_z])
+    positions = (positions - centre) @ rotation.T + shift
+    pocket = (pocket - centre) @ rotation.T + shift
+
+    with open(directory / "protein_oriented.pdb", "w") as handle:
+        app.PDBFile.writeFile(modeller.topology, positions * unit.nanometer, handle)
+    write_benzene(directory / "benzene_oriented.sdf", pocket)
+    return str(directory / "protein_oriented.pdb"), str(directory / "benzene_oriented.sdf")

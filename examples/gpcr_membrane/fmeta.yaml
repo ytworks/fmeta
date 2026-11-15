@@ -1,0 +1,36 @@
+# A GPCR with a ligand in the orthosteric site, embedded in POPC.
+#
+# Inputs:
+#   protein.pdb  - the receptor, protonated and ORIENTED: membrane normal along z and
+#                  the membrane midplane at z = 0 (structures from the OPM database
+#                  are oriented this way; remove their dummy membrane atoms)
+#   ligand.sdf   - the ligand pose with all hydrogens, in the same frame
+#
+# The funnel is placed before the membrane is built and treats the bilayer as
+# a slab, so it points into the extracellular or intracellular water. Check it:
+#   fmeta prepare fmeta.yaml -o run && fmeta funnel run
+# and load run/prepared/funnel.pdb together with run/prepared/topology.cif.
+input:
+  protein: protein.pdb
+  ligand: ligand.sdf
+
+system:
+  ligand_method: openff
+  temperature: 310.0
+  padding: 1.5                 # nm of lipid around the receptor in the membrane plane
+
+membrane:
+  lipid: POPC                  # POPC, POPE, DLPC, DLPE, DMPC, DOPC or DPPC
+  center_z: 0.0
+
+# For ligands that leave sideways into the bilayer, or to pick the vestibule by hand:
+# funnel:
+#   exit_direction: [0, 0, 1]
+
+equilibration:
+  free_ps: 10000               # 10 ns unrestrained, with the funnel walls on
+
+run:
+  length_ns: 1000.0
+  replicas: 5
+  # gpus: [0, 1, 2, 3]

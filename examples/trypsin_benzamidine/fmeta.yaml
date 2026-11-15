@@ -1,0 +1,24 @@
+# Trypsin-benzamidine, the classic funnel metadynamics test case (PDB 3PTB).
+#
+# Prepare the two input files yourself:
+#   protein.pdb  - the protein only, protonated (crystal waters and the ligand removed;
+#                  keep the calcium ion only if your force-field files cover it)
+#   ligand.sdf   - benzamidine in its crystal pose, with all hydrogens (charge +1)
+#
+#   fmeta prepare fmeta.yaml -o run && fmeta funnel run     # check the funnel first
+#   fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run
+input:
+  protein: protein.pdb
+  ligand: ligand.sdf
+
+system:
+  ligand_method: openff        # needs openmmforcefields (see environment.yml)
+  temperature: 300.0
+
+metad:
+  bias_factor: 10.0
+  height: 1.5
+
+run:
+  length_ns: 500.0             # per replica; watch dG(t) and the rebinding count in the analysis
+  replicas: 5
