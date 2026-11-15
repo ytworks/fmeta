@@ -43,6 +43,10 @@ class HillsWriter:
         self._handle.write(f"{time:.6f} {s:.10g} {rho:.10g} {sigma_s:.10g} {sigma_rho:.10g} "
                            f"{stored:.12g} {biasf:.10g}\n")
 
+    def release(self) -> None:
+        """Hand buffered rows to the operating system so other processes can read them."""
+        self._handle.flush()
+
     def flush(self) -> None:
         self._handle.flush()
         os.fsync(self._handle.fileno())
@@ -144,3 +148,52 @@ def truncate_data_file(path, keep_rows: int = None, max_time: float = None) -> i
         os.fsync(handle.fileno())
     os.replace(tmp, path)
     return len(rows)
+
+
+class HillsFollower:
+    """Reads the hills another walker appends to its HILLS file, a batch at a time."""
+
+    def __init__(self, path):
+        self.path = str(path)
+        self.offset = 0
+        self.rows = 0
+
+    def read_new(self) -> Optional[Hills]:
+        """Hills written since the last call (complete lines only), or ``None``."""
+        if not os.path.exists(self.path):
+            return None
+        size = os.path.getsize(self.path)
+        if size < self.offset:        # the file was rolled back under us: do not re-read
+            self.offset = size
+            return None
+        with open(self.path, "rb") as handle:
+            handle.seek(self.offset)
+            data = handle.read()
+        end = data.rfind(b"\n")
+        if end < 0:
+            return None
+        self.offset += end + 1
+        rows = [line.split() for line in data[:end + 1].decode().splitlines()
+                if line.strip() and not line.startswith("#")]
+        rows = [row for row in rows if len(row) == 7]
+        if not rows:
+            return None
+        data = np.array(rows, dtype=float)
+        biasf = float(data[0, 6])
+        bias_factor = None if biasf <= 0 else biasf
+        self.rows += len(rows)
+        return Hills(data[:, 0], data[:, 1], data[:, 2], data[:, 3], data[:, 4],
+                     data[:, 5] / _stored_scale(bias_factor), bias_factor)
+
+
+def merge_hills(parts: list) -> Hills:
+    """Hills of several walkers as one time-ordered series."""
+    parts = [p for p in parts if len(p)]
+    if not parts:
+        empty = np.zeros(0)
+        return Hills(empty, empty, empty, empty, empty, empty, None)
+    time = np.concatenate([p.time for p in parts])
+    order = np.argsort(time, kind="stable")
+    stack = lambda name: np.concatenate([getattr(p, name) for p in parts])[order]   # noqa: E731
+    return Hills(time[order], stack("s"), stack("rho"), stack("sigma_s"), stack("sigma_rho"),
+                 stack("height"), parts[0].bias_factor)

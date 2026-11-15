@@ -19,6 +19,12 @@ from .system.builder import MembraneSettings, SystemSettings
 class InputConfig:
     protein: Optional[str] = None            # PDB / mmCIF of the protein (oriented, if membrane)
     ligand: Optional[str] = None             # posed ligand: SDF / MOL / MOL2 with hydrogens
+    # ... or a complex file from which the ligand residue is cut out:
+    complex: Optional[str] = None            # PDB / mmCIF holding protein and ligand
+    ligand_resname: Optional[str] = None     # residue name of the ligand in the complex
+    ligand_smiles: Optional[str] = None      # its SMILES (protonation state to simulate)
+    ligand_chain: Optional[str] = None       # to pick one of several copies
+    ligand_resid: Optional[str] = None
     # pre-parameterised alternatives (give exactly one instead of protein + ligand)
     amber: Optional[dict] = None             # {prmtop:, coordinates:}
     gromacs: Optional[dict] = None           # {top:, gro:, include_dir:}
@@ -29,7 +35,9 @@ class InputConfig:
 @dataclass
 class RunConfig:
     length_ns: float = 500.0                 # per replica
-    replicas: int = 5
+    replicas: int = 5                        # independent runs (separate biases), for error bars
+    walkers: int = 1                         # walkers sharing one bias within each replica
+    walker_sync_hills: int = 1               # a walker reads the others' hills every N of its own
     timestep_fs: float = 4.0                 # needs hydrogen mass repartitioning above 2 fs
     friction: float = 1.0                    # 1/ps
     pace_ps: float = 1.0                     # time between hills
@@ -101,6 +109,7 @@ class Config:
             return None if value is None else str((base / value).resolve())
         self.input.protein = absolute(self.input.protein)
         self.input.ligand = absolute(self.input.ligand)
+        self.input.complex = absolute(self.input.complex)
         for name in ("amber", "gromacs", "charmm"):
             block = getattr(self.input, name)
             if block:
@@ -138,6 +147,10 @@ TEMPLATE = """\
 input:
   protein: protein.pdb        # for membrane proteins: oriented with the membrane normal along z
   ligand: ligand.sdf          # bound pose with hydrogens, in the protein's frame
+  # A complex straight from the PDB instead (ligand cut out, hydrogens added from the SMILES):
+  # complex: 3ptb.pdb
+  # ligand_resname: BEN
+  # ligand_smiles: "NC(=[NH2+])c1ccccc1"
   # Pre-parameterised input instead of protein + ligand (pick one):
   # amber:   {prmtop: complex.prmtop, coordinates: complex.inpcrd}
   # gromacs: {top: topol.top, gro: conf.gro}
@@ -147,6 +160,7 @@ input:
 system:
   forcefields: [amber14-all.xml, amber14/tip3p.xml]
   ligand_method: openff       # openff | gaff | xml (then list ligand_xml files)
+  fix_protein: false          # true: add missing heavy atoms / fix non-standard residues (PDBFixer)
   ligand_xml: []
   temperature: 300.0
   ionic_strength: 0.15
@@ -169,8 +183,9 @@ metad:
 equilibration: {}             # heating_ps, release_ps, free_ps ...
 
 run:
-  length_ns: 500.0            # per replica
-  replicas: 5
+  length_ns: 500.0            # per replica (per walker, if walkers > 1)
+  replicas: 5                 # independent runs, for the error estimate
+  walkers: 1                  # >1: this many walkers share one bias in each replica
   timestep_fs: 4.0
   platform: auto              # CUDA if available
   # gpus: [0, 1]              # spread replicas over these devices

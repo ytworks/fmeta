@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import openmm.app as app
@@ -99,6 +100,133 @@ def read_ligand(path, resname: str = "LIG") -> tuple[app.Topology, np.ndarray]:
     return topology, positions
 
 
+# ---- protein clean-up and complexes -----------------------------------------
+
+def fix_protein(path, keep_water: bool = False) -> tuple[app.Topology, np.ndarray]:
+    """Repair a protein file with PDBFixer: non-standard residues are replaced by
+    their standard parents and missing heavy atoms are built. Missing residues
+    (unresolved loops, termini) are not modelled; hydrogens are added later with
+    the force field. Hetero groups other than water are removed."""
+    try:
+        from pdbfixer import PDBFixer
+    except ImportError as error:
+        raise ImportError("fix_protein needs PDBFixer (conda install -c conda-forge pdbfixer)") from error
+    path = Path(path)
+    if path.suffix.lower() in (".cif", ".mmcif", ".pdbx"):
+        with open(path) as handle:
+            fixer = PDBFixer(pdbxfile=handle)
+    else:
+        fixer = PDBFixer(filename=str(path))
+    fixer.findMissingResidues()
+    fixer.missingResidues = {}
+    fixer.findNonstandardResidues()
+    fixer.replaceNonstandardResidues()
+    fixer.removeHeterogens(keepWater=keep_water)
+    fixer.findMissingAtoms()
+    fixer.addMissingAtoms()
+    return fixer.topology, _nm(fixer.positions)
+
+
+def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
+                  chain: Optional[str] = None, resid: Optional[str] = None) -> tuple[str, str]:
+    """Split a complex (PDB or mmCIF) into ``protein.pdb`` and ``ligand.sdf``.
+
+    The ligand is the residue called ``resname`` (narrow it down with ``chain``
+    and ``resid`` if there are several copies). Crystal structures carry no
+    ligand hydrogens or bond orders, so give its SMILES in the protonation state
+    you want to simulate; RDKit then assigns bond orders from it and adds the
+    hydrogens. Without ``smiles`` the ligand must already have hydrogens and bonds.
+    Returns the two file paths.
+    """
+    topology, positions = read_structure(path)
+    wanted = resname.strip().upper()
+    matches = [r for r in topology.residues() if r.name.strip().upper() == wanted
+               and (chain is None or r.chain.id == chain)
+               and (resid is None or str(r.id) == str(resid))]
+    if len(matches) != 1:
+        found = ", ".join(f"chain {r.chain.id} residue {r.id}" for r in matches) or "none"
+        raise ValueError(f"expected exactly one ligand residue {resname!r}, found: {found}; "
+                         "select one with chain= and resid=")
+    ligand = matches[0]
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    modeller = app.Modeller(topology, positions * unit.nanometer)
+    modeller.delete([ligand])
+    protein_path = out_dir / "protein.pdb"
+    with open(protein_path, "w") as handle:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, handle, keepIds=True)
+
+    ligand_atoms = list(ligand.atoms())
+    index = {atom.index: k for k, atom in enumerate(ligand_atoms)}
+    coords = positions[[atom.index for atom in ligand_atoms]]
+    elements = [atom.element.symbol for atom in ligand_atoms]
+    bonds = [(index[a.index], index[b.index], 1) for a, b in topology.bonds()
+             if a.index in index and b.index in index]
+    ligand_path = out_dir / "ligand.sdf"
+    if smiles is None:
+        if "H" not in elements or len(bonds) < len(elements) - 1:
+            raise ValueError("the ligand in the complex has no hydrogens or bonds; pass its SMILES "
+                             "(in the protonation state to simulate) so they can be added")
+        _write_molfile(ligand_path, resname, elements, coords, bonds)
+    else:
+        _write_ligand_from_smiles(ligand_path, resname, elements, coords, smiles)
+    return str(protein_path), str(ligand_path)
+
+
+def _write_molfile(path, name: str, elements, coords_nm, bonds) -> None:
+    lines = [name, "  fmeta", "", f"{len(elements):3d}{len(bonds):3d}  0  0  0  0  0  0  0  0999 V2000"]
+    for symbol, (x, y, z) in zip(elements, np.asarray(coords_nm) * 10.0):
+        lines.append(f"{x:10.4f}{y:10.4f}{z:10.4f} {symbol:<3s} 0  0  0  0  0  0  0  0  0  0  0  0")
+    lines += [f"{a + 1:3d}{b + 1:3d}{order:3d}  0" for a, b, order in bonds]
+    lines += ["M  END", "$$$$"]
+    Path(path).write_text("\n".join(lines) + "\n")
+
+
+def _write_ligand_from_smiles(path, name: str, elements, coords_nm, smiles: str) -> None:
+    """Heavy-atom coordinates + SMILES -> protonated molecule with bond orders (RDKit)."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        from rdkit.Geometry import Point3D
+    except ImportError as error:
+        raise ImportError("adding ligand hydrogens from a SMILES needs RDKit "
+                          "(pip install rdkit)") from error
+    template = Chem.MolFromSmiles(smiles)
+    if template is None:
+        raise ValueError(f"RDKit cannot parse the SMILES {smiles!r}")
+    heavy = [k for k, symbol in enumerate(elements) if symbol != "H"]
+    if template.GetNumAtoms() != len(heavy):
+        raise ValueError(f"the SMILES has {template.GetNumAtoms()} heavy atoms but the ligand "
+                         f"residue has {len(heavy)}")
+    # bare heavy atoms with the crystal coordinates; connectivity from interatomic distances
+    editable = Chem.RWMol()
+    for k in heavy:
+        editable.AddAtom(Chem.Atom(elements[k]))
+    conformer = Chem.Conformer(len(heavy))
+    for new, k in enumerate(heavy):
+        x, y, z = np.asarray(coords_nm[k]) * 10.0
+        conformer.SetAtomPosition(new, Point3D(float(x), float(y), float(z)))
+    editable.AddConformer(conformer)
+    from rdkit.Chem import rdDetermineBonds
+    rdDetermineBonds.DetermineConnectivity(editable)
+    mismatch = ("the ligand's connectivity in the structure does not match the SMILES "
+                f"{smiles!r}")
+    if editable.GetNumBonds() != template.GetNumBonds():   # e.g. a ring given as an open chain
+        raise ValueError(mismatch)
+    try:
+        molecule = AllChem.AssignBondOrdersFromTemplate(template, editable.GetMol())
+    except ValueError as error:
+        raise ValueError(mismatch) from error
+    for atom in molecule.GetAtoms():      # the bare atoms were created as hydrogen-less radicals
+        atom.SetNoImplicit(False)
+        atom.SetNumRadicalElectrons(0)
+    Chem.SanitizeMol(molecule)
+    molecule = Chem.AddHs(molecule, addCoords=True)
+    molecule.SetProp("_Name", name)
+    Path(path).write_text(Chem.MolToMolBlock(molecule) + "$$$$\n")
+
+
 # ---- pre-parameterised systems ---------------------------------------------
 
 def _system_kwargs(cutoff: float, hydrogen_mass) -> dict:
@@ -139,17 +267,19 @@ def load_charmm(psf, coordinates, parameter_files, box_nm=None, cutoff: float = 
     path = Path(coordinates)
     if path.suffix.lower() == ".crd":
         positions = _nm(app.CharmmCrdFile(str(path)).positions)
-        box = None
+        vectors = None
     else:
         pdb = app.PDBFile(str(path))
-        positions, box = _nm(pdb.positions), pdb.topology.getUnitCellDimensions()
+        positions, vectors = _nm(pdb.positions), pdb.topology.getPeriodicBoxVectors()
     if box_nm is not None:
-        lengths = [float(v) for v in box_nm]
-    elif box is not None:
-        lengths = list(box.value_in_unit(unit.nanometer))
+        psf_file.setBox(*(float(v) * unit.nanometer for v in box_nm))
+    elif vectors is not None:
+        from openmm.app.internal.unitcell import computeLengthsAndAngles
+        a, b, c, alpha, beta, gamma = computeLengthsAndAngles(vectors)
+        psf_file.setBox(a * unit.nanometer, b * unit.nanometer, c * unit.nanometer,
+                        alpha * unit.radian, beta * unit.radian, gamma * unit.radian)
     else:
         raise ValueError("no periodic box found; pass box_nm=(x, y, z)")
-    psf_file.setBox(*(length * unit.nanometer for length in lengths))
     parameters = app.CharmmParameterSet(*(str(p) for p in parameter_files))
     kwargs = _system_kwargs(cutoff, hydrogen_mass)
     kwargs["switchDistance"] = switch * unit.nanometer

@@ -25,12 +25,12 @@ import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 
-from .analysis import analyze_replicas
+from .analysis import analyze_replicas, walker_directories
 from .config import Config
 from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
 from .engine.platform import select_platform
-from .engine.runner import MetadynamicsRun, RunSettings
+from .engine.runner import MetadynamicsRun, RunSettings, rollback_to_checkpoint
 from .funnel.geometry import Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
@@ -52,6 +52,14 @@ def prepare_stage(config: Config, workdir) -> Prepared:
     source = config.input
     platform, _ = select_platform(config.run.platform, config.run.precision)
 
+    if source.complex:
+        if not source.ligand_resname:
+            raise ValueError("input.complex needs input.ligand_resname")
+        source.protein, source.ligand = inputs.split_complex(
+            source.complex, source.ligand_resname, workdir / "inputs", source.ligand_smiles,
+            source.ligand_chain, source.ligand_resid)
+        config.system.ligand_resname = source.ligand_resname
+        config.save(workdir / "config.yaml")
     if source.protein and source.ligand:
         prepared = prepare(source.protein, source.ligand, config.system, config.membrane,
                            config.funnel, config.funnel_overrides, platform=platform)
@@ -68,7 +76,8 @@ def prepare_stage(config: Config, workdir) -> Prepared:
                                         source.charmm["parameters"], source.charmm.get("box"),
                                         **kwargs)
         else:
-            raise ValueError("config.input needs protein + ligand, or one of amber/gromacs/charmm")
+            raise ValueError("config.input needs protein + ligand, a complex, or one of "
+                             "amber/gromacs/charmm")
         prepared = prepare_from_system(*loaded, ligand=source.ligand_selection,
                                        settings=config.system, funnel_settings=config.funnel,
                                        funnel_overrides=config.funnel_overrides)
@@ -147,14 +156,25 @@ def equilibrate_stage(config: Config, workdir, device: Optional[int] = None) -> 
 
 # ---- production -------------------------------------------------------------
 
+def replica_directory(workdir, replica: int, walker: Optional[int] = None) -> Path:
+    base = Path(workdir) / f"rep{replica}"
+    return base if walker is None else base / f"w{walker}"
+
+
 def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] = None,
-              length_ns: Optional[float] = None) -> Path:
-    """Run (or continue) one replica. Returns its directory."""
+              length_ns: Optional[float] = None, walker: Optional[int] = None) -> Path:
+    """Run (or continue) one replica, or one walker of it. Returns its directory.
+
+    With ``config.run.walkers > 1`` every walker of a replica must be running
+    at the same time for the bias to be shared; :func:`run_replicas` does that.
+    """
     workdir = Path(workdir)
+    run_cfg, temperature = config.run, config.system.temperature
+    if (walker is None) != (run_cfg.walkers <= 1):
+        raise ValueError("pass walker=<index> exactly when config.run.walkers > 1")
     prepared = load_prepared(workdir, config)
     with open(workdir / "equil" / "state.xml") as handle:
         state = mm.XmlSerializer.deserialize(handle.read())
-    run_cfg, temperature = config.run, config.system.temperature
     dt = run_cfg.timestep_fs / 1000.0
 
     system = prepared.system
@@ -163,13 +183,13 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin,
                                              run_cfg.friction / unit.picosecond,
                                              dt * unit.picosecond)
-    seed = run_cfg.seed + replica if run_cfg.seed else 0
+    seed = run_cfg.seed + 1000 * replica + (walker or 0) if run_cfg.seed else 0
     if seed:
         integrator.setRandomNumberSeed(seed)
     platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
     simulation = app.Simulation(prepared.topology, system, integrator, platform, properties)
     simulation.context.setState(state)
-    # fresh velocities decorrelate the replicas (a restart overwrites them again)
+    # fresh velocities decorrelate replicas and walkers (a restart overwrites them again)
     if seed:
         simulation.context.setVelocitiesToTemperature(temperature * unit.kelvin, seed)
     else:
@@ -178,11 +198,15 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     hill_ps = config.metad.pace * dt
     selection = prepared.selection
     solute = np.sort(np.concatenate([selection.protein, selection.ligand, selection.other]))
+    walker_dirs = None
+    if walker is not None:
+        walker_dirs = [replica_directory(workdir, replica, k) for k in range(run_cfg.walkers)]
     settings = RunSettings(
         checkpoint_hills=max(1, round(run_cfg.checkpoint_ps / hill_ps)),
         trajectory_hills=round(run_cfg.trajectory_ps / hill_ps) if run_cfg.trajectory_ps else 0,
-        trajectory_atoms=[int(i) for i in solute] if run_cfg.trajectory_solute_only else None)
-    directory = workdir / f"rep{replica}"
+        trajectory_atoms=[int(i) for i in solute] if run_cfg.trajectory_solute_only else None,
+        walker_dirs=walker_dirs, sync_hills=run_cfg.walker_sync_hills)
+    directory = replica_directory(workdir, replica, walker)
     run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings)
     length = run_cfg.length_ns if length_ns is None else length_ns
     run.run(round(length * 1000.0 / hill_ps))
@@ -190,44 +214,94 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     return directory
 
 
+class _DevicePool:
+    """Hands out GPU device indices to replicas, blocking while all are busy."""
+
+    def __init__(self, devices: Sequence):
+        self._free = list(devices)
+        self._condition = threading.Condition()
+
+    def acquire(self, count: int) -> list:
+        with self._condition:
+            self._condition.wait_for(lambda: len(self._free) >= count)
+            taken, self._free = self._free[:count], self._free[count:]
+            return taken
+
+    def release(self, devices: list) -> None:
+        with self._condition:
+            self._free.extend(devices)
+            self._condition.notify_all()
+
+
 def run_replicas(config: Config, workdir, gpus: Optional[Sequence[int]] = None,
                  length_ns: Optional[float] = None) -> list[Path]:
-    """Run all replicas: in this process one after another, or, with ``gpus``,
-    as one subprocess per replica with each device working through its share."""
+    """Run all replicas (and their walkers).
+
+    Without ``gpus`` and with a single walker, replicas run one after another in
+    this process. Otherwise every replica (or walker) is a subprocess: each
+    replica takes as many devices as it has walkers (or all of them, if there are
+    fewer), replicas run side by side while devices are free, and the walkers of
+    one replica always run together so that they can share their bias.
+    """
     workdir = Path(workdir)
     replicas = list(range(config.run.replicas))
+    n_walkers = max(1, config.run.walkers)
     gpus = gpus if gpus is not None else config.run.gpus
-    if not gpus:
+    if n_walkers == 1 and not gpus:
         return [run_stage(config, workdir, i, None, length_ns) for i in replicas]
 
+    devices = list(gpus) if gpus else [None]        # None: whatever the platform picks
+    pool = _DevicePool(devices)
     failures = []
 
-    def work(device, mine):
-        for replica in mine:
-            command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir),
-                       "--replica", str(replica), "--device", str(device)]
-            if length_ns is not None:
-                command += ["--length-ns", str(length_ns)]
-            with open(workdir / f"rep{replica}.log", "a") as logfile:
-                if subprocess.call(command, stdout=logfile, stderr=subprocess.STDOUT) != 0:
-                    failures.append(replica)
+    def work(replica: int) -> None:
+        mine = pool.acquire(min(n_walkers, len(devices)))
+        try:
+            walkers = list(range(n_walkers)) if n_walkers > 1 else [None]
+            # roll every walker back to its checkpoint before any of them reads the others
+            for walker in walkers:
+                directory = replica_directory(workdir, replica, walker)
+                if walker is not None and (directory / "checkpoint.zip").exists():
+                    rollback_to_checkpoint(directory)
+            processes = []
+            for index, walker in enumerate(walkers):
+                command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir),
+                           "--replica", str(replica)]
+                name = f"rep{replica}"
+                if walker is not None:
+                    command += ["--walker", str(walker)]
+                    name += f"_w{walker}"
+                device = mine[index % len(mine)]
+                if device is not None:
+                    command += ["--device", str(device)]
+                if length_ns is not None:
+                    command += ["--length-ns", str(length_ns)]
+                logfile = open(workdir / f"{name}.log", "a")
+                processes.append((name, logfile, subprocess.Popen(
+                    command, stdout=logfile, stderr=subprocess.STDOUT)))
+            for name, logfile, process in processes:
+                if process.wait() != 0:
+                    failures.append(name)
+                logfile.close()
+        finally:
+            pool.release(mine)
 
-    threads = [threading.Thread(target=work, args=(device, replicas[k::len(gpus)]))
-               for k, device in enumerate(gpus)]
+    threads = [threading.Thread(target=work, args=(replica,)) for replica in replicas]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
     if failures:
-        raise RuntimeError(f"replica(s) {sorted(failures)} failed; see rep<N>.log in {workdir}")
-    return [workdir / f"rep{i}" for i in replicas]
+        raise RuntimeError(f"{', '.join(sorted(failures))} failed; see the .log files in {workdir}")
+    return [replica_directory(workdir, i) for i in replicas]
 
 
 # ---- analysis ---------------------------------------------------------------
 
 def analyze_stage(workdir, **kwargs) -> dict:
     workdir = Path(workdir)
-    directories = sorted((d for d in workdir.glob("rep*") if (d / "HILLS").exists()),
+    directories = sorted((d for d in workdir.glob("rep*") if d.is_dir() and d.name[3:].isdigit()
+                          and ((d / "HILLS").exists() or walker_directories(d))),
                          key=lambda d: int(d.name[3:]))
     if not directories:
         raise FileNotFoundError(f"no replica directories with a HILLS file under {workdir}")

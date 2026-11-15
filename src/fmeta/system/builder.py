@@ -23,7 +23,8 @@ from ..funnel.geometry import Funnel, funnel_frame
 from ..funnel.obstacles import MembraneSlab
 from ..funnel.validate import (UNBOUND_WINDOW, FunnelReport, funnel_points, ligand_radius,
                                required_image_distance, validate_funnel)
-from .inputs import read_ligand, read_structure
+from .imaging import make_whole
+from .inputs import fix_protein, read_ligand, read_structure
 from .ligand import register_ligand
 from .selection import Selection, classify
 
@@ -39,6 +40,8 @@ class SystemSettings:
     water_model: str = "tip3p"
     ligand_method: str = "openff"            # "openff", "gaff" or "xml"
     ligand_forcefield: Optional[str] = None  # e.g. "openff-2.2.0"; default of the generator if None
+    ligand_charge_method: Optional[str] = None   # e.g. "am1bcc", "gasteiger"; default: generator's choice
+    fix_protein: bool = False                # repair the protein with PDBFixer (missing atoms, non-standard residues)
     ligand_xml: Sequence[str] = ()           # ffxml file(s) holding the ligand template
     ligand_resname: str = "LIG"
     keep_water: bool = False                 # keep waters present in the protein file
@@ -186,7 +189,10 @@ def _built_report(placement: FunnelReport, built: FunnelReport) -> FunnelReport:
 def build_complex(protein, ligand, forcefield: app.ForceField,
                   settings: SystemSettings) -> tuple[app.Modeller, list[int]]:
     """Dry protein-ligand complex. Returns the modeller and the ligand atom indices."""
-    topology, positions = read_structure(protein)
+    if settings.fix_protein:
+        topology, positions = fix_protein(protein, settings.keep_water)
+    else:
+        topology, positions = read_structure(protein)
     modeller = app.Modeller(topology, positions * unit.nanometer)
     if not settings.keep_water:
         modeller.deleteWater()
@@ -219,7 +225,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
         log.warning("%s is close to or below its gel transition at %.0f K; raise the temperature",
                     membrane.lipid, settings.temperature)
     forcefield = app.ForceField(*settings.forcefields, *settings.ligand_xml)
-    register_ligand(forcefield, ligand, settings.ligand_method, settings.ligand_forcefield)
+    register_ligand(forcefield, ligand, settings.ligand_method, settings.ligand_forcefield,
+                    settings.ligand_charge_method)
     modeller, ligand_atoms = build_complex(protein, ligand, forcefield, settings)
     dry_topology = modeller.topology
     dry_positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
@@ -284,14 +291,18 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
     positions = np.asarray(positions, dtype=float)
     selection = classify(topology, ligand)
     is_membrane = selection.lipid.size > 0
-    placement = FunnelReport()
-    if funnel is None:
-        funnel, placement = auto_funnel(topology, positions, settings=funnel_settings,
-                                        selection=selection, **(funnel_overrides or {}))
     vectors = topology.getPeriodicBoxVectors()
     if vectors is None:
         raise ValueError("the input system has no periodic box")
     box = np.array(vectors.value_in_unit(unit.nanometer))
+    # Simulation output is often wrapped into the box; the funnel needs whole
+    # molecules and the ligand next to the protein it is bound to.
+    assemble = np.concatenate([selection.protein, selection.ligand, selection.other])
+    positions = make_whole(topology, positions, box, assemble=assemble)
+    placement = FunnelReport()
+    if funnel is None:
+        funnel, placement = auto_funnel(topology, positions, settings=funnel_settings,
+                                        selection=selection, **(funnel_overrides or {}))
     report = _built_report(placement, validate_funnel(funnel, positions, selection, box=box,
                                                       cutoff=settings.cutoff,
                                                       tumbling=not is_membrane))

@@ -29,7 +29,8 @@ import openmm.unit as unit
 import yaml
 
 from .bias import FunnelBias
-from .hills import ColvarWriter, HillsWriter, read_hills, sum_hills, truncate_data_file
+from .hills import (ColvarWriter, HillsFollower, HillsWriter, read_hills, sum_hills,
+                    truncate_data_file)
 from .trajectory import TrajectoryWriter
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,10 @@ class RunSettings:
     checkpoint_hills: int = 250             # hills between checkpoints
     trajectory_hills: int = 0               # hills between trajectory frames (0: no trajectory)
     trajectory_atoms: Optional[Sequence[int]] = None   # default: all atoms
+    # Multiple walkers: run directories of the other walkers that share this bias.
+    # Their hills are read from their HILLS files every ``sync_hills`` of our own.
+    walker_dirs: Optional[Sequence] = None
+    sync_hills: int = 1
 
 
 class MetadynamicsRun:
@@ -63,6 +68,9 @@ class MetadynamicsRun:
             raise ValueError("colvar_stride must divide the hill pace")
         self.n_hills = 0
         self._traj: Optional[TrajectoryWriter] = None
+        self._others = [HillsFollower(Path(d) / "HILLS")
+                        for d in (self.settings.walker_dirs or [])
+                        if Path(d).resolve() != self.workdir.resolve()]
 
         resume = restart and (self.workdir / "checkpoint.zip").exists()
         n_frames = self._restore() if resume else None
@@ -71,6 +79,10 @@ class MetadynamicsRun:
             simulation.context.setStepCount(0)
             simulation.context.setTime(0.0)
             self._write_metadata()
+        # With shared bias, start from everything the other walkers have deposited so far
+        # (after a restart _restore() has put our own hills on the grid already).
+        if self._others and self.sync_walkers():
+            self.bias.push(simulation.context)
         self._hills = HillsWriter(self.workdir / "HILLS", bias.settings.bias_factor, append=resume)
         self._colvar = ColvarWriter(self.workdir / "COLVAR", append=resume)
         if self.settings.trajectory_hills > 0:
@@ -84,6 +96,8 @@ class MetadynamicsRun:
         data = dict(funnel=self.bias.funnel.to_dict(), bias=self.bias.settings.to_dict(),
                     grid=self.bias.grid.spec(), timestep_ps=self.dt,
                     settings=asdict(self.settings))
+        if data["settings"]["walker_dirs"] is not None:
+            data["settings"]["walker_dirs"] = [str(d) for d in data["settings"]["walker_dirs"]]
         if data["settings"]["trajectory_atoms"] is not None:
             data["settings"]["trajectory_atoms"] = [int(i) for i in data["settings"]["trajectory_atoms"]]
         with open(self.workdir / "run.yaml", "w") as handle:
@@ -118,10 +132,20 @@ class MetadynamicsRun:
             os.fsync(handle.fileno())
         os.replace(tmp, path)
 
+    def sync_walkers(self) -> int:
+        """Add the hills the other walkers wrote since the last call. Returns how many."""
+        added = 0
+        for other in self._others:
+            hills = other.read_new()
+            if hills is not None:
+                self.bias.grid.add_hills(hills.s, hills.rho, hills.height)
+                added += len(hills)
+        return added
+
     def _restore(self) -> Optional[int]:
         context = self.simulation.context
+        meta = rollback_to_checkpoint(self.workdir)
         with zipfile.ZipFile(self.workdir / "checkpoint.zip") as archive:
-            meta = json.loads(archive.read("meta.json"))
             values = np.load(io.BytesIO(archive.read("bias.npy")))
             binary = archive.read("checkpoint.chk")
             xml = archive.read("state.xml").decode()
@@ -130,17 +154,18 @@ class MetadynamicsRun:
         except Exception as error:  # different platform or hardware: use the portable state
             log.warning("binary checkpoint unusable (%s); restoring from State XML", error)
             context.setState(mm.XmlSerializer.deserialize(xml))
-        self.bias.set_values(values, context)
         self.n_hills = int(meta["n_hills"])
 
-        kept = truncate_data_file(self.workdir / "HILLS", keep_rows=self.n_hills)
-        if kept != self.n_hills:
-            raise RuntimeError(f"HILLS has {kept} rows but the checkpoint expects {self.n_hills}")
-        truncate_data_file(self.workdir / "COLVAR", max_time=meta["time_ps"])
         replayed = sum_hills(read_hills(self.workdir / "HILLS"), self.bias.grid)
-        scale = max(1.0, float(np.abs(values).max()))
-        if np.abs(replayed.values - values).max() > 1e-6 * scale:
-            log.warning("bias grid in the checkpoint differs from the replayed HILLS file")
+        if self._others:
+            # A shared bias is whatever all the HILLS files hold right now: the
+            # other walkers have moved on (or rolled back) since our checkpoint.
+            self.bias.set_values(replayed.values, context)
+        else:
+            self.bias.set_values(values, context)
+            scale = max(1.0, float(np.abs(values).max()))
+            if np.abs(replayed.values - values).max() > 1e-6 * scale:
+                log.warning("bias grid in the checkpoint differs from the replayed HILLS file")
         log.info("restarted from %d hills (%.3f ns)", self.n_hills, meta["time_ps"] / 1000)
         return meta.get("n_frames")
 
@@ -160,9 +185,13 @@ class MetadynamicsRun:
                     self._colvar.write(t, s, rho, bias, self._restraint_energy())
                 height = self.bias.hill_height(bias)
                 self.bias.grid.add_hill(s, rho, height)
-                self.bias.push(context)
                 self._hills.write(t, s, rho, settings.sigma_s, settings.sigma_rho, height)
                 self.n_hills += 1
+                if self._others:
+                    self._hills.release()               # let the other walkers see this hill
+                    if self.n_hills % self.settings.sync_hills == 0:
+                        self.sync_walkers()
+                self.bias.push(context)
                 if self._traj is not None and self.n_hills % self.settings.trajectory_hills == 0:
                     self._traj.write(context.getState(getPositions=True))
                 if self.n_hills % self.settings.checkpoint_hills == 0:
@@ -189,6 +218,20 @@ class MetadynamicsRun:
         for writer in (self._hills, self._colvar, self._traj):
             if writer is not None:
                 writer.close()
+
+
+def rollback_to_checkpoint(workdir) -> dict:
+    """Cut HILLS and COLVAR back to what the last checkpoint knows about and
+    return the checkpoint's counters. Safe to call more than once."""
+    workdir = Path(workdir)
+    with zipfile.ZipFile(workdir / "checkpoint.zip") as archive:
+        meta = json.loads(archive.read("meta.json"))
+    kept = truncate_data_file(workdir / "HILLS", keep_rows=int(meta["n_hills"]))
+    if kept != int(meta["n_hills"]):
+        raise RuntimeError(f"{workdir}/HILLS has {kept} rows but the checkpoint expects "
+                           f"{meta['n_hills']}")
+    truncate_data_file(workdir / "COLVAR", max_time=meta["time_ps"])
+    return meta
 
 
 def load_run_metadata(workdir) -> dict:

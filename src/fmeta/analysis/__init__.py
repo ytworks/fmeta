@@ -9,7 +9,7 @@ from typing import Optional, Sequence
 import numpy as np
 
 from ..engine.grid import BiasGrid, BiasSettings
-from ..engine.hills import read_colvar, read_hills
+from ..engine.hills import merge_hills, read_colvar, read_hills
 from ..engine.runner import load_run_metadata
 from ..funnel.geometry import Funnel
 from .binding import BindingEstimate, binding_free_energy, default_unbound_window
@@ -20,7 +20,7 @@ from .fes import (free_energy_surface, projection_profile, reweighted_profile,
 
 KCAL = 4.184
 
-__all__ = ["analyze_run", "analyze_replicas", "binding_free_energy", "BindingEstimate",
+__all__ = ["analyze_run", "analyze_replicas", "walker_directories", "binding_free_energy", "BindingEstimate",
            "free_energy_surface", "projection_profile", "reweighted_profile", "reweighting_offset",
            "dg_time_series", "count_transitions", "summarize_replicas"]
 
@@ -31,13 +31,15 @@ MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
 MAX_REWEIGHT_GAP = 4.0   # kJ/mol, bias-sum vs reweighted estimate
 
 
-def _reweighted_estimate(colvar: dict, offset_times: np.ndarray, offsets: np.ndarray,
+def _reweighted_estimate(colvars: list, offset_times: np.ndarray, offsets: np.ndarray,
                          grid: BiasGrid, funnel: Funnel, kT: float, discard: float,
                          **binding_kwargs) -> Optional[float]:
     """dG0 from the reweighted histogram of the trajectory itself. It shares the
     trajectory with the bias-sum estimate but not the route from data to W(s)."""
-    start = int(colvar["s"].size * discard)
-    s, time, bias = (colvar[key][start:] for key in ("s", "time", "bias"))
+    start = discard * max(colvar["time"][-1] for colvar in colvars if colvar["time"].size)
+    keep = [colvar["time"] > start for colvar in colvars]
+    s, time, bias = (np.concatenate([colvar[key][mask] for colvar, mask in zip(colvars, keep)])
+                     for key in ("s", "time", "bias"))
     if s.size < 100:
         return None
     log_weights = (bias - np.interp(time, offset_times, offsets)) / kT
@@ -54,6 +56,13 @@ def _reweighted_estimate(colvar: dict, offset_times: np.ndarray, offsets: np.nda
     return binding_free_energy(centres, profile, funnel, kT, **binding_kwargs).dG
 
 
+def walker_directories(workdir) -> list:
+    """Sub-directories ``w0, w1, ...`` of a run that used multiple walkers."""
+    workdir = Path(workdir)
+    found = [d for d in workdir.glob("w*") if d.name[1:].isdigit() and (d / "HILLS").exists()]
+    return sorted(found, key=lambda d: int(d.name[1:]))
+
+
 def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
                 reweight_discard: float = 0.2, site_max: Optional[float] = None,
                 unbound: Optional[tuple[float, float]] = None, write: bool = True) -> dict:
@@ -66,12 +75,14 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     (skipping the first ``reweight_discard`` of it) and serves as a cross-check.
     """
     workdir = Path(workdir)
-    meta = load_run_metadata(workdir)
+    # With multiple walkers the bias is the sum over all of them, ordered in time.
+    sources = walker_directories(workdir) or [workdir]
+    meta = load_run_metadata(sources[0])
     funnel = Funnel.from_dict(meta["funnel"])
     settings = BiasSettings(**meta["bias"])
     grid = BiasGrid(**meta["grid"])
-    hills = read_hills(workdir / "HILLS")
-    colvar = read_colvar(workdir / "COLVAR")
+    hills = merge_hills([read_hills(d / "HILLS") for d in sources])
+    colvars = [read_colvar(d / "COLVAR") for d in sources]
     if len(hills) == 0:
         raise ValueError(f"{workdir}/HILLS contains no hills")
     kT, scale = settings.kT, settings.fes_scale
@@ -96,13 +107,16 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
 
     s_bound = float(final_grid.s[np.argmin(profile)])
     bound_below = min(s_bound + 0.3, estimate.site_max)
-    transitions = count_transitions(colvar["s"], bound_below, estimate.unbound[0])
-    dg_reweighted = _reweighted_estimate(colvar, np.array(offset_times), np.array(offsets),
+    counted = [count_transitions(colvar["s"], bound_below, estimate.unbound[0])
+               for colvar in colvars]
+    unbinding = sum(c.unbinding for c in counted)
+    rebinding = sum(c.rebinding for c in counted)
+    dg_reweighted = _reweighted_estimate(colvars, np.array(offset_times), np.array(offsets),
                                          final_grid, funnel, kT, reweight_discard, **kwargs)
 
     problems = []
-    if transitions.rebinding < MIN_REBINDING:
-        problems.append(f"only {transitions.rebinding} rebinding event(s); need >= {MIN_REBINDING}")
+    if rebinding < MIN_REBINDING:
+        problems.append(f"only {rebinding} rebinding event(s); need >= {MIN_REBINDING}")
     if abs(plateau["drift"]) > MAX_DRIFT:
         problems.append(f"dG still drifting ({plateau['drift']:+.2f} kJ/mol over the plateau window)")
     if estimate.unbound_roughness > MAX_ROUGHNESS:
@@ -112,7 +126,8 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
 
     result = dict(
         workdir=str(workdir),
-        simulated_ns=float(hills.time[-1] / 1000.0),
+        simulated_ns=float(sum(c["time"][-1] for c in colvars if c["time"].size) / 1000.0),
+        n_walkers=len(sources),
         n_hills=len(hills),
         temperature=settings.temperature,
         dG_plateau=plateau["mean"], dG_plateau_std=plateau["std"],
@@ -121,7 +136,7 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
         drift=plateau["drift"], k_bind_nm3=estimate.k_bind, well_depth=estimate.well_depth,
         s_bound=s_bound, site_max=estimate.site_max, unbound=list(estimate.unbound),
         unbound_roughness=estimate.unbound_roughness,
-        unbinding_events=transitions.unbinding, rebinding_events=transitions.rebinding,
+        unbinding_events=unbinding, rebinding_events=rebinding,
         last_hill_height=float(hills.height[-1]),
         converged=not problems, problems=problems,
         dG_time_ns=(times / 1000.0).tolist(), dG_series=dg.tolist(),

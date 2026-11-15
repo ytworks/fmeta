@@ -16,9 +16,14 @@ def _config_from_args(args) -> Config:
     if args.config:
         config = Config.load(args.config)
     else:
-        if not (args.protein and args.ligand):
-            sys.exit("give a configuration file, or --protein and --ligand")
-        data = {"input": {"protein": args.protein, "ligand": args.ligand}}
+        if args.complex and args.ligand_resname:
+            data = {"input": {"complex": args.complex, "ligand_resname": args.ligand_resname,
+                              "ligand_smiles": args.ligand_smiles}}
+        elif args.protein and args.ligand:
+            data = {"input": {"protein": args.protein, "ligand": args.ligand}}
+        else:
+            sys.exit("give a configuration file, --protein and --ligand, or --complex and "
+                     "--ligand-resname")
         config = Config.from_dict(data, base_dir=Path.cwd())
     if args.membrane:
         from .system.builder import MembraneSettings
@@ -42,6 +47,9 @@ def _add_setup_options(parser) -> None:
     parser.add_argument("config", nargs="?", help="YAML configuration (see 'fmeta init')")
     parser.add_argument("--protein", help="protein structure (PDB or mmCIF)")
     parser.add_argument("--ligand", help="posed ligand with hydrogens (SDF, MOL, MOL2)")
+    parser.add_argument("--complex", help="structure holding protein and ligand (PDB or mmCIF)")
+    parser.add_argument("--ligand-resname", help="residue name of the ligand in --complex")
+    parser.add_argument("--ligand-smiles", help="ligand SMILES, to add its hydrogens (needs RDKit)")
     parser.add_argument("--membrane", nargs="?", const="POPC", metavar="LIPID",
                         help="embed in a lipid bilayer (default POPC); the protein must be "
                              "oriented with the membrane normal along z")
@@ -59,6 +67,13 @@ def cmd_init(args) -> None:
         sys.exit(f"{path} already exists")
     path.write_text(TEMPLATE)
     print(f"wrote {path}")
+
+
+def cmd_split(args) -> None:
+    from .system.inputs import split_complex
+    protein, ligand = split_complex(args.complex, args.resname, args.out, args.smiles,
+                                    args.chain, args.resid)
+    print(f"wrote {protein} and {ligand}")
 
 
 def cmd_prepare(args) -> None:
@@ -88,7 +103,7 @@ def cmd_run(args) -> None:
     from .workflow import run_replicas, run_stage
     config = Config.load(Path(args.workdir) / "config.yaml")
     if args.replica is not None:
-        run_stage(config, args.workdir, args.replica, args.device, args.length_ns)
+        run_stage(config, args.workdir, args.replica, args.device, args.length_ns, args.walker)
     else:
         gpus = [int(g) for g in args.gpus.split(",")] if args.gpus else None
         run_replicas(config, args.workdir, gpus, args.length_ns)
@@ -157,6 +172,15 @@ def main(argv=None) -> None:
     sub.add_argument("path", nargs="?", default="fmeta.yaml")
     sub.set_defaults(func=cmd_init)
 
+    sub = commands.add_parser("split", help="cut a complex into protein.pdb and ligand.sdf")
+    sub.add_argument("complex")
+    sub.add_argument("--resname", required=True, help="ligand residue name")
+    sub.add_argument("--smiles", help="ligand SMILES in the protonation state to simulate")
+    sub.add_argument("--chain")
+    sub.add_argument("--resid")
+    sub.add_argument("-o", "--out", default="inputs")
+    sub.set_defaults(func=cmd_split)
+
     sub = commands.add_parser("prepare", help="build the system and place the funnel")
     _add_setup_options(sub)
     sub.set_defaults(func=cmd_prepare)
@@ -173,6 +197,7 @@ def main(argv=None) -> None:
     sub = commands.add_parser("run", help="run or continue production")
     sub.add_argument("workdir")
     sub.add_argument("--replica", type=int, help="run only this replica")
+    sub.add_argument("--walker", type=int, help="with --replica: run only this walker of it")
     sub.add_argument("--device", type=int, help="GPU device index for --replica")
     sub.add_argument("--gpus", help="comma-separated device indices for all replicas")
     sub.add_argument("--length-ns", type=float, help="total length per replica")
