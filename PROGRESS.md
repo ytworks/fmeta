@@ -40,9 +40,11 @@ Everything below is on PR #1 (not merged).
 
 - GPU gates: **none recorded** (`bench/results/` is empty). The gate script and its criteria
   exist (`scripts/gpu_gates.py`, `docs/gpu-runbook.md`).
-- CPU evidence: `pytest` 71 passed on 2e83ce3. `pytest -m slow` (8 tests) and
-  `fmeta check --platform CPU --quick` (13 passed, 2 skipped: OpenFF / GAFF) last passed in
-  full on 32e5776, before the input-route change of FM-D11; not yet repeated on the head.
+- CPU evidence: CI green on 171220a (Python 3.10 and 3.12: lint, PROGRESS budget, evidence
+  index, `pytest`, 73 tests). `fmeta check --platform CPU --quick` on the same source tree:
+  13 passed, 0 failed, 2 skipped (`pdb_sdf_openff`, `pdb_sdf_gaff`: generators not installed).
+  `pytest -m slow` (6 tests) passed on 6d6e85e; the head differs from it by lint fixes, CLI
+  error reporting and the harness, and has not repeated them yet.
 - Not verified anywhere yet:
   - any GPU platform (CUDA / OpenCL), including the periodic-image handling of the CVs there;
   - ligand parameters from the real OpenFF / GAFF generators — the conda-only packages could
