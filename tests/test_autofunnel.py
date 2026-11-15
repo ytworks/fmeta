@@ -2,16 +2,14 @@
 
 import numpy as np
 import pytest
+from synthetic import ball_with_channel, membrane_barrel
 
-from fmeta.funnel.autodetect import (AutoFunnelSettings, auto_funnel, channel_is_open,
-                                     fibonacci_sphere)
+from fmeta.funnel.autodetect import AutoFunnelSettings, auto_funnel, channel_is_open, fibonacci_sphere
 from fmeta.funnel.geometry import Funnel, compute_cvs, funnel_frame
 from fmeta.funnel.obstacles import MembraneSlab, Obstacles
 from fmeta.funnel.validate import required_image_distance, validate_funnel
 from fmeta.funnel.visualize import write_funnel_pdb
 from fmeta.system.selection import classify
-
-from synthetic import ball_with_channel, membrane_barrel
 
 FAST = dict(n_directions=600)
 

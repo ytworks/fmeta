@@ -29,8 +29,7 @@ import openmm.unit as unit
 import yaml
 
 from .bias import FunnelBias
-from .hills import (ColvarWriter, HillsFollower, HillsWriter, read_hills, sum_hills,
-                    truncate_data_file)
+from .hills import ColvarWriter, HillsFollower, HillsWriter, read_hills, sum_hills, truncate_data_file
 from .trajectory import TrajectoryWriter
 
 log = logging.getLogger(__name__)

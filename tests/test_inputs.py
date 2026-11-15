@@ -7,18 +7,23 @@ import numpy as np
 import openmm.app as app
 import openmm.unit as unit
 import pytest
+from conftest import LIGAND_SETTINGS
+from fixtures import BENZENE_XML
 
 from fmeta.config import Config
 from fmeta.funnel.geometry import compute_cvs
 from fmeta.system.builder import SystemSettings, prepare
 from fmeta.system.imaging import make_whole
-from fmeta.system.inputs import (ensure_ligand_hydrogens, pdbfixer_available, read_ligand,
-                                 read_protein, read_structure, split_complex)
+from fmeta.system.inputs import (
+    ensure_ligand_hydrogens,
+    pdbfixer_available,
+    read_ligand,
+    read_protein,
+    read_structure,
+    split_complex,
+)
 from fmeta.system.ligand import register_ligand
 from fmeta.workflow import prepare_stage
-
-from conftest import LIGAND_SETTINGS
-from fixtures import BENZENE_XML
 
 
 def crystal_like_complex(inputs, path):

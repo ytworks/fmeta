@@ -27,8 +27,7 @@ from scipy.optimize import nnls
 from ..system.selection import LigandSpec, Selection, classify
 from .geometry import Funnel, centroid, funnel_frame
 from .obstacles import MembraneSlab, Obstacles
-from .validate import (ERROR, OK, UNBOUND_WINDOW, WARNING, FunnelReport, funnel_points,
-                       validate_funnel)
+from .validate import ERROR, OK, UNBOUND_WINDOW, WARNING, FunnelReport, funnel_points, validate_funnel
 
 
 @dataclass

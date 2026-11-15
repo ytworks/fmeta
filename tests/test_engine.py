@@ -1,7 +1,6 @@
 """Bias engine: agreement with openmm.app.Metadynamics, HILLS replay, exact restart."""
 
 import numpy as np
-import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 import pytest

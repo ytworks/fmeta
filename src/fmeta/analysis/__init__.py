@@ -12,12 +12,9 @@ from ..engine.grid import BiasGrid, BiasSettings
 from ..engine.hills import merge_hills, read_colvar, read_hills
 from ..engine.runner import load_run_metadata
 from ..funnel.geometry import Funnel
-from .binding import (BindingEstimate, binding_free_energy, default_unbound_window,
-                      empty_funnel_free_energy)
-from .convergence import (count_transitions, dg_time_series, plateau_statistics, scan_hills,
-                          summarize_replicas)
-from .fes import (free_energy_surface, projection_profile, reweighted_profile,
-                  reweighting_offset)
+from .binding import BindingEstimate, binding_free_energy, default_unbound_window, empty_funnel_free_energy
+from .convergence import count_transitions, dg_time_series, plateau_statistics, scan_hills, summarize_replicas
+from .fes import free_energy_surface, projection_profile, reweighted_profile, reweighting_offset
 
 KCAL = 4.184
 

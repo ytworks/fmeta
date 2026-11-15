@@ -41,8 +41,7 @@ from .funnel.geometry import compute_cvs
 from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
 from .testing.systems import BENZENE_XML, write_complex_inputs, write_membrane_inputs
 from .testing.toy import make_simulation, make_toy
-from .workflow import (analyze_stage, equilibrate_stage, load_prepared, prepare_stage,
-                       run_replicas)
+from .workflow import analyze_stage, equilibrate_stage, load_prepared, prepare_stage, run_replicas
 
 PASS, FAIL, SKIP = "PASS", "FAIL", "SKIP"
 
@@ -235,7 +234,7 @@ class Checker:
         except ImportError:
             raise Skip("openmmforcefields / openff-toolkit not installed: without them a ligand "
                        "needs its own ffxml (system.ligand_xml). Install the conda environment "
-                       "to run from a PDB and an SDF alone")
+                       "to run from a PDB and an SDF alone") from None
         directory = self.workdir / "inputs"
         directory.mkdir(exist_ok=True)
         protein, ligand = write_complex_inputs(directory)

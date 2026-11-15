@@ -1,10 +1,9 @@
 """Fixtures shared by the test modules: the small real system is built once."""
 
 import pytest
+from fixtures import BENZENE_XML, write_complex_inputs
 
 from fmeta.system.builder import SystemSettings, prepare
-
-from fixtures import BENZENE_XML, write_complex_inputs
 
 LIGAND_SETTINGS = dict(ligand_method="xml", ligand_xml=[BENZENE_XML], ligand_resname="BNZ")
 

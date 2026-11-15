@@ -8,20 +8,20 @@ import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 import pytest
+from fixtures import BENZENE_XML
 
 from fmeta.cli import main as cli
 from fmeta.config import Config
 from fmeta.engine.hills import read_colvar
 from fmeta.funnel.geometry import compute_cvs
 from fmeta.funnel.validate import required_image_distance
-from fmeta.system.builder import (SystemSettings, box_vectors, prepare, prepare_from_system,
-                                  remap_atoms, soluble_image_distance)
-from fmeta.system.inputs import read_ligand, read_structure
-from fmeta.system.selection import classify
-from fmeta.workflow import (analyze_stage, equilibrate_stage, format_summary, load_prepared,
-                            prepare_stage, run_replicas)
-
-from fixtures import BENZENE_XML, write_complex_inputs
+from fmeta.system.builder import (
+    box_vectors,
+    prepare_from_system,
+    remap_atoms,
+)
+from fmeta.system.inputs import read_ligand
+from fmeta.workflow import analyze_stage, equilibrate_stage, format_summary, load_prepared, prepare_stage, run_replicas
 
 SETTINGS = dict(ligand_method="xml", ligand_xml=[BENZENE_XML], ligand_resname="BNZ")
 
@@ -148,7 +148,6 @@ def test_prepare_from_presolvated_system(prepared):
     assert direction @ np.array(prepared.funnel.metadata["exit_direction"]) > np.cos(np.radians(15))
 
     # in a box too small for the funnel the build is refused
-    small = app.Topology()
     small_box = 0.6 * prepared.box_vectors
     prepared.topology.setPeriodicBoxVectors(small_box * unit.nanometer)
     try:

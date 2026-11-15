@@ -3,17 +3,22 @@
 import numpy as np
 import openmm as mm
 import pytest
+from fixtures import BENZENE_XML, write_membrane_inputs
+from synthetic import membrane_barrel
 
 from fmeta.config import Config
 from fmeta.funnel.geometry import Funnel, funnel_frame
 from fmeta.funnel.validate import validate_funnel
-from fmeta.system.builder import (GEL_TRANSITION_K, MembraneSettings, SystemSettings, add_barostat,
-                                  membrane_box_z, prepare)
+from fmeta.system.builder import (
+    GEL_TRANSITION_K,
+    MembraneSettings,
+    SystemSettings,
+    add_barostat,
+    membrane_box_z,
+    prepare,
+)
 from fmeta.system.selection import classify
 from fmeta.workflow import analyze_stage, equilibrate_stage, prepare_stage, run_replicas
-
-from fixtures import BENZENE_XML, write_membrane_inputs
-from synthetic import membrane_barrel
 
 SETTINGS = dict(ligand_method="xml", ligand_xml=[BENZENE_XML], ligand_resname="BNZ")
 
@@ -123,8 +128,9 @@ def test_membrane_pipeline(membrane_inputs, tmp_path):
 # ---- membrane orientation ----------------------------------------------------
 
 def test_slab_fit_finds_the_membrane_plane_of_a_helix_bundle():
-    from fmeta.system.orientation import fit_slab, orient
     from synthetic import helix_bundle, random_rotation
+
+    from fmeta.system.orientation import fit_slab, orient
     for seed in range(3):
         rng = np.random.default_rng(100 + seed)
         xyz, names = helix_bundle(seed)
@@ -177,9 +183,10 @@ def _bundle_topology(positions, names):
 
 
 def test_orientation_check_and_auto_modes():
+    from synthetic import helix_bundle
+
     from fmeta.system.builder import _membrane_orientation
     from fmeta.system.orientation import fit_slab
-    from synthetic import helix_bundle
     xyz, names = helix_bundle(1)
     topology = _bundle_topology(xyz, names)
 

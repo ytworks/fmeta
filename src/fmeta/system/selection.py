@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence, Union
+from typing import Sequence, Union
 
 import numpy as np
 import openmm.app as app

@@ -6,7 +6,6 @@ import pytest
 from fmeta.analysis import analyze_run
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.engine.hills import HillsFollower, merge_hills, read_hills, sum_hills
-from fmeta.funnel.geometry import KB
 from fmeta.testing.toy import make_simulation, make_toy
 
 SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,

@@ -22,10 +22,16 @@ from ..funnel.autodetect import AutoFunnelSettings, auto_funnel
 from ..funnel.forces import add_funnel_restraint
 from ..funnel.geometry import Funnel, funnel_frame
 from ..funnel.obstacles import MembraneSlab
-from ..funnel.validate import (UNBOUND_WINDOW, FunnelReport, funnel_points, ligand_radius,
-                               required_image_distance, validate_funnel)
+from ..funnel.validate import (
+    UNBOUND_WINDOW,
+    FunnelReport,
+    funnel_points,
+    ligand_radius,
+    required_image_distance,
+    validate_funnel,
+)
 from .imaging import make_whole
-from .inputs import (complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein)
+from .inputs import complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein
 from .ligand import register_ligand
 from .orientation import fit_membrane, orient
 from .selection import Selection, classify
