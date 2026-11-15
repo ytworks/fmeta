@@ -242,7 +242,13 @@ def main(argv=None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                         format="%(levelname)s %(name)s: %(message)s")
-    args.func(args)
+    try:
+        args.func(args)
+    except (ValueError, ImportError, FileNotFoundError, RuntimeError) as error:
+        if args.verbose:
+            raise
+        # problems with the inputs or the installation: say what is wrong, without a traceback
+        sys.exit(f"fmeta: error: {error}")
 
 
 if __name__ == "__main__":

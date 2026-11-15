@@ -260,3 +260,16 @@ def test_missing_ligand_packages_give_a_clear_error(inputs, monkeypatch):
     monkeypatch.setitem(sys.modules, "openmmforcefields", None)
     with pytest.raises(ImportError, match="openmmforcefields"):
         register_ligand(app.ForceField("amber14-all.xml"), inputs[1], "openff")
+
+
+def test_command_line_reports_input_problems_plainly(inputs, tmp_path, monkeypatch):
+    """Missing ligand parameters and a bad pose end with a one-line message, not a traceback."""
+    from fmeta.cli import main as cli
+    monkeypatch.setitem(sys.modules, "openmmforcefields", None)
+    with pytest.raises(SystemExit) as stop:
+        cli(["prepare", "--protein", inputs[0], "--ligand", inputs[1], "-o", str(tmp_path / "a")])
+    assert "fmeta: error:" in str(stop.value) and "openmmforcefields" in str(stop.value)
+    with pytest.raises(SystemExit) as stop:
+        cli(["prepare", "--protein", str(tmp_path / "missing.pdb"), "--ligand", inputs[1],
+             "--ligand-xml", BENZENE_XML, "-o", str(tmp_path / "b")])
+    assert "fmeta: error:" in str(stop.value)
