@@ -48,9 +48,9 @@ PASS, FAIL, SKIP = "PASS", "FAIL", "SKIP"
 PROFILES = {
     # lengths in ps unless noted
     "full": dict(equil=dict(minimize_iterations=2000, heating_ps=20.0, release_ps=20.0, free_ps=50.0),
-                 run_ps=100.0, pace_ps=1.0, toy_hills=5000, toy_tolerance=2.0, bench_steps=10000),
+                 run_ps=100.0, pace_ps=1.0, toy_hills=5000, toy_tolerance=2.0, bench_hills=200),
     "quick": dict(equil=dict(minimize_iterations=200, heating_ps=0.2, release_ps=0.2, free_ps=0.4),
-                  run_ps=1.0, pace_ps=0.1, toy_hills=1500, toy_tolerance=None, bench_steps=200),
+                  run_ps=1.0, pace_ps=0.1, toy_hills=1500, toy_tolerance=None, bench_hills=4),
 }
 
 
@@ -181,7 +181,8 @@ class Checker:
 
         def evaluate(platform, properties, positions):
             system_toy = make_toy()
-            bias = FunnelBias(system_toy.system, system_toy.funnel, BiasSettings(), periodic=True)
+            bias = FunnelBias(system_toy.system, system_toy.funnel, BiasSettings(), periodic=True,
+                              platform=platform.getName())
             for hill in hills:
                 bias.grid.add_hill(*hill)
             context = mm.Context(system_toy.system, mm.VerletIntegrator(0.001), platform, properties)
@@ -216,7 +217,8 @@ class Checker:
         toy = make_toy()
         settings = BiasSettings(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05,
                                 sigma_rho=0.05, pace=100, points_per_sigma=2.0)
-        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True,
+                          platform=self.platform.getName())
         simulation = make_simulation(toy, seed=seed, platform=self.platform.getName(),
                                      properties=self.properties)
         run = MetadynamicsRun(simulation, bias, directory, toy.restraint_group,
@@ -304,7 +306,8 @@ class Checker:
         prepared = load_prepared(work)
         config = Config.load(work / "config.yaml")
         system = prepared.system
-        bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True)
+        bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True,
+                          platform=self.platform.getName())
         context = mm.Context(system, mm.VerletIntegrator(0.001), self.platform, self.properties)
         box = prepared.box_vectors
         context.setPeriodicBoxVectors(*(mm.Vec3(*row) for row in box))
@@ -408,42 +411,54 @@ class Checker:
         config = Config.load(work / "config.yaml")
         with open(work / "equil" / "state.xml") as handle:
             state = mm.XmlSerializer.deserialize(handle.read())
-        steps = self.profile["bench_steps"]
+        hills = self.profile["bench_hills"]
         dt = config.run.timestep_fs / 1000.0
         pace = max(1, round(1.0 / dt))                 # production setting: one hill per ps
+        steps = hills * pace                           # the same stretch with and without the bias
         speeds = {}
         for label in ("plain", "biased"):
             prepared = load_prepared(work, config)
             system = prepared.system
             add_barostat(system, config.system.temperature, config.system.pressure, False)
             metad = BiasSettings(temperature=config.system.temperature, pace=pace)
-            bias = FunnelBias(system, prepared.funnel, metad, periodic=True) if label == "biased" else None
+            bias = FunnelBias(system, prepared.funnel, metad, periodic=True,
+                              platform=self.platform.getName()) if label == "biased" else None
             integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
                                                      1.0 / unit.picosecond, dt * unit.picosecond)
             simulation = app.Simulation(prepared.topology, system, integrator, self.platform,
                                         self.properties)
             simulation.context.setState(state)
-            simulation.step(min(100, steps))          # warm up (kernel compilation, neighbour list)
-            start = time.time()
+            # Warm-up of one hill period before the clock starts: kernel compilation, the
+            # neighbour list and, with the bias, the first hill and the first checkpoint.
             if bias is None:
+                simulation.step(pace)
+                simulation.context.getState(getEnergy=True)
+                start = time.time()
                 simulation.step(steps)
+                simulation.context.getState(getEnergy=True)     # wait for the device to finish
+                elapsed = time.time() - start
             else:
                 directory = self.workdir / "benchmark"
                 shutil.rmtree(directory, ignore_errors=True)
                 run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group,
                                       RunSettings(checkpoint_hills=10**9))
+                run.run(1)
                 start = time.time()
-                run.run(max(1, steps // pace))
+                run.run(1 + hills)                    # ends with a checkpoint ...
+                elapsed = time.time() - start
+                start = time.time()
+                run.checkpoint()                      # ... whose cost is reported on its own
+                checkpoint = time.time() - start
+                elapsed -= checkpoint
                 run.close()
-                steps = max(1, steps // pace) * pace
-            simulation.context.getState(getEnergy=True)     # wait for the device to finish
-            speeds[label] = steps * dt / 1000.0 / (time.time() - start) * 86400.0
+            speeds[label] = steps * dt / 1000.0 / elapsed * 86400.0
         overhead = 100.0 * (speeds["plain"] / speeds["biased"] - 1.0)
         days = 500.0 / speeds["biased"]
         grid = bias.grid.values.size
-        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs: "
-                f"{speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day with funnel "
-                f"metadynamics (overhead {overhead:.0f}%, {grid} grid points, 1 hill/ps); "
+        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, "
+                f"{hills} ps each: {speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day "
+                f"with funnel metadynamics (overhead {overhead:.1f}%, {grid} grid points, 1 hill/ps, "
+                f"checkpoints excluded: {1e3 * checkpoint:.0f} ms each); "
                 f"a 500 ns replica of this system takes about {days:.1f} days")
 
     def check_membrane_build(self) -> str:

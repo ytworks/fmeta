@@ -9,6 +9,7 @@ from fmeta.cli import main as cli
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun
 from fmeta.engine.hills import read_hills
 from fmeta.engine.platform import GPU_PLATFORMS, available_platforms, select_platform
+from fmeta.funnel.geometry import compute_cvs
 from fmeta.testing.toy import make_simulation, make_toy
 
 
@@ -41,7 +42,8 @@ def _gpu_platform():
 
 def _energy_and_forces(platform, properties, positions, hills):
     toy = make_toy()
-    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), periodic=True)
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(), periodic=True,
+                      platform=platform.getName())
     for hill in hills:
         bias.grid.add_hill(*hill)
     context = mm.Context(toy.system, mm.VerletIntegrator(0.001), platform, properties)
@@ -85,11 +87,17 @@ def test_gpu_run_and_restart(tmp_path):
     for target in (40, 80):
         toy = make_toy()
         settings = BiasSettings(bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05, pace=50)
-        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
+        bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True,
+                          platform=platform.getName())
         simulation = make_simulation(toy, seed=2, platform=platform.getName())
         run = MetadynamicsRun(simulation, bias, tmp_path, toy.restraint_group)
         run.run(target)
         run.close()
+        # the CV readout follows the positions, although no step evaluates it
+        state = simulation.context.getState(getPositions=True)
+        assert bias.collective_variables(simulation.context) == pytest.approx(compute_cvs(
+            toy.funnel, state.getPositions(asNumpy=True).value_in_unit(unit.nanometer),
+            box=state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(unit.nanometer)), abs=2e-5)
     hills = read_hills(tmp_path / "HILLS")
     assert len(hills) == 80 and np.all(np.diff(hills.time) > 0)
     assert hills.s.min() > 0.2 and hills.s.max() < 3.8 and hills.rho.max() < 1.2

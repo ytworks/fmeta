@@ -1,6 +1,7 @@
 """Bias engine: agreement with openmm.app.Metadynamics, HILLS replay, exact restart."""
 
 import numpy as np
+import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
 import pytest
@@ -9,6 +10,7 @@ from fmeta.engine import BiasGrid, BiasSettings, FunnelBias, MetadynamicsRun, Ru
 from fmeta.engine.hills import read_colvar, read_hills, sum_hills
 from fmeta.engine.trajectory import count_dcd_frames
 from fmeta.funnel import forces
+from fmeta.funnel.geometry import compute_cvs
 from fmeta.testing.toy import make_simulation, make_toy
 
 SETTINGS = dict(temperature=300.0, bias_factor=8.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
@@ -205,12 +207,61 @@ def test_bias_stays_continuous_outside_the_grid():
         context.setPositions(positions)
         return bias.energy(context)
 
-    # the lookup is clamped 1e-4 nm inside the table
-    edge = bias_at(grid.s_max - 1e-4)
+    edge = bias_at(grid.s_max)
     assert edge > 5.0
-    assert bias_at(grid.s_max + 0.2) == pytest.approx(edge, rel=1e-6)
-    assert bias_at(grid.s_max + 5e-5) == pytest.approx(edge, rel=1e-6)
+    assert bias_at(grid.s_max + 0.2) == pytest.approx(edge, rel=1e-9)
+    assert bias_at(grid.s_max - 1e-6) == pytest.approx(edge, rel=1e-4)     # no step at the edge
     assert bias_at(grid.s_max + 0.2, rho=grid.rho_max + 0.3) == pytest.approx(
-        bias_at(grid.s_max - 1e-4, rho=grid.rho_max - 1e-4), rel=1e-6, abs=1e-9)
+        bias_at(grid.s_max, rho=grid.rho_max), rel=1e-9, abs=1e-12)
     # an unclamped OpenMM table would give exactly zero here
-    assert bias_at(grid.s_min - 0.2) == pytest.approx(bias_at(grid.s_min + 1e-4), rel=1e-6, abs=1e-12)
+    assert bias_at(grid.s_min - 0.2) == pytest.approx(bias_at(grid.s_min), rel=1e-9, abs=1e-12)
+
+
+@pytest.mark.parametrize("built_for", ["Reference", "CUDA"])
+def test_bias_is_the_spline_of_openmm_tables(built_for):
+    """Energy and force equal those of OpenMM's own cubic-spline table of the same grid, in
+    both forms of the bias: the one for CPU platforms and the one for GPUs, which is
+    evaluated on Reference here as well."""
+    settings = BiasSettings(**SETTINGS)
+    toy = make_toy()
+    bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True, platform=built_for)
+    grid = bias.grid
+    rng = np.random.default_rng(4)
+    grid.add_hills(rng.uniform(grid.s_min, grid.s_max, 60), rng.uniform(0.0, grid.rho_max, 60),
+                   rng.uniform(0.5, 3.0, 60))
+    bias.push(None)
+
+    stock = mm.CustomCVForce("table(s, rho)")
+    stock.addCollectiveVariable("s", forces.projection_force(toy.funnel, True))
+    stock.addCollectiveVariable("rho", forces.extent_force(toy.funnel, True))
+    stock.addTabulatedFunction("table", mm.Continuous2DFunction(
+        grid.n_s, grid.n_rho, grid.values.ravel(), grid.s_min, grid.s_max, 0.0, grid.rho_max))
+    stock.setForceGroup(forces.free_force_group(toy.system))
+    toy.system.addForce(stock)
+    context = make_simulation(toy).context
+
+    def evaluate(group):
+        state = context.getState(getEnergy=True, getForces=True, groups={group})
+        return (state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole),
+                state.getForces(asNumpy=True).value_in_unit(unit.kilojoule_per_mole / unit.nanometer))
+
+    # inside the first and the last cell of either axis too: the ends of the spline
+    s_values = np.append(rng.uniform(grid.s_min, grid.s_max, 40),
+                         [grid.s_min + 0.004, grid.s_max - 0.004, 1.3, 2.1])
+    rho_values = np.append(rng.uniform(0.0, grid.rho_max - 0.01, 40),
+                           [0.3, 0.2, 0.002, grid.rho_max - 0.004])
+    largest = 0.0
+    for s, rho in zip(s_values, rho_values):
+        positions = toy.positions.copy()
+        positions[0] = toy.positions[1] + np.array([rho, 0.0, s])
+        context.setPositions(positions)
+        (energy, force), (ref_energy, ref_force) = evaluate(bias.force_group), evaluate(stock.getForceGroup())
+        assert energy == pytest.approx(ref_energy, rel=1e-10, abs=1e-10)
+        assert np.allclose(force, ref_force, rtol=1e-8, atol=1e-8)
+        largest = max(largest, np.abs(ref_force).max())
+    assert largest > 1.0      # the table is not flat where it was compared
+    assert bias.collective_variables(context) == pytest.approx(
+        compute_cvs(toy.funnel, positions), abs=1e-9)
+    if built_for != "Reference":      # sending the table would take 0.8 s here: refused
+        with pytest.raises(ValueError, match="built for a GPU platform"):
+            bias.push(context)

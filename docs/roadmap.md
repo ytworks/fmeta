@@ -18,6 +18,9 @@ Verified on CPU only (see `PROGRESS.md`).
 
 - **The official image** (2026-11-15, FM-D13). One image built from a lock; everything except
   CI runs in it through `scripts/in_docker.sh`.
+- **R4 — Throughput** (2026-11-16, FM-D4 amendment). With the table refit by OpenMM at every
+  hill the bias ran at 73.4% of the speed of plain MD on the GPU. With the spline coefficients
+  fitted by fmeta it runs at 96–97% (24062 atoms, one hill per ps).
 
 ## Next
 
@@ -32,9 +35,6 @@ Plan for R1–R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-bench
 - **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
   5MZJ): funnel placement and membrane-plane estimate on a real structure against its OPM
   orientation; then a production run.
-- **R4 — Throughput.** Measure the bias overhead on the GPU (`benchmark` gate item); if the
-  spline refit at every hill costs more than a few percent, reduce it (coarser grid in `s`,
-  or a different table form).
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.

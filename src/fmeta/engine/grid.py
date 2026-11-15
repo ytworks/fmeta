@@ -1,7 +1,7 @@
 """The metadynamics bias as a 2D grid over (s, rho). Pure numpy.
 
 ``values[j, i]`` is the bias at ``(s[i], rho[j])`` so that ``values.ravel()``
-is in the order OpenMM's ``Continuous2DFunction`` expects (first variable
+is in the order OpenMM's 2D tabulated functions expect (first variable
 fastest).
 """
 
@@ -33,10 +33,9 @@ class BiasSettings:
     s_max: Optional[float] = None
     rho_max: Optional[float] = None
 
-    # Grid resolution: the cubic-spline table reproduces a Gaussian to about
-    # 5e-4 of its height at 3 points per sigma. Finer grids only cost time, since
-    # OpenMM refits the whole spline on the CPU after every hill (roughly 0.4
-    # microseconds per grid point).
+    # Grid resolution: the cubic spline through the grid reproduces a Gaussian to about
+    # 2e-4 of its height at 3 points per sigma. A finer grid only costs time: the spline
+    # is refitted and sent to the GPU after every hill.
 
     def __post_init__(self):
         if self.bias_factor is not None and self.bias_factor <= 1.0:

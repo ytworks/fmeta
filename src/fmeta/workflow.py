@@ -163,14 +163,15 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
 
     system = prepared.system
     add_barostat(system, temperature, config.system.pressure, prepared.membrane)
-    bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True)
+    platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
+    bias = FunnelBias(system, prepared.funnel, config.metad, periodic=True,
+                      platform=platform.getName())
     integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin,
                                              run_cfg.friction / unit.picosecond,
                                              dt * unit.picosecond)
     seed = run_cfg.seed + 1000 * replica + (walker or 0) if run_cfg.seed else 0
     if seed:
         integrator.setRandomNumberSeed(seed)
-    platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
     simulation = app.Simulation(prepared.topology, system, integrator, platform, properties)
     simulation.context.setState(state)
     # fresh velocities decorrelate replicas and walkers (a restart overwrites them again)

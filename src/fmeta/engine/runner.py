@@ -61,6 +61,8 @@ class MetadynamicsRun:
         self.restraint_group = restraint_group
         self.settings = settings or RunSettings()
         self.dt = simulation.integrator.getStepSize().value_in_unit(unit.picosecond)
+        bias.check_platform(simulation.context)
+        bias.exclude_probe(simulation.integrator)
         self.pace = bias.settings.pace
         self.stride = self.settings.colvar_stride or self.pace
         if self.pace % self.stride:

@@ -25,8 +25,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2 and
-D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4
+and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -47,24 +47,28 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 - GPU gates: **none recorded** (`bench/results/` is empty). The gate script and its criteria
   exist (`scripts/gpu_gates.py`, `docs/gpu-runbook.md`).
 - CPU evidence, in the image (lock d061e45a…, on the source of this commit before it was
-  committed): `ruff check .` passes; `pytest` 76 passed. Not rerun on this commit: `fmeta check
+  committed): `ruff check .` passes; `pytest` 78 passed. Not rerun on this commit: `fmeta check
   --platform CPU --quick` (15 passed, 0 failed, 0 skipped on 20c43af) and `pytest -m slow`
   (6 passed on aadd0ad, in the image). CI has not run on the commits after aadd0ad (see
   Blockers); it was green on 171220a.
 - Not verified anywhere yet:
-  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures; the
-    first fix is in this commit (FM-D2), the others follow; nothing is recorded;
+  - any GPU platform (CUDA / OpenCL): the first runs on this machine showed failures; two
+    fixes are committed (FM-D2, FM-D4), the last follows; nothing is recorded;
   - a binding free energy of a real protein-ligand system; input from a real PDB entry;
     the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself;
   - the CI job `docker` and the publish workflow (never run).
-- Known gaps: the bias table is refit on the CPU at every hill (about 0.5 µs per grid point;
-  R4); ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
+- Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`.
 - Blockers: pushes from the GPU machine fail (the session has no git credentials), so the
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D4 (roadmap R4): the bias table holds spline coefficients; two force forms by platform
+- What: fmeta fits the B-spline coefficients of the bias itself after every hill, and the energy expression evaluates the bicubic spline from a `Discrete2DFunction`. The bias is the same function as before (test against a `Continuous2DFunction`: energy 1e-10, forces 1e-8). Measured on the test system of `fmeta check` (24062 atoms, CUDA, mixed precision, 4 fs, one hill per ps): 73.4% of the speed of plain MD before, 96–97% after (1.84 ms per hill). GPU platforms get a `CustomCentroidBondForce` plus a zero-energy force that reads the CVs outside the integration; Reference and CPU get one `CustomCVForce`; a context of the other kind is refused. `benchmark` compares the same stretch with and without the bias and reports the cost of a checkpoint.
+- Why: the old form was below the 80% the plan set for starting R4. Two forms because of three measurements on OpenMM 8.6.1: a centroid force with a table and an energy parameter derivative returns zero on CUDA / OpenCL without an error; a `CustomCVForce` in every step costs about 20% on a GPU; a table update of a centroid force takes 0.7–0.9 s on Reference / CPU.
+- Refs: FM-D4; `docs/roadmap.md` (R4 done); `src/fmeta/engine/bias.py`, `src/fmeta/engine/grid.py`, `src/fmeta/check.py`; `tests/test_engine.py`, `tests/test_platform.py`.
 
 ### 2026-11-15 — [amendment] FM-D2: the forces compute the CVs in the angle form
 - What: `s = d cos θ`, `rho = sqrt((d sin θ)² + eps²)` from the distance ligand–p0 and the angle ligand–p0–p1, instead of three distances; the numpy reference uses the dot and the cross product of the same two vectors. Gate item `forces` on CUDA (mixed precision), worst CV deviation from Reference: 3.6e-05 nm before (criterion 2e-5 nm: failed), 3.8e-07 nm after. The criterion is unchanged.

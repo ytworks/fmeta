@@ -2,7 +2,7 @@
 
 Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
 (2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
-FM-D2 amended (2026-11-15: the first runs on a GPU).
+FM-D2 and FM-D4 amended (2026-11-15 and 16: the first runs on a GPU).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -46,10 +46,30 @@ correction of FM-D9 small and the CVs inside the bias grid.
 ### FM-D4 — Own bias engine on the mechanism of `openmm.app.Metadynamics`
 A 2-D table (`Continuous2DFunction`) refreshed after every hill, with the lookup clamped to
 the grid and hills mirrored at `rho = 0`; 3 grid points per sigma.
+Amendment (2026-11-16, roadmap R4): the table holds the B-spline coefficients of the bias
+(`Discrete2DFunction`, (n_s + 3) × (n_rho + 3) entries) and the energy expression evaluates the
+bicubic spline from 16 of them. fmeta fits the coefficients itself after every hill (two banded
+solves, `engine/bias.py`). The bias is the same function as before, the natural bicubic spline
+through the grid values that a `Continuous2DFunction` gives: a test holds the two together
+(energy to 1e-10, forces to 1e-8). Measured on the test system of `fmeta check` (24062 atoms,
+CUDA, mixed precision, 4 fs, one hill per ps, 19198 grid points): the old form ran at 73.4% of
+the speed of plain MD, below the 80% the plan set for starting R4; the new form runs at 96–97%
+(1.84 ms per hill).
+The force that carries the expression has two forms, chosen from the platform it is built for,
+because three measurements (OpenMM 8.6.1) leave no single one. On CUDA and OpenCL a
+`CustomCentroidBondForce` with a tabulated function and an energy parameter derivative returns
+zero energy and zero forces, without an error. A `CustomCVForce` in every step costs about 20%
+of the speed there. On Reference and CPU a table update of a `CustomCentroidBondForce` takes
+0.7–0.9 s, against 0.01 ms and 2 ms for a `CustomCVForce`. So GPU platforms get one
+`CustomCentroidBondForce` and a second, zero-energy force that only reads the CVs and is left
+out of the integration; Reference and CPU get one `CustomCVForce`. A context of the other kind
+is refused.
 Why: OpenMM tables are zero outside their range (the bias would vanish when a CV overshoots);
 hill logging, exact restart and bias sharing need access the stock class does not give. A test
-keeps the table equal to the stock class for the same hills. OpenMM refits the spline on the CPU
-at every update (about 0.5 µs per grid point measured), hence the coarse grid.
+keeps the table equal to the stock class for the same hills. Every hill costs a fit and a
+transfer of the whole table, hence the coarse grid (with a `Continuous2DFunction` OpenMM refits
+the spline on the CPU at every update, about 0.5 µs per grid point measured: that was the
+cost R4 removed).
 
 ### FM-D5 — HILLS is the record; one atomic checkpoint bundle; exact restart
 PLUMED-layout HILLS / COLVAR. A checkpoint is one zip (binary checkpoint, State XML, bias

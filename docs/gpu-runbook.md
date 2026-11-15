@@ -64,10 +64,10 @@ old lock does not cover the new image.
 
 ## Diagnostics
 
-Wall time and the `benchmark` item (ns/day with and without the bias, and the cost of a bias
-table update) are recorded but never decide a verdict. `scripts/in_docker.sh --gpus 6 fmeta
-doctor` prints the platforms, the optional packages and the table-update cost without running
-anything long.
+Wall time and the `benchmark` item (ns/day with and without the bias over the same stretch of
+the test system, and the cost of a checkpoint) are recorded but never decide a verdict.
+`scripts/in_docker.sh --gpus 6 fmeta doctor` prints the platforms, the optional packages and
+the cost of a bias table update without running anything long.
 
 ## Production runs (reported, not gated)
 

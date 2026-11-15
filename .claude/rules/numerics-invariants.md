@@ -12,6 +12,7 @@ procedure in `docs/gpu-runbook.md`) check them.
 | Wall and bias energy, forces, CVs on the run platform vs Reference | CV ≤ 2e-5 nm; energy ≤ 1e-4, force ≤ 2e-3 (relative) | gate `forces`, `tests/test_platform.py` (`gpu`) |
 | CVs of a solvated complex under periodic re-imaging | ≤ 2e-3 nm on the run platform | gate `periodic_images` |
 | Bias table vs `openmm.app.Metadynamics` for the same hills | ≤ 1e-6 relative | `tests/test_engine.py` |
+| Bias force (both forms) vs a `Continuous2DFunction` table of the same grid values | energy ≤ 1e-10 relative, forces ≤ 1e-8 (Reference) | `tests/test_engine.py` |
 | Restart: N + N hills vs 2N in one run | HILLS, COLVAR, DCD frames identical (Reference) | `tests/test_engine.py` |
 | Walkers: each walker's grid vs the sum of all HILLS files | ≤ 1e-7 | `tests/test_walkers.py` |
 | Toy system: dG0 vs the exact value (quadrature) | 10 ns: reweighted ≤ 2.0, plateau ≤ 3.0 kJ/mol (gate); 4 × 40 ns: each ≤ 1.5, mean ≤ 0.75 (`slow`) | gate `toy_free_energy`, `tests/test_analysis.py` |
