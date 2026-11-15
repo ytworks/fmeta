@@ -36,7 +36,7 @@ def test_membrane_box_height_follows_the_funnel():
     z_short = membrane_box_z(short, positions, selection.solute, cutoff=1.0, padding=1.2)
     z_tall = membrane_box_z(tall, positions, selection.solute, cutoff=1.0, padding=1.2)
     # a longer funnel needs a taller box, by about twice the extra length
-    assert z_tall - z_short == pytest.approx(2 * 1.5 * 1.03, abs=0.2)
+    assert z_tall - z_short == pytest.approx(2 * 1.5, rel=0.12)
     _, axis, _ = funnel_frame(tall, positions)
     assert z_tall >= 2 * (abs(axis[2]) * (tall.upper + 0.3) + tall.max_radius + 0.3)
 
@@ -44,6 +44,11 @@ def test_membrane_box_height_follows_the_funnel():
     box = np.array([6.0, 6.0, z_tall])
     ok = validate_funnel(tall, positions, selection, box=box, tumbling=False)
     assert {c.name: c.status for c in ok.checks}["box_cv"] == "ok"
+    # ... and still after the height a built bilayer system loses under NPT, where x and y stay
+    # (the first real build lost 3.5%, and failed here with the allowance of a water box)
+    settled = validate_funnel(tall, positions, selection, box=np.array([6.0, 6.0, 0.95 * z_tall]),
+                              tumbling=False)
+    assert {c.name: c.status for c in settled.checks}["box_cv"] == "ok"
     # ... while the same box fails the rule for a freely tumbling solute, and a short z fails both
     assert {c.name: c.status for c in validate_funnel(tall, positions, selection, box=box).checks
             }["box_cv"] == "error"

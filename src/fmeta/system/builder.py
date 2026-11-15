@@ -133,6 +133,14 @@ def box_vectors(distance: float, shape: str):
     return [mm.Vec3(*row) * unit.nanometer for row in rows]
 
 
+# The height a freshly built bilayer system needs on top of the rule, for NPT. The solvent is
+# placed less dense than it becomes, and with the bilayer holding x and y the whole change goes
+# into z: the first real build (A2A in 484 POPC, 210 892 atoms) lost 3.5% of its height in 1 ns
+# while x and y changed by 0.2%, and the height the funnel needs grew by 1.2% as its axis moved
+# with the protein. With the 3% of a water box that system failed the box rule (FM-D15).
+MEMBRANE_NPT_ALLOWANCE = 1.08
+
+
 def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
                    cutoff: float, padding: float) -> float:
     """Box height for a membrane system.
@@ -141,7 +149,7 @@ def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
     a cutoff (plus 0.5 nm) from the periodic image above or below, the ligand
     must stay nearer to its own protein than to the copy above or below (the
     z component of the ligand-anchor vector under half the box), and the solute
-    needs ordinary solvent padding. 3% is added for NPT.
+    needs ordinary solvent padding. ``MEMBRANE_NPT_ALLOWANCE`` is added for NPT.
     """
     coords = positions[solute]
     z_min, z_max = float(coords[:, 2].min()), float(coords[:, 2].max())
@@ -153,7 +161,7 @@ def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
     images = span + cutoff + 0.5
     _, axis, _ = funnel_frame(funnel, positions)
     reach_z = abs(axis[2]) * (funnel.upper + 0.3) + funnel.max_radius
-    return 1.03 * max(images, 2.0 * (reach_z + 0.3), (z_max - z_min) + 2.0 * padding)
+    return MEMBRANE_NPT_ALLOWANCE * max(images, 2.0 * (reach_z + 0.3), (z_max - z_min) + 2.0 * padding)
 
 
 def remap_atoms(old_positions: np.ndarray, new_positions: np.ndarray,
