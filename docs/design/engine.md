@@ -275,3 +275,45 @@ launcher); a key for several replicas on one GPU (its effect is not measured, an
 configuration with a key that is later withdrawn no longer loads).
 Why: owner request of 2026-11-15 for both modes. A stopped container must leave nothing on a
 GPU, and what was run where has to be checkable afterwards from a record, on the GPU machine.
+
+### FM-D16 — Official defaults: presets in the package, and one reference of the keys
+Accepted 2026-11-16. The official defaults are the defaults of the settings dataclasses, and
+they are written nowhere else by hand. Two presets, `soluble` and `membrane`, are files of the
+package (`src/fmeta/presets/`): every key with its default, its unit and one line on what it
+does. `membrane` is `soluble` plus the section `membrane`. `fmeta init --preset NAME` writes
+one; the template text of `config.py` is removed. `docs/configuration.md` lists every key with
+its unit, its default and where the value comes from. Tests hold the three together: a preset
+has exactly the keys and the defaults of the code, and the reference has a row for every key
+and for no other, with the same default.
+A configuration may name a preset and hold only what it changes (`preset: membrane`). It is
+read as the defaults of the code, then the preset, then the keys of the file. The file names
+of a preset are placeholders and are not taken over; `membrane: false` removes the bilayer of
+a preset and a mapping changes it; a file that names a ligand method without a force field
+gets the pinned force field of that method. `preset` is an instruction for reading, not a
+setting: the configuration saved in a work directory is resolved, has no `preset` key and
+names the ligand force field that was used. Unknown keys and sections are errors as before.
+Ligand parameters: the pins of FM-D11 stay (`openff-2.2.1`, `gaff-2.11`), and
+`ligand_charge_method: null` stays the default and means the charges that the force field
+prescribes. Measured in the official image (openmmforcefields 0.16.0, openff-toolkit 0.19.0,
+AmberTools 26.0, no OpenEye toolkit): `openff-2.2.1` prescribes AM1-BCC and `openff-2.3.0`
+NAGL charges; AM1-BCC is computed by `sqm` of AmberTools, the only implementation registered
+there; for benzamidinium and theophylline, with both pins, the charges of the default path and
+charges assigned beforehand as `am1bcc` are identical (largest difference 0). No default of
+system building changes with this decision.
+Every default in the reference has its origin: a source that was read, a measurement of this
+project, a decision of this file, or the statement that it has none (`convention`, or `M4`:
+to be confirmed on trypsin-benzamidine from convergence diagnostics, before any benchmark, and
+never tuned against experimental values). No default was changed from the literature. Where
+the sources differ, the reference lists it: hills every 1 ps against 2 ps, a hill width in
+`rho` of 0.05 nm against 0.03 nm, 4 fs with hydrogens of 1.5 amu against 2 fs, the wall force
+constants, the ligand force field. These are the first questions of M4.
+Not done: `ligand_charge_method: am1bcc` as the default (the same charges; with charges
+assigned beforehand the SMIRNOFF generator warns at every build and accepts non-integral
+charges, and the setting would replace the NAGL charges of `openff-2.3.0` for a user who picks
+that force field); a second copy of the defaults as a template; presets for classes of targets
+such as kinases or GPCRs (the values of a target are an example, `examples/<name>/`); a key
+whose effect is not established; a default changed because a paper uses another value.
+Why: owner request of 2026-11-15 for a configuration with official defaults. A default that
+is written in two places drifts apart; a saved configuration has to say what was run without
+the code that wrote it; a value without a stated origin cannot be reviewed, and a value tuned
+on the benchmark would make the benchmark worthless.
