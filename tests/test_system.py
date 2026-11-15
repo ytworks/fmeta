@@ -12,8 +12,9 @@ from fixtures import BENZENE_XML
 
 from fmeta.cli import main as cli
 from fmeta.config import Config
+from fmeta.engine.equilibration import EquilibrationResult
 from fmeta.engine.hills import read_colvar
-from fmeta.funnel.geometry import compute_cvs
+from fmeta.funnel.geometry import compute_cvs, funnel_frame
 from fmeta.funnel.validate import required_image_distance
 from fmeta.system.builder import (
     box_vectors,
@@ -21,7 +22,15 @@ from fmeta.system.builder import (
     remap_atoms,
 )
 from fmeta.system.inputs import read_ligand
-from fmeta.workflow import analyze_stage, equilibrate_stage, format_summary, load_prepared, prepare_stage, run_replicas
+from fmeta.workflow import (
+    analyze_stage,
+    equilibrate_stage,
+    format_summary,
+    load_prepared,
+    prepare_stage,
+    run_replicas,
+    save_prepared,
+)
 
 SETTINGS = dict(ligand_method="xml", ligand_xml=[BENZENE_XML], ligand_resname="BNZ")
 
@@ -155,6 +164,40 @@ def test_prepare_from_presolvated_system(prepared):
             prepare_from_system(prepared.topology, system, prepared.positions)
     finally:
         prepared.topology.setPeriodicBoxVectors(prepared.box_vectors / 0.6 * unit.nanometer)
+
+
+def test_equilibrate_stage_judges_the_ligand_by_the_walls(prepared, inputs, tmp_path, monkeypatch):
+    """The stage accepts an equilibrated structure whose ligand leans on the wall (atoms beyond
+    it, the centre inside) and reports it. The dynamics are replaced by that structure."""
+    funnel = prepared.funnel
+    origin, axis, lig = funnel_frame(funnel, prepared.positions)
+    s = float((lig - origin) @ axis)
+    offsets = prepared.positions[funnel.ligand_atoms] - lig
+    offsets -= np.outer(offsets @ axis, axis)
+    outward = offsets[np.linalg.norm(offsets, axis=1).argmax()]      # towards a ring atom
+    outward /= np.linalg.norm(outward)
+    positions = prepared.positions.copy()
+    positions[prepared.selection.ligand] += (
+        origin + s * axis + (float(funnel.wall_radius(s)) - 0.02) * outward - lig)
+
+    carrier = mm.System()                    # no forces: it only turns the coordinates into a State
+    for _ in range(len(positions)):
+        carrier.addParticle(1.0)
+    context = mm.Context(carrier, mm.VerletIntegrator(0.001), mm.Platform.getPlatformByName("Reference"))
+    context.setPeriodicBoxVectors(*[mm.Vec3(*vector) for vector in prepared.box_vectors])
+    context.setPositions(positions)
+    state = context.getState(getPositions=True, getVelocities=True)
+    monkeypatch.setattr("fmeta.workflow.equilibrate", lambda *args: EquilibrationResult(
+        state, 0.0, 0.0, np.diag(prepared.box_vectors)))
+
+    work = tmp_path / "work"
+    (work / "prepared").mkdir(parents=True)
+    save_prepared(prepared, work / "prepared")
+    config = Config.from_dict({"input": {"protein": inputs[0], "ligand": inputs[1]},
+                               "system": SETTINGS, "run": {"platform": "CPU"}})
+    summary = equilibrate_stage(config, work)
+    checks = {c["name"]: c["status"] for c in summary["funnel_checks"]["checks"]}
+    assert checks["pose"] == "warning" and summary["funnel_checks"]["ok"]
 
 
 @pytest.mark.slow

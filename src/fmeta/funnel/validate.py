@@ -8,11 +8,13 @@ from typing import Optional
 import numpy as np
 
 from ..system.selection import Selection
-from .geometry import Funnel, centroid, funnel_frame
+from .geometry import Funnel, centroid, compute_cvs, funnel_frame
 from .obstacles import MembraneSlab, Obstacles
 
 OK, WARNING, ERROR = "ok", "warning", "error"
 UNBOUND_WINDOW = 0.6     # nm below the upper wall that the analysis treats as bulk
+WALL_BREACH_KT = 10.0    # wall energy (in kT) that thermal motion does not reach: a structure
+                         # from dynamics above it is not held by the walls
 
 
 @dataclass
@@ -114,12 +116,19 @@ def required_image_distance(funnel: Funnel) -> float:
 def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
                     box: Optional[np.ndarray] = None, slab: Optional[MembraneSlab] = None,
                     cutoff: float = 1.0, report: Optional[FunnelReport] = None,
-                    tumbling: bool = True) -> FunnelReport:
+                    tumbling: bool = True, sample_kT: Optional[float] = None) -> FunnelReport:
     """Run the geometric checks. ``box`` (three lengths or lattice vectors, nm)
     enables the periodic checks; ``slab`` stands in for a membrane not built yet.
     ``tumbling=False`` (membrane systems) applies the rule of
     :func:`required_image_distance` per box axis instead of to the shortest image
-    distance, since the solute cannot rotate out of the membrane plane."""
+    distance, since the solute cannot rotate out of the membrane plane.
+
+    ``positions`` are the input pose unless ``sample_kT`` (kT in kJ/mol) is given: then they
+    come from dynamics at that temperature. The input pose defines the funnel, so each of its
+    atoms must be inside the wall and its centre clear of the lower wall. A structure from
+    dynamics is a thermal sample of the funnel and the walls act on the ligand centroid: it
+    fails only when its wall energy exceeds ``WALL_BREACH_KT``; atoms beyond the wall and a
+    centre near the lower wall are warnings."""
     positions = np.asarray(positions, dtype=float)
     report = report or FunnelReport()
     origin, axis, lig = funnel_frame(funnel, positions)
@@ -130,21 +139,41 @@ def validate_funnel(funnel: Funnel, positions: np.ndarray, selection: Selection,
     has_lipids = selection.lipid.size > 0
     obstacles = Obstacles(positions[obstacle_atoms], None if has_lipids else slab)
 
-    # -- bound pose inside the cone ------------------------------------------
+    # -- ligand inside the cone ----------------------------------------------
     relative = positions[funnel.ligand_atoms] - origin
     s_atoms = relative @ axis
     rho_atoms = np.linalg.norm(relative - np.outer(s_atoms, axis), axis=1)
     margin = float((funnel.wall_radius(s_atoms) - rho_atoms).min())
     s_bound = float((lig - origin) @ axis)
-    if margin < 0.0:
-        report.add("pose", ERROR, f"ligand atoms lie {-margin:.2f} nm outside the funnel wall")
-    elif margin < 0.2:
-        report.add("pose", WARNING, f"ligand is only {margin:.2f} nm inside the funnel wall")
+    near_lower_wall = s_bound < funnel.lower + 0.2
+    if sample_kT is None:
+        if margin < 0.0:
+            report.add("pose", ERROR, f"ligand atoms lie {-margin:.2f} nm outside the funnel wall")
+        elif margin < 0.2:
+            report.add("pose", WARNING, f"ligand is only {margin:.2f} nm inside the funnel wall")
+        else:
+            report.add("pose", OK, f"ligand is {margin:.2f} nm inside the wall at s = {s_bound:.2f} nm")
+        if near_lower_wall:
+            report.add("lower_wall", ERROR,
+                       f"bound pose (s = {s_bound:.2f} nm) is within 0.2 nm of the lower wall")
     else:
-        report.add("pose", OK, f"ligand is {margin:.2f} nm inside the wall at s = {s_bound:.2f} nm")
-    if s_bound < funnel.lower + 0.2:
-        report.add("lower_wall", ERROR,
-                   f"bound pose (s = {s_bound:.2f} nm) is within 0.2 nm of the lower wall")
+        _, rho_bound = compute_cvs(funnel, positions)
+        wall = float(funnel.restraint_energy(s_bound, rho_bound))
+        centre = (f"centre at rho = {rho_bound:.2f} nm, wall at {float(funnel.wall_radius(s_bound)):.2f} nm, "
+                  f"wall energy {wall:.2f} kJ/mol")
+        if wall > WALL_BREACH_KT * sample_kT:
+            report.add("pose", ERROR,
+                       f"the funnel walls do not hold the ligand: wall energy {wall:.1f} kJ/mol "
+                       f"({wall / sample_kT:.0f} kT) at s = {s_bound:.2f} nm, rho = {rho_bound:.2f} nm")
+        elif margin < 0.0:
+            report.add("pose", WARNING, f"ligand atoms reach {-margin:.2f} nm beyond the funnel wall ({centre})")
+        elif margin < 0.2:
+            report.add("pose", WARNING, f"ligand is only {margin:.2f} nm inside the funnel wall ({centre})")
+        else:
+            report.add("pose", OK, f"ligand is {margin:.2f} nm inside the wall at s = {s_bound:.2f} nm")
+        if near_lower_wall:
+            report.add("lower_wall", WARNING,
+                       f"ligand (s = {s_bound:.2f} nm) is within 0.2 nm of the lower wall")
 
     # -- anchors -------------------------------------------------------------
     separation = float(np.linalg.norm(

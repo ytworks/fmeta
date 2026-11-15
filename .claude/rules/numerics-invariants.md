@@ -36,6 +36,10 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   a membrane system: the ligand in the funnel is then nearer to its own protein than to any
   periodic copy. The funnel is therefore placed BEFORE solvation and the box is sized from it;
   never size a box from the solute alone.
+- The walls act on the ligand centroid. "Every ligand atom inside the wall" is a rule for the
+  input pose, which sets the funnel width. A structure from dynamics is judged by its wall
+  energy (an error above 10 kT, `WALL_BREACH_KT`): with the atom rule there, the first full
+  gate run failed on a test ligand that had diffused 0.37 nm while the walls did 0.035 kT.
 - Group weights of the CVs are explicit, never particle masses: hydrogen mass repartitioning
   changes masses, and the toy system's anchors are massless.
 - `rho` is regularised at the axis (`eps`) and hills are mirrored at `rho = 0` by default.

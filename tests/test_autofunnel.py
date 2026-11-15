@@ -149,6 +149,41 @@ def test_validation_catches_bad_funnels(tmp_path):
     assert n_atoms > 100 and sum(line.startswith("HETATM") for line in lines) == n_atoms
 
 
+def test_after_dynamics_the_walls_judge_the_ligand():
+    """A structure from dynamics is a thermal sample of the funnel. The walls act on the centre
+    of the ligand, so atoms beyond the wall are a warning there and a ligand that the walls do
+    not hold is an error."""
+    topology, positions, _ = ball_with_channel([0, 0, 1], seed=3)
+    selection = classify(topology)
+    funnel, _ = auto_funnel(topology, positions, settings=AutoFunnelSettings(**FAST))
+    origin, axis, lig = funnel_frame(funnel, positions)
+    s = float((lig - origin) @ axis)
+    sideways = np.cross(axis, [1.0, 0.0, 0.0])
+    sideways /= np.linalg.norm(sideways)
+    kT = 2.494                                           # kJ/mol at 300 K
+
+    def with_ligand_at(s_new, rho_new):
+        moved = positions.copy()
+        moved[selection.ligand] += origin + s_new * axis + rho_new * sideways - lig
+        return moved
+
+    # centre 0.02 nm inside the wall, atoms beyond it: the walls do no work
+    leaning = with_ligand_at(s, float(funnel.wall_radius(s)) - 0.02)
+    assert status(validate_funnel(funnel, leaning, selection), "pose") == "error"
+    sample = validate_funnel(funnel, leaning, selection, sample_kT=kT)
+    assert status(sample, "pose") == "warning" and sample.ok
+
+    # centre 0.2 nm beyond the wall: 200 kJ/mol of wall energy
+    escaped = with_ligand_at(s, float(funnel.wall_radius(s)) + 0.2)
+    assert status(validate_funnel(funnel, escaped, selection, sample_kT=kT), "pose") == "error"
+
+    # 0.1 nm above the lower wall: a misplaced funnel for an input pose, motion in a sample
+    deep = with_ligand_at(funnel.lower + 0.1, 0.0)
+    assert status(validate_funnel(funnel, deep, selection), "lower_wall") == "error"
+    deep_sample = validate_funnel(funnel, deep, selection, sample_kT=kT)
+    assert status(deep_sample, "lower_wall") == "warning" and deep_sample.ok
+
+
 def test_ligand_selection_rules():
     topology, positions, site = ball_with_channel([0, 0, 1], seed=3)
     selection = classify(topology)

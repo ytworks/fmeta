@@ -26,7 +26,7 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D13 Accepted; FM-D2, D4,
-D5, D6 and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+D5, D6, D7 and D11 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -41,15 +41,16 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
-| GPU plan M0: first gate record (R1) | In progress: first GPU runs done and their failures fixed; gate record pending |
+| GPU plan M0: first gate record (R1) | In progress: the first full gate run failed in 1 of 15 items (`membrane_run`); its check was amended (FM-D7); rerun pending |
 | GPU plan M1–M7: run modes, real inputs, presets, examples, benchmarks (R2, R3, R7–R10) | Not started |
 
-- GPU gates: **none recorded** (`bench/results/` is empty). The full gates have not run on a
-  clean commit yet. `fmeta check --quick` on CUDA (2 GPUs, in the image, on the source of this
-  commit before it was committed): 15 passed, 0 failed, 0 skipped. That is not evidence: quick
-  lengths and a dirty tree.
-- CPU evidence, in the image (lock d061e45a…, same source): `ruff check .` passes; `pytest`
-  79 passed; `pytest -m slow` 6 passed. CI has not run on the commits after aadd0ad (see
+- GPU gates: **none recorded** (`bench/results/` is empty). The first full run (clean 81efa0d,
+  CUDA, 2 GPUs, in the image, 193 s): 14 passed, 1 failed (`membrane_run`), so nothing was
+  written. The failing check was amended (FM-D7); the gates have not run on this commit.
+- CPU evidence, in the image (lock d061e45a…, the source of this commit before it was
+  committed): `ruff check .` passes; `pytest` 81 passed; the slow tests of
+  `tests/test_system.py` and `tests/test_membrane.py` 3 passed (the other 3 slow tests: not run
+  on this commit, 6 of 6 passed on b9edcc8). CI has not run on the commits after aadd0ad (see
   Blockers); it was green on 171220a.
 - Seen for the first time on this machine (quick check and diagnostics, not evidence): the
   CUDA platform, the real OpenFF / GAFF generators, a membrane build and run on a GPU.
@@ -67,6 +68,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   commits after aadd0ad are local: CI and PR #1 do not see them.
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D7: after dynamics the ligand is judged by the funnel walls, not atom by atom
+- What: the first full gate run (clean 81efa0d, CUDA, 2 GPUs, 193 s) gave 14 passed, 1 failed (`membrane_run`); nothing was recorded. The stage `equilibrate` had stopped with "ligand atoms lie 0.02 nm outside the funnel wall". Now `validate_funnel(..., sample_kT=...)` judges a structure from dynamics by the wall energy of the ligand centre: an error above 10 kT (`WALL_BREACH_KT`); atoms beyond the wall and a centre within 0.2 nm of the lower wall are warnings. The checks of the input pose at preparation and the gate criteria are unchanged. `pytest` 81 passed; the two new tests fail on the code before. Gates not rerun yet.
+- Why: measured on the failed run. The benzene test ligand had diffused 0.37 nm in 70 ps (protein CA RMSD 0.08 nm); its centre was 0.11 nm inside the wall and one atom 0.017 nm outside; the walls did 0.088 kJ/mol on average (0.035 kT). The walls act on the centroid, so the atom rule on one snapshot was decided by diffusion, not by the funnel. Rejected: a wider funnel or a shorter equilibration in the gate (a user's run would still stop); warnings only (a ligand the walls do not hold must stop the pipeline).
+- Refs: FM-D7; `.claude/rules/numerics-invariants.md`; `src/fmeta/funnel/validate.py`, `src/fmeta/workflow.py`; `tests/test_autofunnel.py`, `tests/test_system.py`.
 
 ### 2026-11-16 — [amendment] FM-D2, FM-D5, FM-D6: CV forces without periodic boundaries; gate `periodic_images` redefined; runs stop before recording NaN
 - What: the forces of the CVs, the walls and the bias no longer use periodic boundaries (the `periodic` argument is gone); the box rule is unchanged. Before: 5 of 40 biased GPU runs of 800 ps on the test system of `fmeta check` ended in NaN. After: the 5 failing seeds pass and so do 40 new runs; started with a corner of the cell inside the complex, the complex changed cell 57 times in 200 ps with the CVs within 8.9e-07 nm of numpy. The gate `periodic_images` now runs dynamics from two placements and probes the upper wall along the narrowest direction of the box (CV tolerance 2e-3 nm unchanged; wall energy within 0.1 kJ/mol): it fails on the periodic forces (1.2e6 kJ/mol), which the old static gate passed. `forces` loses its seventh position, a periodic image of another one. A run now stops with an error before a value that is not finite reaches HILLS, COLVAR or the grid. `fmeta check --quick` on CUDA: 15 passed, 0 failed, 0 skipped (not evidence).

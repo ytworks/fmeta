@@ -2,7 +2,7 @@
 
 Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 added
 (2026-11-15: owner decisions, and the first run with the real ligand-parameter packages);
-FM-D2, FM-D4, FM-D5 and FM-D6 amended (2026-11-15 and 16: the first runs on a GPU).
+FM-D2, FM-D4, FM-D5, FM-D6 and FM-D7 amended (2026-11-15 and 16: the first runs on a GPU).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -125,6 +125,26 @@ Straight paths from the ligand are scored by the solute (and membrane) they cros
 soon they reach bulk; anchors are alpha carbons weighted so that the axis lies on that
 direction; inflection, walls and width follow the pocket geometry. A BioSimSpace-style grid
 average is kept as `method: bss`.
+Amendment (2026-11-16): the check of the ligand against the walls depends on where the
+structure comes from. The input pose defines the funnel: each of its atoms must be inside the
+wall (the width is chosen so that it is) and its centre 0.2 nm clear of the lower wall. That
+is unchanged. A structure that has been through dynamics, as in the check after equilibration,
+is a thermal sample of the funnel, and the walls act on the ligand centroid: it fails only
+when its wall energy is above 10 kT (`WALL_BREACH_KT`); atoms beyond the wall and a centre
+near the lower wall are warnings there. Until now the atom rule was applied to that structure
+as well. The first full gate run (commit 81efa0d, CUDA) failed on it in `membrane_run`, with
+the other 14 items passed: after 70 ps without restraints the benzene of the test system,
+which is not a binding mode, had moved 0.37 nm sideways in the protein frame (protein CA RMSD
+0.08 nm). Its centroid was 0.11 nm inside the wall (rho 0.47 nm, wall at 0.58 nm) and one atom
+0.017 nm outside, while the walls had done 0.088 kJ/mol on average (0.035 kT) and 2.6 kJ/mol
+at most. The soluble system of the same run ended 0.14 nm inside the wall. For a ligand that
+is free in the funnel the atom rule is decided by where diffusion has put it at the last step,
+not by the code: a centroid that fills a disc of 0.58 nm is in the wall's skin about 7% of the
+time. The wall energy is decided by the code: 10 kT is 0.07 nm beyond a default wall
+(10⁴ kJ/mol/nm²), which a harmonic wall lets a ligand reach with a probability of about 1e-5,
+and a ligand 0.1 nm outside is at 50 kJ/mol. Rejected: a wider funnel or a shorter
+equilibration in the gate (the outcome would still be chance), and warnings only (a ligand
+that the walls do not hold must stop the stage).
 Why: the grid average assumes a shallow pocket and treats "no protein" as "water", which fails
 for buried sites and inside a bilayer.
 

@@ -31,7 +31,7 @@ from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
 from .engine.platform import select_platform
 from .engine.runner import MetadynamicsRun, RunSettings, rollback_to_checkpoint
-from .funnel.geometry import Funnel
+from .funnel.geometry import KB, Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
 from .system import inputs
@@ -116,8 +116,10 @@ def equilibrate_stage(config: Config, workdir, device: Optional[int] = None) -> 
 
     positions = np.array(result.state.getPositions(asNumpy=True).value_in_unit(unit.nanometer))
     box = np.array(result.state.getPeriodicBoxVectors().value_in_unit(unit.nanometer))
+    # The structure has been through dynamics: its ligand is judged by the walls (FM-D7).
     report = validate_funnel(prepared.funnel, positions, prepared.selection, box=box,
-                             cutoff=config.system.cutoff, tumbling=not prepared.membrane)
+                             cutoff=config.system.cutoff, tumbling=not prepared.membrane,
+                             sample_kT=KB * config.system.temperature)
     wall_ok = result.wall_ok(config.system.temperature)
     summary = dict(wall_energy_mean=result.wall_energy_mean, wall_energy_max=result.wall_energy_max,
                    wall_ok=wall_ok, box_lengths=result.box_lengths.tolist(),
