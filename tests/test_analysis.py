@@ -187,9 +187,11 @@ def test_run_without_binding_is_flagged(tmp_path):
     bias = FunnelBias(toy.system, toy.funnel, settings, periodic=True)
     run = MetadynamicsRun(make_simulation(toy, temperature=T, seed=4), bias, tmp_path,
                           toy.restraint_group, RunSettings(checkpoint_hills=5000))
-    run.run(4000)
+    run.run(10000)
     run.close()
     result = analyze_run(tmp_path, write=False)
+    # 20 ns: the plateau scatters by about 0.5 kJ/mol between seeds (1.0 at 8 ns), so both
+    # bounds below are four or more standard deviations wide
     assert result["dG_plateau"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
     assert result["binding_excess"] < 1.0 * KT
     assert any("empty funnel" in p for p in result["problems"]) and not result["converged"]
