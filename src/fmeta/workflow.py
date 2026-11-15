@@ -84,6 +84,7 @@ def save_prepared(prepared: Prepared, out: Path) -> None:
         json.dump(prepared.report.to_dict(), handle, indent=2, default=float)
     meta = dict(restraint_group=prepared.restraint_group, membrane=prepared.membrane,
                 ligand_atoms=[int(i) for i in prepared.selection.ligand],
+                kept_atoms=[int(i) for i in prepared.selection.kept],
                 n_atoms=prepared.topology.getNumAtoms())
     with open(out / "meta.json", "w") as handle:
         json.dump(meta, handle, indent=2)
@@ -100,7 +101,8 @@ def load_prepared(workdir, config: Optional[Config] = None) -> Prepared:
     topology = app.PDBxFile(str(out / "topology.cif")).topology
     positions = np.load(out / "positions.npy")
     funnel = Funnel.load(out / "funnel.yaml")
-    selection = classify(topology, meta["ligand_atoms"])
+    # a directory prepared before FM-D15 has no kept atoms recorded
+    selection = classify(topology, meta["ligand_atoms"], meta.get("kept_atoms", ()))
     from .funnel.validate import FunnelReport
     return Prepared(topology, system, positions, funnel, selection, FunnelReport(),
                     meta["restraint_group"], meta["membrane"], config.system)

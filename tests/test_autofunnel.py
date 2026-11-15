@@ -1,8 +1,9 @@
 """Automatic funnel placement on synthetic pockets with a known exit."""
 
 import numpy as np
+import openmm.app as app
 import pytest
-from synthetic import ball_with_channel, membrane_barrel
+from synthetic import ball_with_channel, build_topology, carve, lattice, membrane_barrel
 
 from fmeta.funnel.autodetect import AutoFunnelSettings, auto_funnel, channel_is_open, fibonacci_sphere
 from fmeta.funnel.geometry import Funnel, compute_cvs, funnel_frame
@@ -61,6 +62,29 @@ def test_buried_site_is_reported_but_still_gets_a_funnel():
     # surface. Not exactly along the normal: oblique lanes between lattice rows
     # cross fewer atoms than the straight line does.
     assert angle(funnel.metadata["exit_direction"], [0, 1, 0]) < 45.0
+
+
+def test_a_kept_ion_is_an_obstacle_and_a_solvent_ion_is_not():
+    """Two channels lead out of the site and a sodium ion sits in the short, narrow one. As an
+    ion of the solvent it is ignored; kept from the input structure (``system.keep_hetero``)
+    it is part of the receptor, and the funnel takes the other channel (FM-D15)."""
+    rng = np.random.default_rng(11)
+    short, long = np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0])
+    site = 0.6 * short
+    points = lattice(lambda p: np.linalg.norm(p, axis=1) < 1.8, 1.8, rng)
+    topology, positions = build_topology(carve(points, site, [(short, 0.42), (long, 0.5)]), site, rng)
+    ion = topology.addAtom("NA", app.Element.getBySymbol("Na"),
+                           topology.addResidue("NA", topology.addChain("I"))).index
+    positions = np.vstack([positions, site + 0.6 * short])    # no straight way past it
+
+    def exit_direction(selection):
+        funnel, _ = auto_funnel(topology, positions, settings=AutoFunnelSettings(**FAST),
+                                selection=selection)
+        return funnel.metadata["exit_direction"]
+
+    # which of the two channels (90 degrees apart), not how well its axis is hit
+    assert angle(exit_direction(classify(topology, "LIG")), short) < 20.0
+    assert angle(exit_direction(classify(topology, "LIG", kept=[ion])), long) < 20.0
 
 
 def test_channel_flood_fill_follows_bends():

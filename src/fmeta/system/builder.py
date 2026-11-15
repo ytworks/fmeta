@@ -36,7 +36,7 @@ from .imaging import make_whole
 from .inputs import complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein
 from .ligand import register_ligand
 from .orientation import fit_membrane, orient
-from .selection import Selection, classify
+from .selection import PROTEIN_RESIDUES, WATER_RESIDUES, Selection, classify
 
 log = logging.getLogger(__name__)
 
@@ -160,11 +160,24 @@ def remap_atoms(old_positions: np.ndarray, new_positions: np.ndarray,
                 atoms: Sequence[int]) -> list[int]:
     """Find, in a rebuilt structure, the atoms that sit where ``atoms`` were.
     Solvation and membrane building keep the solute coordinates but may reorder atoms."""
+    if len(atoms) == 0:
+        return []
     tree = cKDTree(new_positions)
     distance, index = tree.query(old_positions[list(atoms)])
     if distance.max() > 1.0e-3:
         raise RuntimeError("solute atoms moved during system building; cannot map the funnel")
     return [int(i) for i in index]
+
+
+def kept_atoms(topology: app.Topology, names: Sequence[str], ligand_atoms: Sequence[int]) -> list[int]:
+    """Atoms of the non-protein residues of the dry complex that ``system.keep_hetero`` kept
+    (a structural ion, a cofactor). The dry complex holds no solvent yet, so a residue of one
+    of these names is one that came with the input structure. Amino acids stay protein and
+    water stays water (mobile) even when they are named there."""
+    wanted = {name.strip().upper() for name in names} - PROTEIN_RESIDUES - WATER_RESIDUES
+    ligand = set(int(i) for i in ligand_atoms)
+    return [atom.index for residue in topology.residues() if residue.name.strip().upper() in wanted
+            for atom in residue.atoms() if atom.index not in ligand]
 
 
 def remap_funnel(funnel: Funnel, old_positions: np.ndarray, new_positions: np.ndarray) -> Funnel:
@@ -334,7 +347,10 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     if membrane is not None:
         dry_positions, orientation = _membrane_orientation(dry_topology, dry_positions, membrane)
         modeller.positions = dry_positions * unit.nanometer
-    dry_selection = classify(dry_topology, ligand_atoms)
+    # The components kept from the input structure are part of the receptor: obstacles for the
+    # funnel, inside the box, held with the protein in equilibration (FM-D15).
+    kept = kept_atoms(dry_topology, settings.keep_hetero, ligand_atoms)
+    dry_selection = classify(dry_topology, ligand_atoms, kept)
     # before anything else: is the ligand where a bound ligand would be?
     contact = pose_contact(dry_positions, dry_selection)
     if contact[0] == "error":
@@ -385,7 +401,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     topology = modeller.topology
     positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
     funnel = remap_funnel(funnel, dry_positions, positions)
-    selection = classify(topology, remap_atoms(dry_positions, positions, ligand_atoms))
+    selection = classify(topology, remap_atoms(dry_positions, positions, ligand_atoms),
+                         remap_atoms(dry_positions, positions, kept))
     system = create_system(forcefield, topology, settings)
     restraint = add_funnel_restraint(system, funnel)
 
@@ -402,14 +419,16 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
                         ligand=None, settings: Optional[SystemSettings] = None,
                         funnel_settings: Optional[AutoFunnelSettings] = None,
                         funnel_overrides: Optional[dict] = None,
-                        funnel: Optional[Funnel] = None) -> Prepared:
+                        funnel: Optional[Funnel] = None, kept: Sequence[int] = ()) -> Prepared:
     """Attach a funnel to an OpenMM system that is already parameterised and
-    solvated (for use from Python). Lipids in the topology make it a membrane system."""
+    solvated (for use from Python). Lipids in the topology make it a membrane system.
+    ``kept`` names atoms of ions or other components that belong to the receptor
+    (see ``classify``); without it an ion is taken for one of the solvent."""
     settings = settings or SystemSettings()
     if unit.is_quantity(positions):
         positions = positions.value_in_unit(unit.nanometer)
     positions = np.asarray(positions, dtype=float)
-    selection = classify(topology, ligand)
+    selection = classify(topology, ligand, kept)
     is_membrane = selection.lipid.size > 0
     vectors = topology.getPeriodicBoxVectors()
     if vectors is None:

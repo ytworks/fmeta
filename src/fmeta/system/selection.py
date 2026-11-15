@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Sequence, Union
 
 import numpy as np
@@ -34,7 +34,8 @@ LIPID_RESIDUES = {
 
 @dataclass
 class Selection:
-    """Atom indices by class. ``other`` holds cofactors and anything unrecognised."""
+    """Atom indices by class. ``other`` holds cofactors, the components kept from the input
+    structure on purpose (``kept``, a subset of it) and anything unrecognised."""
 
     protein: np.ndarray
     ligand: np.ndarray
@@ -43,6 +44,7 @@ class Selection:
     ion: np.ndarray
     other: np.ndarray
     heavy: np.ndarray          # boolean mask over all atoms
+    kept: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=int))
 
     def heavy_atoms(self, name: str) -> np.ndarray:
         indices = getattr(self, name)
@@ -61,18 +63,26 @@ def _is_heavy(atom) -> bool:
     return atom.element is not None and atom.element.symbol != "H"
 
 
-def classify(topology: app.Topology, ligand: LigandSpec = None) -> Selection:
+def classify(topology: app.Topology, ligand: LigandSpec = None,
+             kept: Sequence[int] = ()) -> Selection:
     """Sort atoms into classes.
 
     ``ligand`` may be a residue name, a list of atom indices, or ``None`` to
     pick the single non-polymer, non-lipid, non-solvent residue with at least
     six heavy atoms (an error if there is none or more than one).
+
+    ``kept`` holds atoms of the non-protein residues that were kept from the input
+    structure on purpose (a structural ion, a cofactor). Their residues are part of the
+    receptor model: class ``other`` whatever they are called, where an ion of the same
+    name that came with the solvent is ``ion``. They are never taken for the ligand.
     """
     groups = {name: [] for name in ("protein", "lipid", "water", "ion", "other")}
     candidates = []
     explicit = None
     if ligand is not None and not isinstance(ligand, str):
         explicit = set(int(i) for i in ligand)
+    marked = set(int(i) for i in kept)
+    kept_atoms = []
 
     heavy = np.zeros(topology.getNumAtoms(), dtype=bool)
     for residue in topology.residues():
@@ -81,7 +91,10 @@ def classify(topology: app.Topology, ligand: LigandSpec = None) -> Selection:
         for atom in atoms:
             heavy[atom.index] = _is_heavy(atom)
         indices = [atom.index for atom in atoms]
-        if name in WATER_RESIDUES:
+        if not marked.isdisjoint(indices):
+            groups["other"] += indices
+            kept_atoms += indices
+        elif name in WATER_RESIDUES:
             groups["water"] += indices
         elif name in PROTEIN_RESIDUES:
             groups["protein"] += indices
@@ -117,4 +130,5 @@ def classify(topology: app.Topology, ligand: LigandSpec = None) -> Selection:
     arrays = {name: np.array(sorted(i for i in indices if i not in taken), dtype=int)
               for name, indices in groups.items()}
     return Selection(arrays["protein"], np.array(sorted(taken), dtype=int), arrays["lipid"],
-                     arrays["water"], arrays["ion"], arrays["other"], heavy)
+                     arrays["water"], arrays["ion"], arrays["other"], heavy,
+                     np.array(sorted(i for i in kept_atoms if i not in taken), dtype=int))
