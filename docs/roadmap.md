@@ -37,19 +37,20 @@ Verified on CPU only (see `PROGRESS.md`).
   unit (`fmeta init --preset`); a configuration may hold only its difference from a preset;
   `docs/configuration.md` gives the origin of every value. Tests hold the three together. The
   defaults that differ from the literature are listed there and are the questions of the scan
-  on trypsin-benzamidine (R2). GPU gates on this code: not run yet.
+  on trypsin-benzamidine (R2). All 18 gates passed on 47e84f7, the code with the defaults of
+  the scan verdict (`bench/results/2026-11-16-47e84f72b-gpu-gates.json`).
 - **R8 — Real inputs, membrane part** (2026-11-16, FM-D15). `fmeta split --drop` removes a fusion
   partner before anything is derived; a component kept with `system.keep_hetero` is part of the
   receptor (restrained, an obstacle for the funnel, in the box rule); an orientation that could
-  not be checked is a warning; a membrane box is built 8% above the box rule. GPU gates on this
-  code: not run yet.
+  not be checked is a warning; a membrane box is built 8% above the box rule. Gates passed on
+  47e84f7 (same record).
 - **R8 — Real inputs, protein part** (2026-11-16, FM-D15). A chain break (C–N above 0.2 nm,
   with or without `TER`) is capped with NME and ACE and no loop is built; caps of the input are
   kept; protonation states are read from the hydrogens or the residue names of the input and
   carried through the rebuild of the hydrogens; a kept component that follows the chain without
   `TER` gets its own chain; `prepared/report.json` lists gaps, caps, states, disulfides and
   alternate locations. Built and equilibrated on the GPU from 3PTB, 4GIH and the prepared TYK2
-  protein of the Schrödinger set. GPU gates on this code: not run yet.
+  protein of the Schrödinger set. Gates passed on 47e84f7 (same record).
 
 ## Next
 

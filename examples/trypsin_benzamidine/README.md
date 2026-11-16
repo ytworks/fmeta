@@ -7,7 +7,7 @@ the S1 pocket of bovine beta-trypsin. No membrane.
 |---|---|---|
 | Experimental binding free energy | −6.4 to −7.3 kcal/mol | the measurements quoted by Limongelli et al. (their references 40 and 41) |
 | Funnel metadynamics, published | −8.5 ± 0.7 kcal/mol | Limongelli, Bonomi, Parrinello, PNAS 110, 6358 (2013), doi:10.1073/pnas.1303186110 |
-| fmeta | not available yet | see "Result" below |
+| fmeta, official defaults (5 replicas of 40 ns) | NOT CONVERGED: −6.5 kcal/mol, 95% interval −16.4 to 3.3, 2 of 5 replicas pass | see "Result" below |
 
 ## Inputs
 
@@ -56,81 +56,122 @@ checkpoints. With one GPU use `--gpus 0` and `--mode sequential`.
 
 ## Result
 
-Not available yet. The run of five replicas with the official defaults was started on
-2026-11-15 (UTC) on commit 8d1f10a in the official image, configured for the default length of
-that day, 500 ns per replica. It ends at the length that "Run length" below gives. This section
-will hold the standard binding free energy with its confidence interval, the rebinding counts
-and the convergence verdict, whatever they turn out to be.
+NOT CONVERGED at the default length. The numbers are reported as measured; they are not a
+binding free energy to quote.
+
+Two runs have the values of the defaults. The first is the scan run `sig2` of the section
+below (commit f2ea653): five replicas at the same time on one GPU with NVIDIA MPS, from the
+equilibrated system of the first run of this example. The second follows the steps above on the
+commit of the defaults (47e84f7) with one replica after another on one GPU
+(`--mode sequential`). It was started on 2026-11-16 (UTC); its numbers are added here when it
+ends.
+
+| Quantity | Scan run with the values of the defaults (5 replicas on one GPU with MPS) |
+|---|---|
+| dG0 | −27.35 kJ/mol (−6.54 kcal/mol) |
+| 95% interval of the five replicas | −68.67 to 13.98 kJ/mol (standard error 14.88) |
+| Each replica | −78.17, −1.73, −44.29, −3.42, −9.13 kJ/mol |
+| Rebinding events per replica | 0, 3, 5, 5, 5 |
+| Replicas without a convergence problem | 2 of 5 |
+
+What `fmeta analyze` says about the three replicas that fail:
+
+- Replica 0 never left the site in 40 ns. There is no estimate from its samples, and its value
+  is the mean of dG(t) from the bias, which still drifts (+98.8 kJ/mol over the plateau window).
+- Replica 1 is within 1 kT of what an empty funnel gives (−0.83 kJ/mol): "no binding beyond the
+  funnel volume".
+- Replica 2 still drifts (+15.3 kJ/mol), and its value changes by +38.2 kJ/mol when only the
+  second half of the run is used.
+
+The mean of the five lies near the experimental range (−26.8 to −30.5 kJ/mol). That is an
+average over replicas that differ by 76 kJ/mol, with an interval that includes zero: it says
+nothing about agreement.
 
 The calcium ion is removed by default. Keeping it (`system.keep_hetero`) is a variation that
 has not been run.
 
-## Run length
+## How the run length and the bias were chosen
 
-The default was 500 ns per replica, taken from the literature that was read
-(`docs/configuration.md`). On 2026-11-16 the owner decided that this is too long. The new
-default comes from this run, by a rule written at about 01:00 UTC on 2026-11-16, when the five
-replicas were at 41 to 44 ns:
+The defaults before 2026-11-16 were 500 ns per replica, taken from the literature that was
+read, with bias factor 10, hills of 1.5 kJ/mol and widths of 0.025 / 0.05 nm. On 2026-11-16 the
+owner decided that 500 ns is too long, and then that 100 to 200 ns is too long as well: 20 ns
+first, at most 40 ns. Two rules that this file held for the longer lengths (the shortest of
+100, 150 and 200 ns; a scan of `run.pace_ps`, `metad.sigma_rho` and the time step at that
+length) were withdrawn with those decisions before either gave a value. Of their runs only the
+one with 2 fs and real masses had started; it was stopped at 15 to 18 ns and not analysed.
 
-- The run is analysed with `fmeta analyze` as it stood at 100, 150 and 200 ns (HILLS and COLVAR
-  cut at that time; the trajectory does not depend on the configured length).
-- The default `run.length_ns` becomes the shortest of the three at which the verdict over the
-  five replicas is "converged": every replica passes every convergence criterion of the product
-  (rebinding events, drift and roughness of dG(t), gap to the reweighted estimate).
-- If the verdict is "not converged" at all three, the default becomes 200 ns, and this file and
-  `docs/configuration.md` say that the default did not converge on this system.
-- Five replicas stay. No criterion changes. Agreement with experiment is not looked at.
-- The run is stopped at the chosen length, and the result above is the analysis of that length.
+On the same day the owner asked that the start of a run, where the bias changes fastest, is not
+used. Since then the headline of `fmeta analyze` is the estimate from the samples after the
+first 2 ns, and the mean of dG(t) from the bias is a cross-check (FM-D9 amendment,
+`docs/design/engine.md`). Every number below is from that analysis.
 
-Known when the rule was written: this run analysed at 20 ns and at 40 ns, not converged at
-either (at 40 ns 3 to 5 rebinding events per replica, a drift of dG(t) of +12 to +22 kJ/mol
-over the plateau window); and replica 0 of `examples/tyk2_ejm46`, where the ligand left the
-site within 5 ns and was back within 20 ns.
+**The former default bias.** The run of five replicas by the steps above (commit 8d1f10a, five
+GPUs at the same time) was stopped at 75 to 81 ns. Cut at a length and analysed:
 
-## Scan of the defaults
+| Length (ns) | dG0 (kJ/mol) | 95% interval (kJ/mol) | Rebinding events per replica | Replicas that pass |
+|---|---|---|---|---|
+| 10 | −66.68 | −87.97 to −45.39 | 1, 1, 1, 1, 0 | 0 of 5 |
+| 20 | −48.60 | −66.09 to −31.12 | 2, 4, 1, 2, 2 | 0 of 5 |
+| 30 | −36.47 | −54.50 to −18.45 | 2, 5, 3, 2, 3 | 0 of 5 |
+| 40 | −27.95 | −44.43 to −11.47 | 4, 5, 3, 4, 3 | 0 of 5 |
+| 60 | −18.42 | −30.49 to −6.36 | 7, 6, 4, 6, 4 | 0 of 5 |
+| 75 | −14.30 | −25.06 to −3.54 | 9, 10, 5, 8, 5 | 1 of 5 |
 
-Three official defaults differ from the literature in a way that a run can test
-(`docs/configuration.md`, "Where the defaults differ from the literature that was read"). Each
-is run here with that one value changed, three replicas of 200 ns, and compared with the first
-200 ns of the five replicas of the run above.
+The mean still rises at 75 ns. With that bias the ligand stays in the site for 4.5 to 10 ns
+while the bias fills, so most of what the samples after 2 ns see at short lengths is the site.
 
-| Variant | Changed | Official default |
-|---|---|---|
-| `pace2` | `run.pace_ps: 2.0` | 1.0 ps |
-| `srho03` | `metad.sigma_rho: 0.03` | 0.05 nm |
-| `dt2` | `run.timestep_fs: 2.0` with `system.hydrogen_mass: null` | 4 fs with hydrogens of 1.5 amu |
+**The scan.** Five faster bias settings, five replicas each, from the equilibrated system of
+that run (commit f2ea653, one setting per GPU, the five replicas sharing it with NVIDIA MPS).
+All 25 replicas ran to 40 ns and were analysed as they stood at 10, 15, 20, 30 and 40 ns.
 
-`pace2` and `srho03` start from the prepared and equilibrated system of the run above; `dt2` is
-prepared and equilibrated again, because the masses are part of the system.
+| Setting | `metad.bias_factor` | `metad.height` (kJ/mol) | `metad.sigma_s` / `sigma_rho` (nm) |
+|---|---|---|---|
+| `bf20` | 20 | 1.5 | 0.025 / 0.05 |
+| `h3` | 10 | 3.0 | 0.025 / 0.05 |
+| `sig2` | 10 | 1.5 | 0.05 / 0.10 |
+| `bf20_h3` | 20 | 3.0 | 0.025 / 0.05 |
+| `bf20_h3_sig2` | 20 | 3.0 | 0.05 / 0.10 |
 
-The rule, written on 2026-11-16 before any of these runs had started:
+The rule, written before a scan run started (FM-D16, second amendment,
+`docs/design/engine.md`):
 
-- Compared per variant: rebinding events per replica, drift and roughness of dG(t), the gap to
-  the reweighted estimate, the convergence verdict, the plateau mean of each replica, their mean
-  and their spread.
-- Three replicas of 200 ns show a gross difference and nothing finer. A default changes only if
-  1. for `dt2`: its mean lies outside the 95% confidence interval of the five replicas and
-     their mean outside the interval of `dt2`. The time step would then change the free energy,
-     and the default would become 2 fs with real masses;
-  2. for `pace2` and `srho03`: every replica of the variant passes the convergence criteria at
-     200 ns while fewer than half of the five replicas do. The two bias settings have the same
-     free energy as their limit, so a difference of the means at 200 ns says only that one of
-     them has not converged: it is reported and changes nothing.
-  Otherwise the defaults stay and the numbers are reported as measured.
-- Agreement with experiment is not a criterion, here or on any benchmark.
+- The lengths are taken in the order 10, 15, 20, 30, 40 ns. The first length at which a setting
+  has all five replicas without a convergence problem becomes `run.length_ns`, and that setting
+  the default bias; of several at the same length, the one with the smallest standard error of
+  the five.
+- If no setting has five at 40 ns, the setting with the most passing replicas at 40 ns and
+  40 ns become the defaults, and the count is stated. Nothing runs longer.
+- Only the convergence diagnostics on this system decide. The distance to experiment is
+  reported and decides nothing; no criterion changes; no benchmark is tuned.
 
-Amendment of 2026-11-16, about 01:00 UTC, with "Run length". The `dt2` replicas were at 6 to
-8 ns, `pace2` and `srho03` had not started, and no variant had been analysed.
+What the scan gave: dG0 in kJ/mol, the mean of the five replicas with its standard error in
+brackets. No replica of any setting passes at 10, 15, 20 or 30 ns.
 
-- The comparison is made at the chosen length L instead of 200 ns: three replicas of L per
-  variant against the first L of the five replicas. Conditions 1 and 2 are otherwise unchanged.
-- Condition 2 can only be met when fewer than half of the five replicas pass at L. `pace2` and
-  `srho03` are run only in that case. Otherwise they cannot change a default: they are not run,
-  and are reported as not run. The reason for leaving them out is the time: the owner asked for
-  the shortest way to the results.
-- `dt2` is run to L in every case.
+| Setting | 10 ns | 15 ns | 20 ns | 30 ns | 40 ns | Replicas that pass at 40 ns |
+|---|---|---|---|---|---|---|
+| `bf20` | −23.14 (11.19) | −19.35 (8.34) | −12.98 (5.64) | −10.84 (5.00) | −8.07 (5.14) | 1 of 5 |
+| `h3` | −33.08 (16.15) | −26.19 (13.31) | −22.81 (11.86) | −16.17 (8.88) | −12.68 (6.96) | 0 of 5 |
+| `sig2` | −58.64 (25.79) | −52.73 (22.63) | −45.57 (21.95) | −36.72 (21.22) | −27.35 (14.88) | 2 of 5 |
+| `bf20_h3` | −7.11 (4.47) | −14.80 (10.62) | −16.72 (10.49) | −14.35 (8.78) | −15.67 (11.05) | 0 of 5 |
+| `bf20_h3_sig2` | −5.44 (3.05) | −5.91 (1.71) | −5.85 (3.80) | −5.95 (4.14) | −2.89 (1.42) | 0 of 5 |
+| former default | −66.68 (7.67) | not cut | −48.60 (6.30) | −36.47 (6.49) | −27.95 (5.94) | 0 of 5 |
 
-Not scanned: the wall force constants, the force fields and the shape of the funnel. Each would
-be a scan of its own; they are listed with their sources in `docs/configuration.md`.
+By the second point of the rule the defaults are `sig2` (hill widths 0.05 / 0.1 nm; bias factor
+10 and hills of 1.5 kJ/mol stay) and 40 ns per replica: 2 of 5 replicas pass at 40 ns. With the
+analysis before the FM-D9 amendment the choice is the same (`sig2` 2 of 5, every other setting
+0 of 5).
 
-Result: not available yet.
+What the count does not say:
+
+- `sig2` has the widest scatter between replicas of all settings, and one of its replicas never
+  left the site. The rule counts replicas that pass and was applied as written.
+- With the defaults this system is not converged in 40 ns, and the roadmap item that asked for
+  five converged replicas on it (R2) is not met. A run can be extended exactly
+  (`fmeta run runs/tb --length-ns 80`); how long this system needs was not measured, because
+  nothing runs longer than 40 ns by the owner's decision.
+- The faster settings (`bf20_h3`, `bf20_h3_sig2`) push the ligand out early. Their samples then
+  rarely visit the site and the estimate is shallow: at 40 ns 3 and 4 of their five replicas are
+  within 1 kT of the empty funnel (2, 2 and 1 for `bf20`, `h3` and `sig2`).
+
+Not scanned: the deposition interval, the time step, the wall force constants, the force fields
+and the shape of the funnel. They are listed with their sources in `docs/configuration.md`.

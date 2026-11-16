@@ -30,7 +30,9 @@ record stores the UUIDs, which identify the physical GPUs.
 
 1. Commit the change (the gates record the commit). The record is flagged dirty when `src/`,
    `tests/`, `scripts/`, `examples/`, `docker/`, `pyproject.toml`, `environment.yml`,
-   `conda-linux-64.lock`, `Dockerfile` or `.dockerignore` differ from it.
+   `conda-linux-64.lock`, `Dockerfile` or `.dockerignore` differ from it. Run the gates in the
+   main checkout, not in a `git worktree`: the script reads the commit with git in the
+   container, where the git directory of a worktree is not mounted, and stops at once.
 2. `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`:
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
