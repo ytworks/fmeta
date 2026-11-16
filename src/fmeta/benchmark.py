@@ -14,11 +14,13 @@ from __future__ import annotations
 import contextlib
 import copy
 import csv
+import datetime
 import hashlib
 import json
 import math
 import os
 import re
+import subprocess
 import sys
 import urllib.request
 import warnings
@@ -29,10 +31,10 @@ from typing import NamedTuple, Optional, Sequence
 import numpy as np
 import yaml
 
-from .analysis import KCAL
+from .analysis import KCAL, MIN_BINDING_EXCESS, analyze_replicas, analyze_run, walker_directories
 from .config import Config
 from .engine.platform import resolve_devices
-from .funnel.geometry import KB
+from .funnel.geometry import KB, STANDARD_VOLUME
 from .scheduler import Job, Task, directory_lock, is_locked, read_schedule, run_jobs
 from .workflow import replica_jobs, status_table, unfinished_jobs
 
@@ -778,6 +780,7 @@ def run_set(benchmark: BenchmarkSet, workdir, gpus=None, mode: Optional[str] = N
             return {}
         run = prepared[0].config.run
         devices = resolve_devices(mode or run.mode, gpus if gpus is not None else run.gpus, run.platform)
+        _record_run(workdir)
         status = run_jobs(jobs, devices, launcher, log=workdir / "schedule.jsonl", events=record.append)
     problem = unfinished_jobs(status, record, workdir)
     if problem:
@@ -910,3 +913,378 @@ def agreement(predicted, reference, resamples: int = BOOTSTRAP_RESAMPLES, seed: 
         interval = [float(low[i]), float(high[i])] if value is not None and np.isfinite(low[i]) else None
         result[name] = dict(value=value, ci95=interval)
     return result
+
+
+# ---- the report: the code and the image it comes from -----------------------
+
+SCHEMA = 1
+IMAGE_LOCK = Path("/opt/fmeta") / "conda-linux-64.lock"      # the lock the official image was built from
+CODE = ("src", "scripts", "examples", "pyproject.toml", "environment.yml", "conda-linux-64.lock", "Dockerfile",
+        ".dockerignore", "docker")
+
+
+def _git(root: Path, *arguments) -> Optional[str]:
+    try:
+        done = subprocess.run(["git", *arguments], cwd=root, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def code_version(commit: Optional[str] = None, root: Optional[Path] = None) -> tuple:
+    """``(commit, dirty)`` of the code that writes a report.
+
+    Both come from git when this package is the source tree of a repository; ``dirty`` says
+    that the code differs from the commit. Where git cannot answer (the work tree of a
+    repository mounted into a container, an installed package) the commit has to be given,
+    and ``dirty`` is None: not known."""
+    root = Path(__file__).resolve().parents[2] if root is None else Path(root)
+    if commit is not None and not _COMMIT.fullmatch(commit):
+        raise ValueError("--commit takes the full hash of a commit (40 hexadecimal digits)")
+    head = _git(root, "rev-parse", "HEAD") if (root / ".git").exists() else None
+    if head is None:
+        if commit is None:
+            raise ValueError("git does not tell the commit of this code here: give it with --commit "
+                             "(the output of 'git rev-parse HEAD' on the host)")
+        return commit, None
+    head = head.strip()
+    if commit is not None and commit != head:
+        raise ValueError(f"--commit {commit} is not the commit of this code ({head})")
+    status = _git(root, "status", "--porcelain", "--", *CODE)
+    return head, None if status is None else bool(status.strip())
+
+
+def image_environment() -> dict:
+    """The image this process runs in (``scripts/in_docker.sh`` passes its identifier) and the
+    sha256 of the lock it was built from. What is not known is None: outside the image."""
+    return dict(image=os.environ.get("FMETA_IMAGE_ID") or None,
+                lock_sha256=_sha256(IMAGE_LOCK) if IMAGE_LOCK.exists() else None)
+
+
+RUNS = "runs.jsonl"                          # in the work directory: the code and the image of every call of run_set
+
+
+def _record_run(workdir: Path) -> None:
+    """Append the code and the image of this call to ``workdir/runs.jsonl``: the simulations of
+    a report may be older than the code that writes it, and the report names both."""
+    try:
+        commit, dirty = code_version()
+    except ValueError:                       # git cannot tell here: not known
+        commit, dirty = None, None
+    call = dict(time=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), commit=commit,
+                dirty=dirty, **image_environment())
+    with open(workdir / RUNS, "a") as handle:
+        handle.write(json.dumps(call) + "\n")
+
+
+# ---- the report: one ligand -------------------------------------------------
+
+def _rounded(value, digits: int = 4) -> Optional[float]:
+    return None if value is None or not math.isfinite(value) else round(float(value), digits)
+
+
+def _energy(value) -> Optional[dict]:
+    """A free energy given in kJ/mol, in both units."""
+    if value is None or not math.isfinite(value):
+        return None
+    return dict(kj_mol=round(float(value), 4), kcal_mol=round(float(value) / KCAL, 4))
+
+
+def _interval(values) -> Optional[dict]:
+    if values is None or not all(math.isfinite(value) for value in values):
+        return None
+    return dict(kj_mol=[round(float(value), 4) for value in values],
+                kcal_mol=[round(float(value) / KCAL, 4) for value in values])
+
+
+def _analysed(directory: Path) -> tuple:
+    """The summary of the replicas of a ligand that can be analysed (None without one), and
+    for each of the others why it cannot. The replicas are those 'fmeta analyze' takes."""
+    found = sorted((d for d in directory.glob("rep*") if d.is_dir() and d.name[3:].isdigit()
+                    and ((d / "HILLS").exists() or walker_directories(d))), key=lambda d: int(d.name[3:]))
+    failures: dict = {}
+    if not found:
+        return None, failures
+    try:
+        return analyze_replicas(found, write_to=directory / "summary.json"), failures
+    except Exception:                               # a replica without a hill, a file cut short, ...
+        usable = []
+        for replica in found:                       # which one: the others still count
+            try:
+                analyze_run(replica, write=False)
+                usable.append(replica)
+            except Exception as error:
+                failures[replica.name] = f"{type(error).__name__}: {error}"
+    summary = analyze_replicas(usable, write_to=directory / "summary.json") if usable else None
+    return summary, failures
+
+
+def ligand_result(item: Prepared, reference: Reference) -> dict:
+    """What the replicas of one ligand give, beside its reference values.
+
+    ``dg`` is the mean of the plateau values of the replicas that were analysed, ``ci95`` its
+    Student-t interval (None for one replica). ``converged`` says that each of them passed
+    every check of the analysis; ``no_binding`` counts those within 1 kT of what the empty
+    funnel gives, whose value is not a binding free energy. A ligand without a value keeps its
+    place in the list, with ``error``."""
+    summary, failures = _analysed(item.directory)
+    replicas = []
+    for run in (summary["replicas"] if summary else []):
+        directory = Path(run["workdir"])
+        result = _read_json(directory / "result.json") or {}
+        excess, temperature = result.get("binding_excess"), result.get("temperature")
+        replicas.append(dict(
+            name=directory.name, simulated_ns=_rounded(run["simulated_ns"]), dg=_energy(run["dG_plateau"]),
+            rebinding_events=int(run["rebinding_events"]), converged=bool(run["converged"]),
+            no_binding=bool(excess is not None and temperature is not None
+                            and excess < MIN_BINDING_EXCESS * KB * temperature)))
+    rows = _replica_rows(item)
+    dg = _energy(summary["dG"]) if summary else None
+    error = None
+    if dg is None:
+        error = ("the free energy is not finite" if summary else
+                 "no replica could be analysed" if failures else "no replica has hills yet")
+    return dict(
+        name=item.ligand.name, directory=item.directory.name, charge=item.ligand.charge, dg=dg,
+        sem=_energy(summary["sem"]) if summary else None, ci95=_interval(summary["ci95"]) if summary else None,
+        n_replicas=len(replicas), replicas_planned=int(item.config.run.replicas),
+        replicas_finished=sum(all(row["state"] == "done" for row in group) for group in rows.values()),
+        converged=bool(replicas) and all(replica["converged"] for replica in replicas),
+        no_binding_replicas=sum(replica["no_binding"] for replica in replicas),
+        rebinding_events=sum(replica["rebinding_events"] for replica in replicas),
+        replicas=replicas,
+        problems={Path(replica).name: found for replica, found in (summary or {}).get("problems", {}).items()},
+        not_analysed=failures, error=error,
+        experiment=dict(dg=_energy(reference.exp_dg), temperature_k=reference.exp_temperature, doi=reference.exp_doi),
+        fep=None if reference.fep_dg is None else dict(
+            dg=_energy(reference.fep_dg), se=_energy(reference.fep_se), kind=reference.fep_kind,
+            source=reference.fep_source),
+        afe=None if reference.afe_dg is None else dict(
+            dg=_energy(reference.afe_dg), se=_energy(reference.afe_se), source=reference.afe_source))
+
+
+# ---- the report: the set ----------------------------------------------------
+
+COMPARISONS = (("fmeta_vs_experiment", "dg"), ("fep_vs_experiment", "fep"), ("afe_vs_experiment", "afe"))
+
+
+def _value(ligand: dict, what: str) -> Optional[float]:
+    """A value of a ligand as the report lists it, in kJ/mol: ``dg`` (fmeta), ``fep`` or ``afe``."""
+    entry = ligand["dg"] if what == "dg" else (ligand[what] or {}).get("dg")
+    return None if entry is None else entry["kj_mol"]
+
+
+def _comparison(ligands: Sequence[dict], what: str) -> Optional[dict]:
+    """How one kind of value agrees with experiment on those of ``ligands`` that have it (None
+    without one). It is computed from the values as the report lists them, so a reader of the
+    report gets the same numbers."""
+    pairs = [(ligand["name"], _value(ligand, what), ligand["experiment"]["dg"]["kj_mol"]) for ligand in ligands]
+    pairs = [pair for pair in pairs if pair[1] is not None]
+    if not pairs:
+        return None
+    measures = agreement([pair[1] for pair in pairs], [pair[2] for pair in pairs])
+    result: dict = dict(ligands=[pair[0] for pair in pairs], n=measures["n"])
+    for name in MEASURES:
+        value, interval = measures[name]["value"], measures[name]["ci95"]
+        if name in ENERGY_MEASURES:
+            result[name] = dict(value=_energy(value), ci95=_interval(interval))
+        else:
+            result[name] = dict(value=_rounded(value),
+                                ci95=None if interval is None else [round(bound, 4) for bound in interval])
+    return result
+
+
+def set_statistics(ligands: Sequence[dict]) -> dict:
+    """The agreement with experiment, twice: over ``all`` ligands that have a value of fmeta,
+    whatever the verdict of the analysis, and over the ``converged`` ones. In each, the FEP
+    values are compared on the same ligands. No ligand is left out silently: those without a
+    value are named in ``without_value``."""
+    valued = [ligand for ligand in ligands if ligand["dg"] is not None]
+    subsets = dict(all=valued, converged=[ligand for ligand in valued if ligand["converged"]])
+    result: dict = {name: {key: _comparison(chosen, what) for key, what in COMPARISONS}
+                    for name, chosen in subsets.items()}
+    result["without_value"] = [ligand["name"] for ligand in ligands if ligand["dg"] is None]
+    result["bootstrap"] = dict(resamples=BOOTSTRAP_RESAMPLES, seed=BOOTSTRAP_SEED,
+                               interval="2.5 - 97.5 percentile over ligands drawn with replacement")
+    return result
+
+
+def _runs(workdir: Path) -> list:
+    """The distinct codes and images that ran the simulations of ``workdir``, each with the
+    time of its first call."""
+    seen: dict = {}
+    path = workdir / RUNS
+    for line in (path.read_text().splitlines() if path.exists() else []):
+        call = json.loads(line)
+        seen.setdefault(tuple(call.get(key) for key in ("commit", "dirty", "image", "lock_sha256")), call)
+    return list(seen.values())
+
+
+def report_set(benchmark: BenchmarkSet, workdir, reports, version: tuple, environment: Optional[dict] = None,
+               date: Optional[str] = None) -> Path:
+    """Analyse every prepared ligand of ``workdir`` and write the report of the set:
+    ``<reports>/<UTC date>-<commit>-<set>.json`` and ``.md``, and its entry in
+    ``<reports>/index.json``. Returns the path of the JSON file.
+
+    ``version`` is ``(commit, dirty)`` of the code that writes the report
+    (:func:`code_version`). A report says what was measured; it has no verdict. It can be
+    written while the set still runs: a ligand counts with the replicas it has."""
+    workdir, reports = Path(workdir).resolve(), Path(reports)
+    commit, dirty = version
+    prepared = prepared_ligands(benchmark, workdir)
+    config, on = prepared[0].config, benchmark.superpose_on
+    ligands = [ligand_result(item, benchmark.reference[item.ligand.name]) for item in prepared]
+    names = [item.ligand.name for item in prepared]
+    report = dict(
+        schema=SCHEMA, set=benchmark.name, title=benchmark.title,
+        date=date or datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+        commit=commit, dirty=dirty, environment=image_environment() if environment is None else environment,
+        runs=_runs(workdir),
+        definition=dict(
+            set_yaml_sha256=_sha256(benchmark.directory / "set.yaml"),
+            reference_csv_sha256=_sha256(benchmark.directory / "reference.csv"),
+            source=benchmark.source, files={key: source.sha256 for key, source in benchmark.files.items()},
+            superpose_on_sha256=None if on is None else on.source.sha256,
+            configuration_sha256=configuration_hash(benchmark, config)),
+        conditions=dict(
+            temperature_k=float(config.system.temperature), length_ns=float(config.run.length_ns),
+            replicas=int(config.run.replicas), standard_state="1 mol/L", standard_volume_nm3=STANDARD_VOLUME,
+            experiment="as the reference file gives them; a value given as Ki is converted at the temperature "
+                       "of its measurement; no value is corrected to the temperature of the simulation"),
+        ligands=ligands,
+        not_prepared=[ligand.name for ligand in benchmark.ligands if ligand.name not in names],
+        statistics=set_statistics(ligands))
+    reports.mkdir(parents=True, exist_ok=True)
+    stem = f"{report['date']}-{commit[:9]}-{benchmark.name}"
+    _replace(reports / f"{stem}.json", json.dumps(report, indent=1, allow_nan=False) + "\n")
+    _replace(reports / f"{stem}.md", format_report(report))
+    index = reports / "index.json"
+    entries = json.loads(index.read_text())["entries"] if index.exists() else []
+    entry = dict(file=f"{stem}.json", date=report["date"], commit=commit, dirty=dirty, set=benchmark.name)
+    entries = [other for other in entries if other.get("file") != entry["file"]] + [entry]
+    _replace(index, json.dumps(dict(entries=entries), indent=1) + "\n")
+    return reports / f"{stem}.json"
+
+
+# ---- the report: as text ----------------------------------------------------
+
+UNITS = (("kcal_mol", "kcal/mol"), ("kj_mol", "kJ/mol"))
+_LABELS = dict(mue="MUE", rmse="RMSE", mean_signed_error="Mean signed error", mue_offset_removed="MUE, offset removed",
+               rmse_offset_removed="RMSE, offset removed", pearson_r="Pearson r", kendall_tau="Kendall tau")
+_KINDS = dict(fmeta_vs_experiment="fmeta", fep_vs_experiment="FEP", afe_vs_experiment="absolute FEP")
+
+
+def _verdict(ligand: dict) -> str:
+    if ligand["error"]:
+        return ligand["error"]
+    text = "converged" if ligand["converged"] else "NOT CONVERGED"
+    if ligand["no_binding_replicas"]:
+        text += f"; no binding in {ligand['no_binding_replicas']} of {ligand['n_replicas']} replica(s)"
+    return text
+
+
+def _ligand_table(ligands: Sequence[dict], unit: str) -> list:
+    lines = ["| Ligand | Replicas analysed (finished / planned) | dG0 fmeta | 95% CI | Experiment | FEP "
+             "| fmeta - experiment | Rebinding events | Analysis |", "|---|---|---|---|---|---|---|---|---|"]
+    for ligand in ligands:
+        dg, interval, fep = ligand["dg"], ligand["ci95"], ligand["fep"]
+        experiment = ligand["experiment"]["dg"][unit]
+        cells = [ligand["name"],
+                 f"{ligand['n_replicas']} ({ligand['replicas_finished']} / {ligand['replicas_planned']})",
+                 "" if dg is None else f"{dg[unit]:.2f}",
+                 "" if interval is None else f"{interval[unit][0]:.2f} to {interval[unit][1]:.2f}",
+                 f"{experiment:.2f}",
+                 "" if fep is None else f"{fep['dg'][unit]:.2f}" + (f" ± {fep['se'][unit]:.2f}" if fep["se"] else ""),
+                 "" if dg is None else f"{dg[unit] - experiment:+.2f}",
+                 str(ligand["rebinding_events"]), _verdict(ligand)]
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def _statistics_table(statistics: dict, unit: str) -> list:
+    columns = [(f"{_KINDS[key]}, {subset}", statistics[subset][key]) for key, _ in COMPARISONS
+               for subset in ("all", "converged") if statistics["all"][key] is not None]
+
+    def cell(comparison, name) -> str:
+        measure = (comparison or {}).get(name) or dict(value=None, ci95=None)
+        value, interval = measure["value"], measure["ci95"]
+        if name in ENERGY_MEASURES:
+            value, interval = (None if entry is None else entry[unit] for entry in (value, interval))
+        if value is None:
+            return ""
+        text = f"{value:+.2f}" if name == "mean_signed_error" else f"{value:.2f}"
+        return text if interval is None else f"{text} [{interval[0]:.2f}, {interval[1]:.2f}]"
+
+    lines = ["| Measure | " + " | ".join(title for title, _ in columns) + " |", "|---" * (len(columns) + 1) + "|",
+             "| Ligands | " + " | ".join(str((comparison or {}).get("n", 0)) for _, comparison in columns) + " |"]
+    for name in MEASURES:
+        lines.append(f"| {_LABELS[name]} | " + " | ".join(cell(comparison, name) for _, comparison in columns) + " |")
+    return lines
+
+
+def format_report(report: dict) -> str:
+    """The report of :func:`report_set` as Markdown: every table in kcal/mol and in kJ/mol."""
+    environment, definition, conditions = report["environment"], report["definition"], report["conditions"]
+    ligands, statistics = report["ligands"], report["statistics"]
+    state = {True: " with uncommitted changes", False: "", None: " (whether it has uncommitted changes is not known)"}
+    source = definition["source"]
+    lines = [
+        f"# Benchmark report: {report['title']}", "",
+        f"Set `{report['set']}`, written {report['date']} (UTC) by the code of commit `{report['commit']}`"
+        f"{state[report['dirty']]}.", "",
+        f"- Image: `{environment['image'] or 'not known'}`, lock sha256 `{environment['lock_sha256'] or 'not known'}`"]
+    for call in report["runs"]:
+        lines.append(f"- Simulations run from {call['time']} by commit `{call['commit'] or 'not known'}`"
+                     f"{state[call['dirty']] if call['commit'] else ''}, image `{call['image'] or 'not known'}`, "
+                     f"lock sha256 `{call['lock_sha256'] or 'not known'}`")
+    if not report["runs"]:
+        lines.append("- Simulations: no call of 'fmeta benchmark run' is recorded")
+    lines += [
+        f"- Set definition: `set.yaml` sha256 `{definition['set_yaml_sha256']}`, `reference.csv` sha256 "
+        f"`{definition['reference_csv_sha256']}`, configuration sha256 `{definition['configuration_sha256']}`"
+        + (f"; inputs from {source['repository']} at commit `{source.get('commit')}`" if source.get("repository")
+           else ""),
+        f"- Plan: {conditions['replicas']} replica(s) of {conditions['length_ns']:g} ns per ligand at "
+        f"{conditions['temperature_k']:g} K",
+        f"- Standard state: {conditions['standard_state']} (V0 = {conditions['standard_volume_nm3']:.4f} nm^3)",
+        f"- Experimental values: {conditions['experiment']}", "",
+        "This report states what was measured. It holds no verdict.", ""]
+    for unit, label in UNITS:
+        lines += [f"## Ligands ({label})", "",
+                  "dG0 of fmeta is the mean over the analysed replicas of the plateau mean of dG0(t); the interval "
+                  "is the 95% Student-t interval of that mean (none for a single replica).", ""]
+        lines += _ligand_table(ligands, unit) + [""]
+    notes = [f"- {ligand['name']}, {replica}: {problem}" for ligand in ligands
+             for replica, problems in ligand["problems"].items() for problem in problems]
+    notes += [f"- {ligand['name']}, {replica}: not analysed ({reason})" for ligand in ligands
+              for replica, reason in ligand["not_analysed"].items()]
+    if notes:
+        lines += ["## What the analysis found", ""] + notes + [""]
+    if any(ligand["no_binding_replicas"] for ligand in ligands):
+        lines += ["A replica marked \"no binding\" gave a value within 1 kT of what the empty funnel gives. Such a "
+                  "value is not a binding free energy. Its ligand stays in the \"all\" columns below, so that no "
+                  "ligand is dropped, and is not in the \"converged\" columns.", ""]
+    bootstrap = statistics["bootstrap"]
+    lines += ["## Agreement with experiment", "",
+              "The error of a ligand is the calculated value minus the experimental one. \"all\": every ligand "
+              "with a value of fmeta, whatever the analysis says about it; \"converged\": the ligands whose "
+              "analysed replicas all passed every check. The other methods are compared on the same ligands. "
+              "\"offset removed\": after the mean error on these ligands is taken out, so that only differences "
+              f"between the ligands count. In brackets: {bootstrap['interval']} ({bootstrap['resamples']} "
+              f"resamples, seed {bootstrap['seed']}); it tells how much a measure depends on the choice of "
+              "ligands. Below three ligands there is no interval and no correlation.", ""]
+    for subset in ("all", "converged"):
+        chosen = (statistics[subset]["fmeta_vs_experiment"] or {}).get("ligands", [])
+        lines.append(f"- {subset}: {', '.join(chosen) or 'no ligand'}")
+    for title, names in (("without a value", statistics["without_value"]), ("not prepared", report["not_prepared"])):
+        if names:
+            lines.append(f"- {title}: {', '.join(names)}")
+    lines.append("")
+    for unit, label in UNITS:
+        lines += [f"### Energies in {label}", ""] + _statistics_table(statistics, unit) + [""]
+    if any(ligand["fep"] and ligand["fep"]["kind"] == "relative" for ligand in ligands):
+        lines += ["The FEP values are relative free energies: differences between the ligands, shifted by a "
+                  "constant that their source chose (see the README of the set). Their MUE, RMSE and mean signed "
+                  "error contain that choice; fmeta has no such constant. The fair comparison of the two is in "
+                  "the rows \"offset removed\" and in the correlations.", ""]
+    return "\n".join(lines)

@@ -4,6 +4,7 @@ jobs and the restart, the report and its check."""
 import hashlib
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -16,21 +17,30 @@ from scipy.spatial.transform import Rotation
 from fmeta.benchmark import (
     REFERENCE_COLUMNS,
     agreement,
+    code_version,
     fetch_inputs,
     format_status,
     load_set,
     prepare_set,
     prepared_ligands,
+    report_set,
     run_set,
     sdf_charge,
     sdf_coordinates,
     sdf_records,
+    set_statistics,
     status_rows,
 )
 from fmeta.config import Config
+from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.scheduler import read_schedule, verify_schedule
+from fmeta.testing.toy import make_simulation, make_toy
 
-EXAMPLES = Path(__file__).resolve().parents[1] / "examples" / "benchmarks"
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import verify_bench_results  # noqa: E402
+
+EXAMPLES = ROOT / "examples" / "benchmarks"
 NAMES = ("a", "b D", "c")                                 # "b D": a name that is not a directory name
 ROWS = ("a,-8.0,,,10.1000/exp,-8.5,0.1,relative,10.1000/fep,,,",
         "b D,-9.0,,,10.1000/exp,-9.2,0.1,relative,10.1000/fep,,,",
@@ -300,6 +310,7 @@ def test_every_ligand_has_a_first_replica_before_any_has_a_second_and_finished_s
 
     assert run_set(benchmark, work, launcher=children) == {}          # the work directory is the truth
     assert len(children.started) == 12 and len(read_schedule(work / "schedule.jsonl")) == 2
+    assert len((work / "runs.jsonl").read_text().splitlines()) == 2   # the code and the image of each call
     rows = status_rows(benchmark, work)
     assert {row["state"] for row in rows} == {"done"}
     assert format_status(rows).splitlines()[-1] == "3 ligand(s): 6 of 6 run(s) done, 0.024 of 0.024 ns"
@@ -390,3 +401,122 @@ def test_measures_that_do_not_exist_are_none():
     assert flat["pearson_r"]["value"] is None and flat["kendall_tau"]["value"] is None
     assert flat["mue"]["ci95"] is not None
     assert agreement([], [])["mue"] == dict(value=None, ci95=None)
+
+
+# ---- the report and its check -----------------------------------------------
+
+VERSION = ("0123456789abcdef0123456789abcdef01234567", False)        # (commit, dirty) of the code of a report
+
+
+def run_toy(directory, seed) -> None:
+    """A short run of the solvable toy system: a replica that the analysis can read."""
+    toy = make_toy()
+    settings = BiasSettings(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
+                            pace=100, points_per_sigma=2.0)
+    bias = FunnelBias(toy.system, toy.funnel, settings)             # its force joins the system before the context
+    run = MetadynamicsRun(make_simulation(toy, temperature=300.0, seed=seed), bias, directory, toy.restraint_group,
+                          RunSettings(checkpoint_hills=5000))
+    run.run(600)
+    run.close()
+
+
+@pytest.fixture(scope="module")
+def reported(tmp_path_factory, inputs):
+    """The report of a set of which ``a`` has two replicas, ``b D`` one and a second without
+    a hill, and ``c`` none: ``(directory of the reports, path of the JSON file)``."""
+    root = tmp_path_factory.mktemp("reported")
+    benchmark = load_set(write_set(root / "set", inputs))
+    work = root / "work"
+    prepare_set(benchmark, work, "all")
+    for replica, seed in (("a/rep0", 1), ("a/rep1", 2), ("b_D/rep0", 3)):
+        run_toy(work / replica, seed)
+    (work / "b_D" / "rep1").mkdir()
+    (work / "b_D" / "rep1" / "HILLS").write_text("")
+    call = dict(commit=VERSION[0], dirty=False, image="sha256:0a", lock_sha256="0b")
+    (work / "runs.jsonl").write_text("".join(json.dumps(dict(time=f"2026-11-1{day}T00:00:00+00:00", **call)) + "\n"
+                                             for day in (4, 5)))
+    path = report_set(benchmark, work, root / "reports", VERSION,
+                      environment=dict(image="sha256:0a", lock_sha256="0b"), date="2026-11-16")
+    return root / "reports", path
+
+
+def test_a_report_keeps_every_ligand_gives_both_units_and_compares_the_values_it_lists(reported):
+    reports, path = reported
+    assert path == reports / "2026-11-16-012345678-toy.json"
+    report = json.loads(path.read_text())
+    a, b, c = report["ligands"]
+    assert [ligand["name"] for ligand in (a, b, c)] == list(NAMES)   # no ligand is dropped
+    assert [ligand["n_replicas"] for ligand in (a, b, c)] == [2, 1, 0]
+    assert a["dg"]["kj_mol"] == pytest.approx(np.mean([replica["dg"]["kj_mol"] for replica in a["replicas"]]), abs=1e-4)
+    assert a["dg"]["kcal_mol"] == pytest.approx(a["dg"]["kj_mol"] / 4.184, abs=1e-4)
+    assert a["ci95"]["kj_mol"][0] < a["dg"]["kj_mol"] < a["ci95"]["kj_mol"][1]
+    assert b["ci95"] is None and list(b["not_analysed"]) == ["rep1"]  # one replica: a value without an interval
+    assert c["dg"] is None and c["error"] == "no replica has hills yet"
+    assert a["experiment"]["dg"] == dict(kj_mol=-33.472, kcal_mol=-8.0)
+    assert [call["time"] for call in report["runs"]] == ["2026-11-14T00:00:00+00:00"]    # one code, its first call
+
+    statistics = report["statistics"]
+    fmeta, fep = (statistics["all"][key] for key in ("fmeta_vs_experiment", "fep_vs_experiment"))
+    errors = [ligand["dg"]["kj_mol"] - ligand["experiment"]["dg"]["kj_mol"] for ligand in (a, b)]
+    assert fmeta["ligands"] == fep["ligands"] == ["a", "b D"] and statistics["without_value"] == ["c"]
+    assert fmeta["mean_signed_error"]["value"]["kj_mol"] == pytest.approx(np.mean(errors), abs=1e-4)
+    assert fep["mue"]["value"] == dict(kj_mol=1.4644, kcal_mol=0.35)   # FEP - experiment: -0.5 and -0.2 kcal/mol
+
+    text = path.with_suffix(".md").read_text()
+    assert "## Ligands (kcal/mol)" in text and "## Ligands (kJ/mol)" in text
+    assert f"| a | 2 (2 / 2) | {a['dg']['kcal_mol']:.2f} |" in text and "| c | 0 (0 / 2) |  |" in text
+    index = json.loads((reports / "index.json").read_text())
+    assert index == dict(entries=[dict(file=path.name, date="2026-11-16", commit=VERSION[0], dirty=False, set="toy")])
+
+
+def listed(name, dg, experiment, fep, converged=True) -> dict:
+    """A ligand as a report lists it, with what the statistics read; values in kJ/mol."""
+    def energy(value):
+        return None if value is None else dict(kj_mol=value, kcal_mol=value / 4.184)
+    return dict(name=name, converged=converged, dg=energy(dg), experiment=dict(dg=energy(experiment)),
+                fep=dict(dg=energy(fep)), afe=None)
+
+
+def test_the_statistics_stand_side_by_side_for_all_ligands_and_for_the_converged_ones():
+    statistics = set_statistics([listed("a", -30.0, -31.0, -31.5), listed("b", -36.0, -35.0, -35.5),
+                                 listed("c", -20.0, -40.0, -40.5, converged=False),
+                                 listed("d", None, -38.0, -38.5)])
+    everything, converged = statistics["all"], statistics["converged"]
+    assert everything["fmeta_vs_experiment"]["ligands"] == everything["fep_vs_experiment"]["ligands"] == ["a", "b", "c"]
+    assert converged["fmeta_vs_experiment"]["ligands"] == converged["fep_vs_experiment"]["ligands"] == ["a", "b"]
+    assert statistics["without_value"] == ["d"]
+    assert everything["fmeta_vs_experiment"]["mue"]["value"]["kj_mol"] == pytest.approx(22.0 / 3.0, abs=1e-4)
+    assert converged["fmeta_vs_experiment"]["mue"]["value"] == dict(kj_mol=1.0, kcal_mol=0.239)
+    assert converged["fmeta_vs_experiment"]["mean_signed_error"]["value"]["kj_mol"] == 0.0
+    assert everything["fep_vs_experiment"]["mue"]["value"]["kj_mol"] == 0.5          # a constant offset only
+    assert everything["fep_vs_experiment"]["mue_offset_removed"]["value"]["kj_mol"] == 0.0
+    assert everything["afe_vs_experiment"] is None and converged["afe_vs_experiment"] is None
+
+
+def test_the_check_accepts_a_report_and_catches_one_that_was_changed(reported, tmp_path):
+    reports, path = reported
+    assert verify_bench_results.verify_reports(reports) == ([], 1)
+    assert verify_bench_results.verify_reports(tmp_path) == ([], -1)  # no report yet is fine
+
+    def changed(change) -> str:
+        directory = tmp_path / f"reports{len(list(tmp_path.iterdir()))}"
+        shutil.copytree(reports, directory)
+        report = json.loads((directory / path.name).read_text())
+        change(report, directory)
+        (directory / path.name).write_text(json.dumps(report))
+        errors, _ = verify_bench_results.verify_reports(directory)
+        return "\n".join(errors)
+
+    assert "holds no verdict" in changed(lambda report, directory: report["statistics"].update(passed=True))
+    assert "no environment" in changed(lambda report, directory: report["environment"].update(image=None))
+    assert "commit differs" in changed(lambda report, directory: report.update(commit="f" * 40))
+    assert "not beside it" in changed(lambda report, directory: (directory / path.name).with_suffix(".md").unlink())
+    assert "not listed" in changed(lambda report, directory: shutil.copy(directory / path.name, directory / "x.json"))
+
+
+def test_the_commit_of_a_report_is_given_where_git_cannot_tell(tmp_path):
+    assert code_version(VERSION[0], root=tmp_path) == (VERSION[0], None)      # dirty: not known
+    with pytest.raises(ValueError, match="give it with --commit"):
+        code_version(root=tmp_path)
+    with pytest.raises(ValueError, match="full hash"):
+        code_version("0123456", root=tmp_path)
