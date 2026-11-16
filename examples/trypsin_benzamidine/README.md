@@ -56,13 +56,36 @@ checkpoints. With one GPU use `--gpus 0` and `--mode sequential`.
 
 ## Result
 
-Not available yet. The run of five replicas × 500 ns with the official defaults was started on
-2026-11-15 (UTC) on commit 8d1f10a in the official image; at the measured speed it needs about
-18 hours. This section will hold the standard binding free energy with its confidence interval,
-the rebinding counts and the convergence verdict, whatever they turn out to be.
+Not available yet. The run of five replicas with the official defaults was started on
+2026-11-15 (UTC) on commit 8d1f10a in the official image, configured for the default length of
+that day, 500 ns per replica. It ends at the length that "Run length" below gives. This section
+will hold the standard binding free energy with its confidence interval, the rebinding counts
+and the convergence verdict, whatever they turn out to be.
 
 The calcium ion is removed by default. Keeping it (`system.keep_hetero`) is a variation that
 has not been run.
+
+## Run length
+
+The default was 500 ns per replica, taken from the literature that was read
+(`docs/configuration.md`). On 2026-11-16 the owner decided that this is too long. The new
+default comes from this run, by a rule written at about 01:00 UTC on 2026-11-16, when the five
+replicas were at 41 to 44 ns:
+
+- The run is analysed with `fmeta analyze` as it stood at 100, 150 and 200 ns (HILLS and COLVAR
+  cut at that time; the trajectory does not depend on the configured length).
+- The default `run.length_ns` becomes the shortest of the three at which the verdict over the
+  five replicas is "converged": every replica passes every convergence criterion of the product
+  (rebinding events, drift and roughness of dG(t), gap to the reweighted estimate).
+- If the verdict is "not converged" at all three, the default becomes 200 ns, and this file and
+  `docs/configuration.md` say that the default did not converge on this system.
+- Five replicas stay. No criterion changes. Agreement with experiment is not looked at.
+- The run is stopped at the chosen length, and the result above is the analysis of that length.
+
+Known when the rule was written: this run analysed at 20 ns and at 40 ns, not converged at
+either (at 40 ns 3 to 5 rebinding events per replica, a drift of dG(t) of +12 to +22 kJ/mol
+over the plateau window); and replica 0 of `examples/tyk2_ejm46`, where the ligand left the
+site within 5 ns and was back within 20 ns.
 
 ## Scan of the defaults
 
@@ -96,8 +119,16 @@ The rule, written on 2026-11-16 before any of these runs had started:
   Otherwise the defaults stay and the numbers are reported as measured.
 - Agreement with experiment is not a criterion, here or on any benchmark.
 
-The length of 500 ns is not a variant: dG(t) and the convergence verdict of the run above say
-whether it is enough on this system.
+Amendment of 2026-11-16, about 01:00 UTC, with "Run length". The `dt2` replicas were at 6 to
+8 ns, `pace2` and `srho03` had not started, and no variant had been analysed.
+
+- The comparison is made at the chosen length L instead of 200 ns: three replicas of L per
+  variant against the first L of the five replicas. Conditions 1 and 2 are otherwise unchanged.
+- Condition 2 can only be met when fewer than half of the five replicas pass at L. `pace2` and
+  `srho03` are run only in that case. Otherwise they cannot change a default: they are not run,
+  and are reported as not run. The reason for leaving them out is the time: the owner asked for
+  the shortest way to the results.
+- `dt2` is run to L in every case.
 
 Not scanned: the wall force constants, the force fields and the shape of the funnel. Each would
 be a scan of its own; they are listed with their sources in `docs/configuration.md`.

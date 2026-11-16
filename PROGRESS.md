@@ -26,7 +26,7 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D16 Accepted, of FM-D15 the
-membrane part; FM-D2, D4, D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+membrane part; FM-D2, D4, D5, D6, D7, D11, D12 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -46,7 +46,7 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates not run on this code yet |
 | GPU plan M2: real inputs (R8, FM-D15) | Membrane part merged: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule; `pytest` 113 passed. GPU gates not run on this code yet, and the real `addMembrane` test (`-m slow`) not rerun. Protein part (chain gaps, caps, protonation states) in progress on a branch |
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | In progress on a branch; not merged, not gated |
-| GPU plan M4: trypsin-benzamidine (R2) and the scan of the defaults | Running: 5 replicas × 500 ns from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, 33 ns each at 2026-11-16 00:29 UTC (660 ns/day). Scan (protocol and decision rule in `examples/trypsin_benzamidine/README.md`, written before the runs): `dt2` running, 3 × 200 ns at 2 fs on GPUs 5–7 (container `fmeta-scan-dt2`) since 00:22 UTC; `pace2` and `srho03` prepared, not started. No result yet |
+| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the defaults | Running: 5 replicas from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, 41–44 ns each at 2026-11-16 00:53 UTC (660 ns/day). Analysed at 40 ns: not converged (3–5 rebinding events per replica, drift +12 to +22 kJ/mol). The default length of 500 ns is withdrawn (owner); the run ends at the length its convergence gives: 100, 150 or 200 ns (rule in `examples/trypsin_benzamidine/README.md`, FM-D16 amendment). Scan, compared at that length: `dt2` running at 2 fs on GPUs 5–7 (container `fmeta-scan-dt2`) since 00:22 UTC; `pace2` and `srho03` prepared, run only if the rule can still change a default. No result yet |
 | GPU plan M5: kinase example (R10) | Paused: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms, commit 8d1f10a). Replica 0 ran on GPU 5 from 2026-11-15 23:30 UTC and was stopped at 2026-11-16 00:22 UTC for the scan; all replicas continue from the checkpoints when GPUs are free. No result yet |
 | GPU plan M6: GPCR example (R3) | Draft: `examples/a2a_theophylline` (OPM file of 5MZJ, 221143 atoms, 484 POPC). Builds, places the funnel into the extracellular water and passes 1 ns of equilibration with a placeholder input (`TER` records added by hand); as `fmeta split` writes it, `prepare` stops (kept ion read into the protein chain). No metadynamics yet |
 | GPU plan M7: benchmark runs (R10) | Not started |
@@ -55,15 +55,14 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   (CUDA, mixed precision, 2 GPUs, in the image):
   `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
   (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 110 passed on
-  the code of FM-D16 with the fix of dG(t). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 113 passed on
+  4eb3483 (FM-D16, the fix of dG(t), the membrane part of FM-D15). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
   them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system (the first run is in progress);
-    the membrane-plane estimate on a real membrane protein;
   - reading HILLS with PLUMED itself;
   - the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
@@ -75,15 +74,20 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 - GPUs (plan decision changed 2026-11-16, see the Change Log): 0–4 trypsin, 5–7 the scan. Gates
   run on 6–7 with the scan container stopped for the run and restarted with the same command.
 - Time estimate from the measured speeds (72k atoms 660, 88k atoms 570 ns/day at 4 fs; the A2A
-  box, 221k atoms, 167 ns/day at 2 fs in equilibration, 4 fs not measured): the TYK2 pilot
-  (3 ligands × 5 × 500 ns) is about 13 GPU-days. Everything planned is about 115 GPU-days, two
-  weeks on 8 GPUs: TYK2 44, A2A 67 if 4 fs gives twice the speed of 2 fs, trypsin with the scan 7.
+  box, 221k atoms, 167 ns/day at 2 fs in equilibration, 4 fs not measured), for 5 replicas per
+  ligand, 10 TYK2 and 9 A2A ligands, A2A at twice its 2 fs speed: about 22 GPU-days at 100 ns
+  per replica (TYK2 9, A2A 13), 45 at 200 ns. It was about 115 at 500 ns.
 - Blockers: the A2A example waits for the protein part of FM-D15 (a kept ion that follows the
   chain without `TER`, caps at the loop gap). Nothing else. Pushes from the GPU machine work
   since 2026-11-16 (the `gh` login of the machine as the git credential; the owner added the
   `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] Default run length: 500 ns withdrawn (owner); the new value comes from the trypsin run by a rule written first
+- What: the plan and FM-D16 had 5 replicas × 500 ns as the default. The owner decided on 2026-11-16 that 500 ns is too long. The new `run.length_ns` is the shortest of 100, 150 and 200 ns at which all five replicas of the official trypsin-benzamidine run pass the convergence criteria; 200 ns if they pass at none, stated as not converged. Rule committed with the replicas at 41–44 ns. Five replicas stay; no criterion changes. The scan compares at that length; `pace2` and `srho03` run only if fewer than half of the baseline replicas pass there (otherwise their condition cannot be met). Code and presets hold 500 until the rule has given the value. The two chain scripts that queued the old runs were stopped.
+- Why: the owner's decision. Two measurements with the default bias say that transitions are frequent: trypsin 3–5 rebinding events per replica within 40 ns; TYK2 with ejm_46 (4.8 nM) left the site within 5 ns and was back within 20 ns. 500 ns came from the literature, not from a measurement here.
+- Refs: FM-D16 (amendment), `examples/trypsin_benzamidine/README.md` ("Run length", amendment of the scan), `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md` (defaults, compute table).
 
 ### 2026-11-16 — [amendment] Plan decision on the GPUs changed: the scan also runs on GPUs 6–7, TYK2 paused
 - What: the plan kept GPUs 0–5 for production and 6–7 for gates and development. Now GPUs 5–7 run the three 2 fs replicas of the scan (`fmeta-scan-dt2`, started 00:22 UTC, 3 × 200 ns, 360–390 ns/day on an unshared GPU); for a gate run that container is stopped and afterwards started again with the same command. The TYK2 run on GPU 5 was stopped at 00:22 UTC (replica 0 near 25 ns) and continues from its checkpoints later. The scan protocol and its decision rule were committed (2cf99bd) before any scan run started; `pace2` and `srho03` follow when GPUs are free.

@@ -366,3 +366,16 @@ Why: owner request of 2026-11-15 for a configuration with official defaults. A d
 is written in two places drifts apart; a saved configuration has to say what was run without
 the code that wrote it; a value without a stated origin cannot be reviewed, and a value tuned
 on the benchmark would make the benchmark worthless.
+Amendment (2026-11-16, owner): the default run length of 500 ns per replica is withdrawn. The
+owner decided that it is too long. Its origin was the literature that was read, not a
+measurement of this project. The new `run.length_ns` comes from the official
+trypsin-benzamidine run, by a rule written when that run was at 41 to 44 ns
+(`examples/trypsin_benzamidine/README.md`, "Run length"): the shortest of 100, 150 and 200 ns
+at which all five replicas pass the convergence criteria; 200 ns if they pass at none, and the
+reference then says that the default did not converge there. Five replicas stay and no
+criterion changes. The scan of the other defaults is compared at the same length. Until the
+rule has given the value, the code and the presets hold 500.
+Why: the owner's decision, and two measurements with the default bias: on trypsin 3 to 5
+rebinding events per replica within 40 ns, and on TYK2 with ejm_46 (4.8 nM) the ligand left
+the site within 5 ns and was back within 20 ns. A length chosen from one system's convergence
+diagnostics has a stated origin; a number picked by hand would not.
