@@ -275,3 +275,56 @@ launcher); a key for several replicas on one GPU (its effect is not measured, an
 configuration with a key that is later withdrawn no longer loads).
 Why: owner request of 2026-11-15 for both modes. A stopped container must leave nothing on a
 GPU, and what was run where has to be checkable afterwards from a record, on the GPU machine.
+
+### FM-D15 — The protein of the input: gaps, caps, protonation states, and what is reported
+Status: **Accepted** (2026-11-16). This is the part on the protein model
+(`src/fmeta/system/protein.py`, called by `read_protein`); the part on kept hetero components
+and membranes is written separately.
+The model is made from what the file states, before PDBFixer and the template matching.
+Gaps: consecutive residues of a chain whose C-N distance is above 0.2 nm (`GAP_NM`; a peptide
+bond is 0.133 nm) have residues missing between them. The chain is split there and the two
+ends get NME and ACE (the Amber templates), with their heavy atoms where the backbone of the
+missing neighbours was: the nitrogen opposite to the carbonyl oxygen, the acetyl carbon in the
+plane of the amide hydrogen, and without those atoms where there is most room. A TER record at
+the gap changes nothing: the next chain of the file under the same identifier, with the
+numbering going on, is the same chain. Where the input states a terminus, a chain starts and
+nothing is added: after an OXT, and before a residue with H2 and H3. If a cap would stand
+within 0.3 nm (`CAP_CLASH_NM`) of the other cap or of the residue across the gap, `prepare`
+stops: at most one residue is missing and there is no model without it (measured on the test
+protein, heavy atoms: one residue missing leaves at most 0.23 nm, two at least 0.37 nm).
+Caps of the input stay: an acetyl group (two C, one O) or an N-methyl group (one N, one C)
+within 0.17 nm of a chain end is its ACE or NME under any residue name (preparation programs
+write `UNK` residues after the chain).
+Protonation states: the hydrogens of a residue state its form (histidine: HD1 / HE2; ASP and
+GLU: a hydrogen on the acid; LYS: two or three HZ; CYS: HG, and without it a disulfide or the
+thiolate). A residue without hydrogens keeps the form its name states (HID, HIE, HIP, HSD,
+HSP, ASH, GLH, LYN, CYX, CYM), which OpenMM drops when it reads the file. The forms go to
+`Modeller.addHydrogens` as its `variants`, so they hold against `system.ph` and when the
+hydrogens of the file fit no template and are all rebuilt. Everything else is decided by
+OpenMM at `system.ph`, as before.
+Kept non-protein residues (`keep_hetero`, water) go to a chain of their own behind the protein
+of their chain: an ion listed after the last residue without TER otherwise hides the C terminus.
+Report: `info.protein_input` of `prepared/report.json` and the check `protein_input` hold what
+was removed and kept, the gaps capped (residues, C-N distance, caps added), the caps kept, the
+alternate locations (OpenMM takes the first listed one of a residue; PDB files only), the
+protonation states taken from the input, the histidine forms of the model and its disulfides.
+No second report file.
+Not done: building loops (a modelled loop is an input the user did not give; a cap is a
+statement about what is there); capping the ends of the file (they stay charged termini unless
+the file has caps; no NHE); neutral chain ends (a hydrogen that a preparation program put on an
+open end, HXT or a second one on N, fits no template: the hydrogens are then rebuilt in the
+forms read); pKa prediction; the name HSE (CHARMM's HIE, but a homoserine in the PDB); which
+oxygen of an acid holds the proton after a rebuild. Two chains under one identifier with the
+numbering going on and neither OXT nor H2 / H3 are read as a gap and capped.
+Verified (2026-11-16, GPU 6, files not committed): 3PTB (6 disulfides), 4GIH and the prepared
+TYK2 protein of Schrödinger's `public_binding_free_energy_benchmark` (commit a65d86b; its UNK
+caps kept, HID x5, HIE x7, HIP x1 from its hydrogens) through `prepare` and a 200 ps
+equilibration with zero wall energy, also 4GIH with residues 1056-1059 removed (capped). The
+protein model alone on A2A: OPM 5MZJ with the sodium kept (no TER: gap LEU208-GLU219 capped,
+ion in its own chain) and the prepared `a2a_hip278` protein of the same benchmark (ends filled
+with hydrogens: capped, hydrogens rebuilt, HIE x4 and HIP x2 as its hydrogens state them).
+Why: plan milestone M2 (2026-11-16). OpenMM bonded LEU208 to GLU219 over 1.15 nm and the force
+field accepted it; caps of a prepared file were removed as hetero components and the ends
+became charged; a rebuild turned HIP and HIE of a prepared file into HID. Each of these changes
+the charge or the shape of the protein at the pocket without a message, and the binding free
+energy with it. Parameters are never invented: only templates of the force field are used.
