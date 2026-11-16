@@ -50,7 +50,7 @@ SDF records.
   equals the mean of experimental binding free energies." The shift was made over all 16
   ligands (means in the file: experiment -9.7462, prediction -9.7456 kcal/mol). On the ten
   ligands of this set the two means differ, and an absolute method such as funnel
-  metadynamics has no such shift at all: a report therefore gives every measure a second time
+  metadynamics has no such shift at all: a report therefore gives the MUE and the RMSE a second time,
   after the mean error on the same ligands is removed, and that is the fair comparison
   with FEP+.
 - **Absolute FEP** (`afe_*`): empty. Khalak et al., Chem. Sci. 12, 13958 (2021),
@@ -66,9 +66,23 @@ and MUE 0.55 kcal/mol, R² 0.86, Kendall tau 0.81.
 `config` in `set.yaml` is empty: the defaults of fmeta, at 300 K. The standard state of every
 value is 1 mol/L.
 
+## The protein file as fmeta reads it
+
+Measured on 2026-11-16 with commit eeb5302 (`fmeta benchmark prepare`, then
+`fmeta benchmark run --until prepare` for the three pilot ligands; `prepare.log` and
+`prepared/report.json` of each ligand).
+
+| Point | Result |
+|---|---|
+| Caps | the two `UNK` residues are read as the caps they are and kept: acetyl before THR 890, N-methylamide after GLN 1177 |
+| Histidines | read from the hydrogens of the file: HIS 907 doubly protonated; HIS 958, 993, 1018, 1052 and 1173 with the hydrogen on ND1; HIS 893, 940, 956, 1015, 1021, 1097 and 1146 with it on NE2 |
+| Hydrogens | those of the file are kept; 7 are added |
+| Systems | `ejm_44` 86 105 atoms, `ejm_31` 91 416, `ejm_46` 85 854; no error in the validation. `ejm_46` has one warning: the pose is only 0.20 nm inside the funnel wall |
+
+The protein model is therefore that of the FEP+ input; force field, water and ions are fmeta's.
+
 ## What is not settled
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- fmeta's reading of the protein file (the `UNK` caps, the histidine states) decides what is
-  simulated: check `prepare.log` and `prepared/report.json` of a ligand before a long run.
+- No ligand of this set has been run yet.

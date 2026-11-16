@@ -71,7 +71,7 @@ the SDF records.
   equals the mean of experimental binding free energies." The shift was made over the 20 rows
   of the file (means: experiment -10.9689, prediction -10.9660 kcal/mol). On the eight
   ligands of this set the two means differ, and an absolute method such as funnel
-  metadynamics has no such shift at all: a report therefore gives every measure a second time
+  metadynamics has no such shift at all: a report therefore gives the MUE and the RMSE a second time,
   after the mean error on the same ligands is removed, and that is the fair comparison
   with FEP+.
 - **Absolute FEP** (`afe_*`): empty; no absolute values for this series were looked up.
@@ -88,12 +88,35 @@ equilibration) with three differences, the same as in `examples/a2a_theophylline
 (`keep_hetero: [NA]`) and 1.5 nm of lipid around the receptor (`system.padding`). Everything
 else is the official default, at 300 K. The standard state of every value is 1 mol/L.
 
+## The protein file as fmeta reads it
+
+Measured on 2026-11-16 with commit eeb5302 (`fmeta benchmark prepare`, then
+`fmeta benchmark run --until prepare` for `4q`; `inputs/superposition.json`, `4q/prepare.log`
+and `4q/prepared/report.json` of the work directory).
+
+| Point | Result |
+|---|---|
+| Superposition on the OPM file | 297 CA atoms, RMSD 0.112 nm (the limit in `set.yaml` is 0.2 nm) |
+| Histidines | read from the hydrogens of the file: HIS 264 and HIS 278 doubly protonated, HIS 75, 155, 230 and 250 with the hydrogen on NE2 |
+| Sodium ion | kept (`NA 2400`), 13.5 Å from the nearest heavy atom of `4q` |
+| Break between LEU 208 and GLU 219 (C-N 1.57 nm) | chain split there, N-methylamide on LEU 208 and acetyl on GLU 219 |
+| Disulfide bonds | four: 71-159, 74-146, 77-166, 259-262 |
+| Hydrogens | the 2354 hydrogens of the file did not match the force field's names and were rebuilt, in the protonation states read before |
+| System of `4q` | 231 482 atoms; no error in the validation; the same two warnings as the example (no straight open path, site closed for a 0.3 nm probe) |
+
+Two differences from the model of the FEP+ input remain:
+
+- In the source file the ends at the break and the last residue are neutral: LEU 208 and
+  SER 305 end in an aldehyde (`HXT` on the carbonyl carbon, no `OXT`), GLU 219 starts with a
+  neutral amine. The force field has no such end groups: the break gets the two caps above
+  (neutral as well), and SER 305 gets the missing `OXT`, a charged carboxylate. SER 305 is
+  35 Å from the nearest heavy atom of `4q`. GLY -1 is a charged ammonium in both models.
+- Hydrogen positions are fmeta's, not those of the file (heavy atoms are unchanged).
+
 ## What is not settled
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- The doubly protonated HIS 278 and the kept sodium ion have to survive fmeta's reading of
-  the protein file: check `prepare.log` and `prepared/report.json` of a ligand before a long
-  run.
+- No ligand of this set has been equilibrated or run yet.
 - The hydrophobic thickness of OPM (2 x 15.7 Å) is not used: the bilayer is built with the
   default `membrane.half_thickness`.
