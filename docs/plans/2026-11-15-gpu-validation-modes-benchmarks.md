@@ -99,6 +99,40 @@ The owner's decisions of 2026-11-16 change M4–M7; the detail is in FM-D14 and 
   `bench/reports/`. A replica that does not converge is reported as NOT CONVERGED; nothing is
   extended.
 
+## Second amendment (2026-11-16, owner): what "complete" means
+
+The owner: the work is complete when everything in the original plan and in the request is
+met. The conditions of the first amendment stay. The points of this plan that they did not
+name are added:
+
+- M5, M6 (report for 3 ligands): the two pilots (3 ligands each, 20 ns) run to their end and
+  their reports go to `bench/reports/`, named as pilots. They started before the scan verdict,
+  with the bias that was the default then, to measure throughput and to find defects; nothing
+  is selected from them. The whole sets run after the verdict, with the official defaults, in
+  fresh directories. They start at the verdict, when the throughput is measured, not after the
+  pilot reports.
+- R2: the trypsin README compares the result with experiment and with the published
+  funnel-metadynamics value.
+- Verification, run modes: the trypsin example on one GPU in `sequential` mode is the "5
+  replicas on one GPU in order"; `docker stop` and the same command are tried once during it
+  (for the parallel mode this is on record, roadmap R7).
+- Verification, image: the run without the mounted source also checks that the files it writes
+  belong to the host user.
+- Reports: the measures named under M5–M7 (bootstrap intervals, raw and with the offset
+  removed) are read on the real reports.
+- R8, R9: the lines "GPU gates on this code: not run yet" of the roadmap are closed by the
+  gates on the final code.
+- M7: the text of the PR description; CI `cpu` and `docker` green on the final head.
+
+Where this plan and a later decision of the owner differ, the later decision holds and the
+difference is reported:
+
+- `pytest -m slow` (Verification, CPU) is not rerun: no time is spent on operation on a CPU.
+- The run length is at most 40 ns. If no scan setting has five converged replicas by then,
+  "five replicas to convergence" of R2 is not met, and the reports say so.
+- Roadmap R5 (ligand charge states) and R6 (mixed bilayers) are outside this plan, which covers
+  R2, R3 and R7–R10.
+
 ## Invariants
 
 - No criterion in `.claude/rules/numerics-invariants.md` is relaxed. New gate items
