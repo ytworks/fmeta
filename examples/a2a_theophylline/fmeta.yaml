@@ -1,0 +1,27 @@
+# Human adenosine A2A receptor with theophylline in a POPC bilayer (PDB entry 5MZJ, the file
+# oriented by OPM). DRAFT of 2026-11-16: README.md says how the two input files are made, what
+# is simulated and what is still open. Copy this file to runs/a2a_theophylline/ (README.md).
+input:
+  protein: inputs/protein.pdb    # written by `fmeta split` from the OPM file
+  ligand: inputs/ligand.sdf      # theophylline in the crystal pose, same frame
+
+system:
+  ligand_method: openff
+  ligand_resname: TEP
+  temperature: 310.0
+  padding: 1.5                   # nm of lipid around the receptor in the membrane plane
+  keep_hetero: [NA]              # the sodium ion below the site (residue 2400): part of the receptor
+
+membrane:
+  lipid: POPC
+  center_z: 0.0
+  orient: input                  # the OPM file is oriented. fmeta's own estimate is 14 deg from
+                                 # the OPM normal on this receptor, so `auto` would make it worse
+
+equilibration:
+  free_ps: 10000                 # 10 ns unrestrained, with the funnel walls on
+
+# Not tuned for this system: the values of examples/gpcr_membrane.
+run:
+  length_ns: 1000.0
+  replicas: 5
