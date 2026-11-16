@@ -32,7 +32,7 @@ Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D17 Accept
 FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
 scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
-ended. Open: the image check on the final commit and the result of CI.
+ended and every check of it that this machine can run has run. Open: the result of CI.
 
 | Milestone | Status |
 |---|---|
@@ -45,7 +45,7 @@ ended. Open: the image check on the final commit and the result of CI.
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The result of the CI job `docker` is not checked here; the publish workflow has never run |
+| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e, the final code: 17 passed, 232 entries of the calling user, `fmeta` imported from the image; only `README.md` and `PROGRESS.md` changed after it. The result of the CI job `docker` is not checked here; the publish workflow has never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -74,7 +74,8 @@ ended. Open: the image check on the final commit and the result of CI.
   fixed in c59ec99: the cross-check from the samples was missing for a replica whose weights
   span more than the digits of a float (the headline from the bias is not affected).
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 161 passed on
-  c59ec99. The image check without the mounted source is not repeated on that code yet. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+  c59ec99. The image check without the mounted source passed on 384538e, the same code (the
+  image row above). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
@@ -112,6 +113,11 @@ ended. Open: the image check on the final commit and the result of CI.
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] The image of the final code runs without the mounted source (384538e)
+- What: the image built from clean 384538e (the code of c59ec99; documents and evidence since) passed `fmeta check --quick` on CUDA with an empty directory as `/work` (2 GPUs, 19:16 to 19:18 UTC): 17 passed, 0 failed, 0 skipped; the 232 files and directories it wrote belong to the calling user; `fmeta` is imported from the image (`/opt/conda/lib/python3.12/site-packages/fmeta`). A check, not gate evidence. This closes "the image check on the final commit" of the entries on the gates and on the benchmark sets. Every check of the plan that this machine can run has now run. Not verified here: the result of CI (`cpu`, `docker`); the publish workflow (started by the owner); `pytest -m slow` (owner: no CPU verification).
+- Why: item 2 of the owner request (an official, runnable Docker image): the image that is distributed must work without the repository, on the code that the gates verified.
+- Refs: `Dockerfile`, `conda-linux-64.lock` (sha256 d061e45a…), `README.md`; FM-D13.
 
 ### 2026-11-16 — [progress] Both benchmark sets ran to the end with the defaults; reports beside experiment and FEP+; R10 closed
 - What: `fmeta benchmark run` ended with exit 0 for both sets on 47e84f7 (TYK2, 10 ligands in water, 06:41 to 18:54 UTC; A2A, 8 ligands in POPC, 06:48 to 18:51 UTC; 5 × 40 ns per ligand, 90 replicas, every one to its end; the TYK2 set was stopped at 12:58 UTC for the function checks and continued with the same command). `fmeta benchmark report` by the code of 7386d28 on a clean tree wrote `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol, fmeta / FEP+. TYK2: MUE 3.60 / 0.37, RMSE 4.12 / 0.45, mean signed error +3.60 / +0.19, MUE with the offset removed 1.81 / 0.35, Pearson r 0.15 / 0.96. A2A: MUE 4.34 / 0.74, RMSE 5.79 / 0.98, mean signed error −3.74 / +0.23, offset removed 3.49 / 0.79, Pearson r 0.57 / 0.79. Experiment inside the 95% interval for 5 of 10 and 7 of 8 ligands; intervals 4.3 to 16.4 and 7.0 to 28.9 kcal/mol wide against experimental spans of 4.3 and 3.2: the order of the ligands is not resolved. Returns to the site: 47 of 50 TYK2 replicas (153 rebinding events), 15 of 40 A2A replicas (23 left once and stayed out, 2 did not reach the unbound region). Nothing was tuned for a set; no verdict. `scripts/verify_bench_results.py` passes. The MPS daemon is stopped. Roadmap R10 moved to done. Not verified here: the result of CI; the image check on the final commit.
