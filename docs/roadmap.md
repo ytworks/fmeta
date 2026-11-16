@@ -73,20 +73,26 @@ Verified on CPU only (see `PROGRESS.md`).
   a 0.3 nm probe in the crystal structure, and theophylline left and came back along the funnel
   in every replica (2, 7, 1, 3, 9 rebinding events). The membrane-plane estimate is 14° and
   0.2 nm off the OPM orientation. Reported, not gated. Not reached: a narrow interval (as R2).
+- **R10 — Examples and benchmarks** (2026-11-16, FM-D17). A kinase example (TYK2 with ejm_46,
+  4GIH) and a GPCR example (A2A with theophylline, 5MZJ; R3) with experimental values, each run
+  from its README to dG0. `fmeta benchmark prepare | run | status | report` and the sets
+  `examples/benchmarks/tyk2` (10 ligands, in water) and `a2a` (8 ligands, in POPC) with
+  experimental and FEP+ values; a report goes to `bench/reports/` and holds no verdict. Both
+  whole sets ran with the official defaults on 47e84f7: 5 replicas of 40 ns per ligand, 90
+  replicas, every one to its end, nothing tuned for a set. Reports:
+  `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol,
+  fmeta / FEP+: MUE 3.60 / 0.37 (TYK2) and 4.34 / 0.74 (A2A); with the mean offset removed
+  1.81 / 0.35 and 3.49 / 0.79; Pearson r 0.15 / 0.96 and 0.57 / 0.79. The 95% intervals are 4.3
+  to 16.4 (TYK2) and 7.0 to 28.9 kcal/mol (A2A) wide; the experimental values span 4.3 and 3.2.
+  Reported, not gated. Not reached: narrow intervals and the order of the ligands (as R2); in
+  the A2A set the ligand did not come back to the site within 40 ns in 25 of the 40 replicas.
+  Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 ## Next
-
-Plan for R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.
-- **R10 — Examples and benchmarks.** A kinase (TYK2, 4GIH) and a GPCR (A2A, 5MZJ) example with
-  experimental values. In (2026-11-16, FM-D17): `fmeta benchmark prepare | run | status | report`
-  and the sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental
-  and FEP+ values; a report goes to `bench/reports/` and holds no verdict. Done: the results of
-  both examples in their READMEs; the pilot runs (3 ligands per set) with their reports. Open:
-  the whole sets and their reports.
 
 ## Not planned
 

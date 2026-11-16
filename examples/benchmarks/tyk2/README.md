@@ -81,8 +81,61 @@ Measured on 2026-11-16 with commit eeb5302 (`fmeta benchmark prepare`, then
 
 The protein model is therefore that of the FEP+ input; force field, water and ions are fmeta's.
 
+## Result
+
+The whole set with the defaults (`config` empty): 10 ligands, 5 replicas of 40 ns each, every
+replica to its end. The simulations ran from commit 47e84f7 on 2026-11-16 (06:41 to 18:54 UTC,
+beside the A2A set and the examples on 8 GPUs, several replicas per GPU with NVIDIA MPS).
+Report: `bench/reports/2026-11-16-7386d2881-tyk2.md`, written by the code of 7386d28 (the dG0
+of a replica from the accumulated bias; FM-D9, third amendment). Nothing was tuned for the set,
+and the report holds no verdict. Values in kcal/mol:
+
+| Ligand | dG0 fmeta | 95% interval | Experiment | FEP+ | fmeta − experiment | Rebinding events |
+|---|---|---|---|---|---|---|
+| ejm_44 | −6.43 | −13.54 to 0.68 | −7.42 | −6.48 | +0.99 | 18 |
+| ejm_49 | −6.07 | −10.23 to −1.91 | −7.75 | −8.05 | +1.68 | 15 |
+| ejm_43 | −7.01 | −12.98 to −1.04 | −8.26 | −8.30 | +1.25 | 18 |
+| ejm_48 | −3.17 | −6.15 to −0.19 | −9.00 | −8.86 | +5.83 | 16 |
+| ejm_31 | −7.73 | −15.94 to 0.48 | −9.54 | −9.91 | +1.81 | 17 |
+| ejm_42 | −2.87 | −6.34 to 0.60 | −9.78 | −9.95 | +6.91 | 23 |
+| ejm_54 | −6.11 | −9.35 to −2.87 | −10.53 | −10.38 | +4.42 | 15 |
+| jmc_28 | −7.73 | −10.74 to −4.71 | −10.98 | −10.34 | +3.25 | 6 |
+| ejm_46 | −6.10 | −8.23 to −3.96 | −11.31 | −10.82 | +5.21 | 10 |
+| jmc_23 | −7.02 | −13.18 to −0.87 | −11.70 | −11.27 | +4.68 | 15 |
+
+Agreement with experiment over the 10 ligands (in brackets the 2.5 to 97.5 percentile of a
+bootstrap over the ligands):
+
+| Measure | fmeta | FEP+ |
+|---|---|---|
+| MUE (kcal/mol) | 3.60 [2.37, 4.82] | 0.37 [0.22, 0.53] |
+| RMSE (kcal/mol) | 4.12 [2.83, 5.16] | 0.45 [0.27, 0.61] |
+| Mean signed error (kcal/mol) | +3.60 [2.37, 4.82] | +0.19 [−0.05, 0.45] |
+| MUE, offset removed (kcal/mol) | 1.81 [1.00, 2.23] | 0.35 [0.19, 0.46] |
+| RMSE, offset removed (kcal/mol) | 1.99 [1.27, 2.38] | 0.41 [0.24, 0.51] |
+| Pearson r | 0.15 [−0.29, 0.59] | 0.96 [0.93, 0.99] |
+| Kendall tau | 0.11 [−0.33, 0.52] | 0.96 [0.78, 1.00] |
+
+What the numbers say:
+
+- Every value of fmeta is above experiment (weaker binding), by 1.0 to 6.9 kcal/mol. The values
+  of fmeta lie between −2.9 and −7.7 kcal/mol, the experimental ones between −7.4 and −11.7.
+- The experimental value is inside the 95% interval for 5 of the 10 ligands (ejm_44, ejm_49,
+  ejm_43, ejm_31, jmc_23). The intervals are 4.3 to 16.4 kcal/mol wide (18 to 69 kJ/mol); the
+  experimental values of the set span 4.3 kcal/mol. The order of the ligands is not resolved
+  at this length and number of replicas.
+- The FEP+ values are relative free energies placed on the mean of experiment by their source,
+  so their MUE holds no error of the absolute scale. On the rows with the offset removed and on
+  the correlations, which compare like with like, FEP+ is closer to experiment than fmeta.
+- The ligand left the site and came back in 47 of the 50 replicas (153 rebinding events in
+  all); in the other three it left and did not return within 40 ns.
+- ejm_46 is also the example `examples/tyk2_ejm46` (protein model from 4GIH, other seeds):
+  −6.10 kcal/mol here (−25.50 kJ/mol, 95% interval −34.45 to −16.56) against −3.55 there
+  (−14.85 kJ/mol, −26.60 to −3.11). The two intervals overlap.
+
 ## What is not settled
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- No ligand of this set has been run yet.
+- A value with a narrow interval. The settings for accuracy (walkers, run length, bias) are
+  not chosen yet: the owner deferred them until every function is shown to work.

@@ -136,11 +136,63 @@ Two differences from the model of the FEP+ input remain:
   35 Å from the nearest heavy atom of `4q`. GLY -1 is a charged ammonium in both models.
 - Hydrogen positions are fmeta's, not those of the file (heavy atoms are unchanged).
 
+## Result
+
+The whole set with the configuration above: 8 ligands, 5 replicas of 40 ns each, every replica
+to its end. The simulations ran from commit 47e84f7 on 2026-11-16 (06:48 to 18:51 UTC, beside
+the TYK2 set and the examples on 8 GPUs, several replicas per GPU with NVIDIA MPS). Report:
+`bench/reports/2026-11-16-7386d2881-a2a.md`, written by the code of 7386d28 (the dG0 of a
+replica from the accumulated bias; FM-D9, third amendment). Nothing was tuned for the set, and
+the report holds no verdict. Values in kcal/mol:
+
+| Ligand | dG0 fmeta | 95% interval | Experiment | FEP+ | fmeta − experiment | Rebinding events |
+|---|---|---|---|---|---|---|
+| 4q | −10.56 | −14.08 to −7.05 | −8.89 | −8.96 | −1.68 | 6 |
+| 4a | −7.42 | −12.57 to −2.28 | −9.41 | −7.15 | +1.99 | 4 |
+| 4b D | −13.31 | −27.76 to 1.15 | −9.96 | −10.06 | −3.35 | 6 |
+| 4d | −22.50 | −33.46 to −11.54 | −10.50 | −9.98 | −12.00 | 2 |
+| 4h | −12.76 | −21.83 to −3.69 | −10.65 | −11.13 | −2.10 | 0 |
+| 4g | −14.94 | −22.47 to −7.40 | −11.06 | −11.83 | −3.87 | 1 |
+| 4c | −11.05 | −23.57 to 1.46 | −11.46 | −12.09 | +0.41 | 9 |
+| 4e D | −21.39 | −32.81 to −9.98 | −12.07 | −11.01 | −9.32 | 0 |
+
+Agreement with experiment over the 8 ligands (in brackets the 2.5 to 97.5 percentile of a
+bootstrap over the ligands):
+
+| Measure | fmeta | FEP+ |
+|---|---|---|
+| MUE (kcal/mol) | 4.34 [1.98, 7.21] | 0.74 [0.35, 1.23] |
+| RMSE (kcal/mol) | 5.79 [2.24, 8.41] | 0.98 [0.45, 1.49] |
+| Mean signed error (kcal/mol) | −3.74 [−6.94, −0.93] | +0.23 [−0.37, 0.94] |
+| MUE, offset removed (kcal/mol) | 3.49 [1.30, 5.28] | 0.79 [0.27, 1.17] |
+| RMSE, offset removed (kcal/mol) | 4.42 [1.67, 5.66] | 0.96 [0.33, 1.26] |
+| Pearson r | 0.57 [−0.08, 0.94] | 0.79 [0.51, 0.99] |
+| Kendall tau | 0.36 [−0.33, 0.90] | 0.64 [0.20, 1.00] |
+
+What the numbers say:
+
+- Six of the eight values of fmeta are below experiment (stronger binding), 4d and 4e D by 12.0
+  and 9.3 kcal/mol; 4a and 4c are above it by 2.0 and 0.4.
+- The experimental value is inside the 95% interval for 7 of the 8 ligands (not for 4d). The
+  intervals are 7.0 to 28.9 kcal/mol wide (29 to 121 kJ/mol); the experimental values of the
+  set span 3.2 kcal/mol. The order of the ligands is not resolved at this length and number of
+  replicas.
+- The FEP+ values are relative free energies placed on the mean of experiment by their source,
+  so their MUE holds no error of the absolute scale. On the rows with the offset removed and on
+  the correlations, which compare like with like, FEP+ is closer to experiment than fmeta.
+- In 25 of the 40 replicas the ligand did not come back to the site within 40 ns: in 23 it left
+  once and stayed out, in 2 (one of 4d, one of 4e D) it did not reach the unbound region. No
+  replica of 4h or 4e D has a rebinding event. In the TYK2 set, in water, 47 of the 50 replicas
+  have one or more. A surface built from one passage out holds the site as the bias had filled
+  it by then, and the two ligands farthest below experiment (4d, 4e D) are among those with the
+  fewest returns.
+
 ## What is not settled
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- No ligand of this set has been run yet; the equilibration of the pilot ligands was started
-  on 2026-11-16.
+- A value with a narrow interval, and a run in which every ligand returns to the site several
+  times. The settings for accuracy (walkers, run length, bias) are not chosen yet: the owner
+  deferred them until every function is shown to work.
 - The hydrophobic thickness of OPM (2 x 15.7 Å) is not used: the bilayer is built with the
   default `membrane.half_thickness`.

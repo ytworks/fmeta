@@ -19,6 +19,22 @@ measurement, and the interval says what their scatter leaves open (FM-D9, second
 
 The set definitions are in `examples/benchmarks/<set>/`.
 
+## Reports of the whole sets
+
+Every ligand of both sets with the official defaults: 5 replicas of 40 ns per ligand, 90
+replicas in all, every one to its end. The simulations ran from commit 47e84f7 on 2026-11-16;
+the reports were written by the code of 7386d28, whose analysis gives the dG0 of a replica from
+the accumulated bias (FM-D9, third amendment). The set definition is the `set.yaml` of the
+repository: `config` is empty for TYK2; for A2A it is the preset `membrane` with the frame of
+the input and the sodium ion kept. Nothing was tuned for a set.
+
+| Report | Set | Ligands | MUE, fmeta / FEP+ (kcal/mol) | MUE with the offset removed | Pearson r |
+|---|---|---|---|---|---|
+| `2026-11-16-7386d2881-tyk2` | TYK2, in water | 10 | 3.60 / 0.37 | 1.81 / 0.35 | 0.15 / 0.96 |
+| `2026-11-16-7386d2881-a2a` | A2A, in POPC | 8 | 4.34 / 0.74 | 3.49 / 0.79 | 0.57 / 0.79 |
+
+The tables per ligand with their reading are in the README of each set ("Result").
+
 ## Pilot reports
 
 Three ligands per set ran before the scan of the bias gave the defaults: 5 replicas of 20 ns

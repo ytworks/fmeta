@@ -1,0 +1,1319 @@
+{
+ "schema": 1,
+ "set": "a2a",
+ "title": "Adenosine A2A receptor, GPCR set (Schrodinger public binding free energy benchmark)",
+ "date": "2026-11-16",
+ "commit": "7386d288144ebebbf8238459a90b895e5ae3b7ab",
+ "dirty": false,
+ "environment": {
+  "image": "sha256:b08f577e5238bd6470a491c3e86fe78a9739263f4b5efd489c5027be2ed150b9",
+  "lock_sha256": "d061e45a7a9a86f0ae693dd0fb720fd9ef7d182a7a3634f0bd44bda3fef81347"
+ },
+ "runs": [
+  {
+   "time": "2026-11-16T06:47:53+00:00",
+   "commit": "47e84f72b811452eb09c093340b2def087f3573f",
+   "dirty": false,
+   "image": "sha256:b08f577e5238bd6470a491c3e86fe78a9739263f4b5efd489c5027be2ed150b9",
+   "lock_sha256": "d061e45a7a9a86f0ae693dd0fb720fd9ef7d182a7a3634f0bd44bda3fef81347"
+  }
+ ],
+ "definition": {
+  "set_yaml_sha256": "bf7a6c09342546f90f98a0cc89bf5580aba5039a87e478d2ac97ec2c683f8375",
+  "reference_csv_sha256": "aea68796d8b442e6d6a6006f32662f6fce2a5e9a72e7fed5404c200b70a6822f",
+  "source": {
+   "repository": "https://github.com/schrodinger/public_binding_free_energy_benchmark",
+   "commit": "a65d86b782a678c75388566ce00446e45283ee63",
+   "raw": "https://raw.githubusercontent.com/schrodinger/public_binding_free_energy_benchmark/a65d86b782a678c75388566ce00446e45283ee63/",
+   "licence": "MIT"
+  },
+  "files": {
+   "protein": "d70c683cf304f7ff858d10825898a7f697308723705f89dcd503c4318266a756",
+   "ligands": "06f9b16d6fac563fcab4d9bff604e67a826bb9fc28a378a8752ed8b508cca15b",
+   "predictions": "0c3216ed8fbe75f35a5202319e416080f40435596ab77da3907fcb9b93160ca6"
+  },
+  "superpose_on_sha256": "5e3748bd55c464653d1c292ae8cf81c51d705f9ff2eb1f0b5e17d0496e7ac385",
+  "configuration_sha256": "ef41fb7568728e93a9a36618239ff5ed3452fd853459fc2a3043f4dc07fa4a6a"
+ },
+ "conditions": {
+  "temperature_k": 300.0,
+  "length_ns": 40.0,
+  "replicas": 5,
+  "standard_state": "1 mol/L",
+  "standard_volume_nm3": 1.660539,
+  "experiment": "as the reference file gives them; a value given as Ki is converted at the temperature of its measurement; no value is corrected to the temperature of the simulation"
+ },
+ "ligands": [
+  {
+   "name": "4q",
+   "directory": "4q",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -44.1987,
+    "kcal_mol": -10.5637
+   },
+   "sem": {
+    "kj_mol": 5.2961,
+    "kcal_mol": 1.2658
+   },
+   "ci95": {
+    "kj_mol": [
+     -58.903,
+     -29.4944
+    ],
+    "kcal_mol": [
+     -14.0782,
+     -7.0493
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 6,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -62.6081,
+      "kcal_mol": -14.9637
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -47.6419,
+      "kcal_mol": -11.3867
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -35.9082,
+      "kcal_mol": -8.5823
+     },
+     "rebinding_events": 4,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -42.3932,
+      "kcal_mol": -10.1322
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -32.4422,
+      "kcal_mol": -7.7539
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +36.12 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +62.70 kJ/mol from dG"
+    ],
+    "rep1": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -17.22 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +7.89 kJ/mol from dG"
+    ],
+    "rep2": [
+     "dG(t) from the bias changed by +14.00 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +23.22 kJ/mol from dG"
+    ],
+    "rep3": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -26.09 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +18.80 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +15.09 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +6.88 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +22.94 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -37.182,
+     "kcal_mol": -8.8867
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -37.4886,
+     "kcal_mol": -8.96
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4a",
+   "directory": "4a",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -31.0545,
+    "kcal_mol": -7.4222
+   },
+   "sem": {
+    "kj_mol": 7.7562,
+    "kcal_mol": 1.8538
+   },
+   "ci95": {
+    "kj_mol": [
+     -52.5891,
+     -9.5199
+    ],
+    "kcal_mol": [
+     -12.5691,
+     -2.2753
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 4,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -36.7341,
+      "kcal_mol": -8.7797
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -19.9487,
+      "kcal_mol": -4.7679
+     },
+     "rebinding_events": 2,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -17.9807,
+      "kcal_mol": -4.2975
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -21.5224,
+      "kcal_mol": -5.144
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -59.0863,
+      "kcal_mol": -14.122
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -27.70 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +10.99 kJ/mol from dG"
+    ],
+    "rep1": [
+     "2 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -27.37 kJ/mol over the last 50% of the run",
+     "unbound region not flat (std 3.07 kJ/mol)",
+     "the estimate from the samples after the first 2.0 ns differs by +10.24 kJ/mol from dG"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +41.24 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +7.79 kJ/mol from dG"
+    ],
+    "rep3": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +45.46 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +14.30 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +20.00 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +40.57 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by -13.19 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +51.88 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -39.3852,
+     "kcal_mol": -9.4133
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -29.9156,
+     "kcal_mol": -7.15
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4b D",
+   "directory": "4b_D",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -55.6767,
+    "kcal_mol": -13.307
+   },
+   "sem": {
+    "kj_mol": 21.7843,
+    "kcal_mol": 5.2066
+   },
+   "ci95": {
+    "kj_mol": [
+     -116.1595,
+     4.8062
+    ],
+    "kcal_mol": [
+     -27.7628,
+     1.1487
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 6,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -24.79,
+      "kcal_mol": -5.925
+     },
+     "rebinding_events": 3,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -59.6423,
+      "kcal_mol": -14.2548
+     },
+     "rebinding_events": 2,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -135.429,
+      "kcal_mol": -32.3683
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -48.8233,
+      "kcal_mol": -11.6691
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -9.6987,
+      "kcal_mol": -2.318
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "dG(t) from the bias changed by +29.95 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +23.80 kJ/mol from dG"
+    ],
+    "rep1": [
+     "2 rebinding event(s), fewer than 3",
+     "the estimate from the samples of the second half of the run differs by +23.27 kJ/mol from dG"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +41.37 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +6.25 kJ/mol from dG"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3"
+    ],
+    "rep4": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +20.26 kJ/mol over the last 50% of the run"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -41.6685,
+     "kcal_mol": -9.959
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -42.091,
+     "kcal_mol": -10.06
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4d",
+   "directory": "4d",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -94.1542,
+    "kcal_mol": -22.5034
+   },
+   "sem": {
+    "kj_mol": 16.5139,
+    "kcal_mol": 3.9469
+   },
+   "ci95": {
+    "kj_mol": [
+     -140.0042,
+     -48.3042
+    ],
+    "kcal_mol": [
+     -33.4618,
+     -11.545
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 2,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -65.2495,
+      "kcal_mol": -15.595
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -116.6401,
+      "kcal_mol": -27.8776
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -117.1256,
+      "kcal_mol": -27.9937
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -44.3543,
+      "kcal_mol": -10.6009
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -127.4016,
+      "kcal_mol": -30.4497
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +46.97 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +6.93 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +5.43 kJ/mol from dG"
+    ],
+    "rep1": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +16.44 kJ/mol over the last 50% of the run",
+     "unbound region not flat (std 3.12 kJ/mol)",
+     "the estimate from the samples of the second half of the run differs by +4.34 kJ/mol from dG"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +10.34 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +8.05 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +80.85 kJ/mol from dG"
+    ],
+    "rep3": [
+     "1 rebinding event(s), fewer than 3",
+     "the estimate from the samples after the first 2.0 ns differs by +16.61 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -10.39 kJ/mol over the last 50% of the run",
+     "no estimate from the samples after the first 2.0 ns (they do not cover the unbound region): dG has no cross-check from the samples"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -43.9517,
+     "kcal_mol": -10.5047
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -41.7563,
+     "kcal_mol": -9.98
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4h",
+   "directory": "4h",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -53.3784,
+    "kcal_mol": -12.7577
+   },
+   "sem": {
+    "kj_mol": 13.6682,
+    "kcal_mol": 3.2668
+   },
+   "ci95": {
+    "kj_mol": [
+     -91.3274,
+     -15.4293
+    ],
+    "kcal_mol": [
+     -21.8278,
+     -3.6877
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 0,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -78.9152,
+      "kcal_mol": -18.8612
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -25.5683,
+      "kcal_mol": -6.111
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -60.0357,
+      "kcal_mol": -14.3489
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -17.5937,
+      "kcal_mol": -4.205
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -84.779,
+      "kcal_mol": -20.2627
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +61.35 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by -4.34 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +18.38 kJ/mol from dG"
+    ],
+    "rep1": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +47.00 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +21.18 kJ/mol from dG"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +48.22 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +55.85 kJ/mol from dG"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +4.39 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +21.76 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +82.40 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by -6.61 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -44.5797,
+     "kcal_mol": -10.6548
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -46.5679,
+     "kcal_mol": -11.13
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4g",
+   "directory": "4g",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -62.4951,
+    "kcal_mol": -14.9367
+   },
+   "sem": {
+    "kj_mol": 11.3579,
+    "kcal_mol": 2.7146
+   },
+   "ci95": {
+    "kj_mol": [
+     -94.0296,
+     -30.9606
+    ],
+    "kcal_mol": [
+     -22.4736,
+     -7.3998
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 1,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -76.6665,
+      "kcal_mol": -18.3237
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -31.1926,
+      "kcal_mol": -7.4552
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -71.0254,
+      "kcal_mol": -16.9755
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -92.1883,
+      "kcal_mol": -22.0335
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -41.4027,
+      "kcal_mol": -9.8955
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +69.25 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +77.15 kJ/mol from dG"
+    ],
+    "rep1": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +22.17 kJ/mol over the last 50% of the run",
+     "unbound region not flat (std 2.02 kJ/mol)",
+     "the estimate from the samples of the second half of the run differs by +22.04 kJ/mol from dG"
+    ],
+    "rep2": [
+     "1 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -43.46 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +8.36 kJ/mol from dG"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +78.26 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +55.86 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +24.78 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +18.11 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -46.2918,
+     "kcal_mol": -11.064
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -49.4967,
+     "kcal_mol": -11.83
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4c",
+   "directory": "4c",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -46.2505,
+    "kcal_mol": -11.0541
+   },
+   "sem": {
+    "kj_mol": 18.855,
+    "kcal_mol": 4.5065
+   },
+   "ci95": {
+    "kj_mol": [
+     -98.6005,
+     6.0994
+    ],
+    "kcal_mol": [
+     -23.5661,
+     1.4578
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 9,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -74.7154,
+      "kcal_mol": -17.8574
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -31.5723,
+      "kcal_mol": -7.546
+     },
+     "rebinding_events": 2,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -12.1391,
+      "kcal_mol": -2.9013
+     },
+     "rebinding_events": 6,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -104.9639,
+      "kcal_mol": -25.087
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -7.8618,
+      "kcal_mol": -1.879
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +85.69 kJ/mol over the last 50% of the run",
+     "unbound region not flat (std 2.01 kJ/mol)",
+     "the estimate from the samples of the second half of the run differs by +15.04 kJ/mol from dG"
+    ],
+    "rep1": [
+     "2 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -19.31 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +14.74 kJ/mol from dG"
+    ],
+    "rep2": [
+     "dG(t) from the bias changed by +12.82 kJ/mol over the last 50% of the run",
+     "the estimate from the samples of the second half of the run differs by +11.13 kJ/mol from dG"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +87.63 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by -16.52 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +33.98 kJ/mol from dG"
+    ],
+    "rep4": [
+     "1 rebinding event(s), fewer than 3",
+     "the estimate from the samples after the first 2.0 ns differs by +8.27 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +12.20 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -47.9474,
+     "kcal_mol": -11.4597
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -50.5846,
+     "kcal_mol": -12.09
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "4e D",
+   "directory": "4e_D",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -89.5058,
+    "kcal_mol": -21.3924
+   },
+   "sem": {
+    "kj_mol": 17.1986,
+    "kcal_mol": 4.1106
+   },
+   "ci95": {
+    "kj_mol": [
+     -137.2567,
+     -41.7549
+    ],
+    "kcal_mol": [
+     -32.8051,
+     -9.9797
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 0,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -85.315,
+      "kcal_mol": -20.3908
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -129.1554,
+      "kcal_mol": -30.8689
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -28.1163,
+      "kcal_mol": -6.72
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -91.9524,
+      "kcal_mol": -21.9771
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 40.0,
+     "dg": {
+      "kj_mol": -112.99,
+      "kcal_mol": -27.0052
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +25.87 kJ/mol over the last 50% of the run",
+     "unbound region not flat (std 3.76 kJ/mol)",
+     "the estimate from the samples after the first 2.0 ns differs by -5.22 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +51.09 kJ/mol from dG"
+    ],
+    "rep1": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by -28.74 kJ/mol over the last 50% of the run",
+     "no estimate from the samples after the first 2.0 ns (they do not cover the unbound region): dG has no cross-check from the samples"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "the estimate from the samples after the first 2.0 ns differs by -6.23 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +20.87 kJ/mol from dG"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +82.04 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by -16.72 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +61.46 kJ/mol from dG"
+    ],
+    "rep4": [
+     "0 rebinding event(s), fewer than 3",
+     "dG(t) from the bias changed by +12.96 kJ/mol over the last 50% of the run",
+     "the estimate from the samples after the first 2.0 ns differs by +8.12 kJ/mol from dG",
+     "the estimate from the samples of the second half of the run differs by +12.95 kJ/mol from dG"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -50.5159,
+     "kcal_mol": -12.0736
+    },
+    "temperature_k": null,
+    "doi": "10.1021/acs.jcim.0c00449"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -46.0658,
+     "kcal_mol": -11.01
+    },
+    "se": {
+     "kj_mol": 0.4184,
+     "kcal_mol": 0.1
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  }
+ ],
+ "not_prepared": [],
+ "statistics": {
+  "fmeta_vs_experiment": {
+   "ligands": [
+    "4q",
+    "4a",
+    "4b D",
+    "4d",
+    "4h",
+    "4g",
+    "4c",
+    "4e D"
+   ],
+   "n": 8,
+   "mue": {
+    "value": {
+     "kj_mol": 18.1559,
+     "kcal_mol": 4.3394
+    },
+    "ci95": {
+     "kj_mol": [
+      8.274,
+      30.1763
+     ],
+     "kcal_mol": [
+      1.9775,
+      7.2123
+     ]
+    }
+   },
+   "rmse": {
+    "value": {
+     "kj_mol": 24.2338,
+     "kcal_mol": 5.792
+    },
+    "ci95": {
+     "kj_mol": [
+      9.3662,
+      35.207
+     ],
+     "kcal_mol": [
+      2.2386,
+      8.4147
+     ]
+    }
+   },
+   "mean_signed_error": {
+    "value": {
+     "kj_mol": -15.649,
+     "kcal_mol": -3.7402
+    },
+    "ci95": {
+     "kj_mol": [
+      -29.0339,
+      -3.8971
+     ],
+     "kcal_mol": [
+      -6.9393,
+      -0.9314
+     ]
+    }
+   },
+   "mue_offset_removed": {
+    "value": {
+     "kj_mol": 14.6122,
+     "kcal_mol": 3.4924
+    },
+    "ci95": {
+     "kj_mol": [
+      5.4596,
+      22.1023
+     ],
+     "kcal_mol": [
+      1.3049,
+      5.2826
+     ]
+    }
+   },
+   "rmse_offset_removed": {
+    "value": {
+     "kj_mol": 18.5037,
+     "kcal_mol": 4.4225
+    },
+    "ci95": {
+     "kj_mol": [
+      6.9858,
+      23.6856
+     ],
+     "kcal_mol": [
+      1.6697,
+      5.661
+     ]
+    }
+   },
+   "pearson_r": {
+    "value": 0.5725,
+    "ci95": [
+     -0.0843,
+     0.9377
+    ]
+   },
+   "kendall_tau": {
+    "value": 0.3571,
+    "ci95": [
+     -0.3333,
+     0.9048
+    ]
+   }
+  },
+  "fep_vs_experiment": {
+   "ligands": [
+    "4q",
+    "4a",
+    "4b D",
+    "4d",
+    "4h",
+    "4g",
+    "4c",
+    "4e D"
+   ],
+   "n": 8,
+   "mue": {
+    "value": {
+     "kj_mol": 3.0843,
+     "kcal_mol": 0.7372
+    },
+    "ci95": {
+     "kj_mol": [
+      1.4614,
+      5.139
+     ],
+     "kcal_mol": [
+      0.3493,
+      1.2282
+     ]
+    }
+   },
+   "rmse": {
+    "value": {
+     "kj_mol": 4.1193,
+     "kcal_mol": 0.9845
+    },
+    "ci95": {
+     "kj_mol": [
+      1.8741,
+      6.2157
+     ],
+     "kcal_mol": [
+      0.4479,
+      1.4856
+     ]
+    }
+   },
+   "mean_signed_error": {
+    "value": {
+     "kj_mol": 0.9445,
+     "kcal_mol": 0.2257
+    },
+    "ci95": {
+     "kj_mol": [
+      -1.5302,
+      3.9376
+     ],
+     "kcal_mol": [
+      -0.3657,
+      0.9411
+     ]
+    }
+   },
+   "mue_offset_removed": {
+    "value": {
+     "kj_mol": 3.3204,
+     "kcal_mol": 0.7936
+    },
+    "ci95": {
+     "kj_mol": [
+      1.1359,
+      4.8907
+     ],
+     "kcal_mol": [
+      0.2715,
+      1.1689
+     ]
+    }
+   },
+   "rmse_offset_removed": {
+    "value": {
+     "kj_mol": 4.0096,
+     "kcal_mol": 0.9583
+    },
+    "ci95": {
+     "kj_mol": [
+      1.3846,
+      5.27
+     ],
+     "kcal_mol": [
+      0.3309,
+      1.2595
+     ]
+    }
+   },
+   "pearson_r": {
+    "value": 0.791,
+    "ci95": [
+     0.5068,
+     0.9907
+    ]
+   },
+   "kendall_tau": {
+    "value": 0.6429,
+    "ci95": [
+     0.2,
+     1.0
+    ]
+   }
+  },
+  "afe_vs_experiment": null,
+  "without_value": [],
+  "bootstrap": {
+   "resamples": 10000,
+   "seed": 20261116,
+   "interval": "2.5 - 97.5 percentile over ligands drawn with replacement"
+  }
+ }
+}
