@@ -43,7 +43,7 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 47e84f7 runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence). The result of the CI job `docker` is not checked here; the publish workflow has never run |
+| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The result of the CI job `docker` is not checked here; the publish workflow has never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -62,6 +62,13 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs (FM-D14).
   Speed values (1255 ns/day plain, 1219 with the bias, 759 membrane) were taken while the other
   six GPUs ran production; they decide nothing.
+- Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
+  every function of this development that the gates do not reach has run once: walkers on
+  trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
+  from a YAML, `fmeta init`, the input routes (`--complex`, two files, GAFF, `--membrane`),
+  `fmeta split --drop`, `fmeta doctor`, `fmeta analyze --plot` / `--discard-ns`,
+  `fmeta benchmark status` / `report` with the current analysis. Table: `README.md`
+  ("機能ごとの動作確認"). Open there: the fifth replica of the sequential trypsin run.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 160 passed on
   the code with the headline of the third amendment of FM-D9. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
@@ -72,8 +79,9 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% interval −66.9 to 10.4 kJ/mol, and the value depends on the bias setting;
     TYK2 with ejm_46: −26.6 to −3.1 kJ/mol, 32 kJ/mol above experiment);
-  - shared-bias walkers on a real system, and settings chosen for accuracy (walkers in the
-    defaults, run length, bias): deferred by the owner until everything is shown to work;
+  - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
+    owner until everything is shown to work; walkers operate on trypsin, their accuracy is not
+    measured;
   - reading HILLS with PLUMED itself;
   - the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
@@ -90,7 +98,9 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   math-library thread per replica: the three examples on GPUs 2, 3 and 4 (trypsin one replica
   after another), the TYK2 set on GPUs 0 and 5, the A2A set on GPUs 6 and 7; the A2A pilot
   finishes on GPU 1. The TYK2 example ended at 10:08 UTC; its GPU 3 went to the TYK2 set.
-  The A2A pilot ended at 12:04 UTC; its GPU 1 is with the A2A set.
+  The A2A pilot ended at 12:04 UTC; its GPU 1 is with the A2A set. Since 13:17 UTC, after the
+  function checks: the TYK2 set on GPUs 0, 3 and 5 with 13 replicas each (every remaining
+  replica in flight; about 1600 ns/day per GPU), the A2A set on GPUs 1, 6 and 7.
 - Time estimate (measured: 88k atoms 606 ns/day alone and 1283 / 1541 / 1620 ns/day per GPU with
   4 / 6 / 8 replicas under MPS; A2A set system about 1015 ns/day per GPU with 6 replicas, A2A
   example about 506 with 5): both full sets and the three examples at 5 × 40 ns are about
@@ -99,6 +109,11 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] Every function of this development has operated on the GPU: checks on real systems beside the gates (783ecff)
+- What: the functions the gates do not reach ran once each on the code of 783ecff, in the image. Trypsin (3PTB): 4 shared-bias walkers × 1 ns on one GPU with MPS (424–433 ns/day each, 1000 hills each); `docker stop` at 550–560 hills and the same command: every walker rolled back to the checkpoint at 500, the first 500 HILLS lines identical to the copies at the stop; `fmeta auto` from a YAML with `run: {length_ns, replicas, mode, gpus}` (2 replicas side by side on 2 GPUs, exit 0); `fmeta run --length-ns 1.5` on that finished run (first 1003 HILLS lines identical, 1503 at the end); `fmeta analyze --plot` and `--discard-ns`; `fmeta prepare` by `--complex`, by two files without a YAML and with GAFF (72431, 72431, 72428 atoms). A2A: `--membrane POPC` on the command line (221123 atoms, no error in the validation); `fmeta split --drop A:1001-1106` on the RCSB entry 5MZJ (90 residues dropped). `fmeta init` for both presets; `fmeta doctor`; `fmeta benchmark status` and `report` with the current analysis on a copy of the running TYK2 set (written under the ignored `runs/`, not a report of the set); a directory prepared with another configuration is refused. The image built from 783ecff passed `fmeta check --quick` on CUDA without the mounted source (17 items; 232 files and directories, all of the calling user). No defect was found; no code changed. Not verified: `pytest -m slow` (owner: no CPU verification), the result of CI, the publish workflow; the fifth replica of the sequential trypsin run is in progress.
+- Why: the owner's definition of 2026-11-16: "works" is the operation of every function of this development; the benchmark sets continue on the GPUs but do not decide it.
+- Refs: `README.md` ("機能ごとの動作確認"), `bench/results/2026-11-16-d4bbcc67f-gpu-gates.json` (the gated functions).
 
 ### 2026-11-16 — [progress] GPU gates pass on the code with the published measurement procedure (d4bbcc6)
 - What: owner clarification of 2026-11-16: "works" means every function of this development operates, not that every benchmark run ends. The function checks therefore come before the benchmark sets; the TYK2 set was stopped at 12:58 UTC (12 of 50 replicas finished, restartable from its checkpoints) and its GPUs went to the checks. First of them: `scripts/gpu_gates.py` on clean d4bbcc6 (2 GPUs, in the image): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 8.4e-07 nm, wall energy 2.5e-04 kJ/mol; `toy_free_energy` −3.95 and −3.46 against −4.95 kJ/mol. This closes "not run yet on the code after 47e84f7" (analysis without a verdict, one math-library thread per replica, headline from the bias). Not verified here: the result of CI.
