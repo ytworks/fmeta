@@ -59,16 +59,19 @@ Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchm
   replicas to convergence, compared with experiment and published funnel-metadynamics values.
   Reported, not gated.
 - **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
-  5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build (221143 atoms), the funnel
-  into the extracellular water, 1 ns of equilibration, and the membrane-plane estimate against
-  the OPM orientation (14° and 0.2 nm off). Open: `prepare` on the input as `fmeta split` writes it,
-  10 ns of equilibration, the production run.
+  5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build from the input as
+  `fmeta split` writes it (221110 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the
+  funnel into the extracellular water, 1 ns of equilibration, and the membrane-plane estimate
+  against the OPM orientation (14° and 0.2 nm off). Open: 10 ns of equilibration (running), the
+  production run.
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.
 - **R10 — Examples and benchmarks.** A kinase (TYK2, 4GIH) and a GPCR (A2A, 5MZJ) example with
-  experimental values; `fmeta benchmark` on a TYK2 and an A2A set that have experimental and
-  FEP values; reports in `bench/reports/`.
+  experimental values. In (2026-11-16, FM-D17): `fmeta benchmark prepare | run | status | report`
+  and the sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental
+  and FEP+ values; a report goes to `bench/reports/` and holds no verdict. Open: the examples'
+  results, the pilot runs (3 ligands per set), the whole sets, the reports.
 
 ## Not planned
 

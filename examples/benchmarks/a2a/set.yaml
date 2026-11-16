@@ -1,0 +1,58 @@
+# Adenosine A2A receptor in a POPC bilayer, 8 ligands of the series of PDB 5OLZ (see README.md).
+#   fmeta benchmark prepare examples/benchmarks/a2a -o runs/bench-a2a        # the pilot ligands
+#   fmeta benchmark run     examples/benchmarks/a2a -o runs/bench-a2a --gpus 0,1,2,3
+#   fmeta benchmark report  examples/benchmarks/a2a -o runs/bench-a2a
+name: a2a
+title: Adenosine A2A receptor, GPCR set (Schrodinger public binding free energy benchmark)
+
+source:
+  repository: https://github.com/schrodinger/public_binding_free_energy_benchmark
+  commit: a65d86b782a678c75388566ce00446e45283ee63          # main and tag v2.0 on 2026-11-16
+  raw: https://raw.githubusercontent.com/schrodinger/public_binding_free_energy_benchmark/a65d86b782a678c75388566ce00446e45283ee63/
+  licence: MIT
+
+files:
+  protein:                    # HIS 278 doubly protonated ("hip278"), with the sodium ion of the receptor
+    path: fep_benchmark_inputs/structure_inputs/gpcrs/a2a_hip278_protein.pdb
+    sha256: d70c683cf304f7ff858d10825898a7f697308723705f89dcd503c4318266a756
+  ligands:
+    path: fep_benchmark_inputs/structure_inputs/gpcrs/a2a_hip278_ligands.sdf
+    sha256: 06f9b16d6fac563fcab4d9bff604e67a826bb9fc28a378a8752ed8b508cca15b
+  predictions:                # where reference.csv comes from; fetched and verified, not read
+    path: 21_4_results/ligand_predictions/gpcrs/a2a_hip278_sbpkacorr_out.csv
+    sha256: 0c3216ed8fbe75f35a5202319e416080f40435596ab77da3907fcb9b93160ca6
+
+# The benchmark structure is in the frame of the crystal. The bilayer is built around z = 0,
+# so the protein and every ligand are moved onto 5OLZ as OPM orients it in the membrane:
+# CA atoms of the same residue number are superposed. The fusion protein of the crystal is
+# numbered from 1001 in 5OLZ and so matches nothing. OPM keeps one file per entry without
+# versions: the sha256 is what pins it.
+superpose_on:
+  url: https://opm-assets.storage.googleapis.com/pdb/5olz.pdb
+  sha256: 5e3748bd55c464653d1c292ae8cf81c51d705f9ff2eb1f0b5e17d0496e7ac385
+  max_rmsd: 0.2
+
+# In the order of the experimental affinity, weakest first: 3.2 kcal/mol between the ends.
+# "D" (down) is one of the two rotamer states the source gives for 4b and 4e (README.md).
+ligands:
+  - {name: "4q", charge: 0}
+  - {name: "4a", charge: 0}
+  - {name: "4b D", charge: 0}
+  - {name: "4d", charge: 0}
+  - {name: "4h", charge: 0}
+  - {name: "4g", charge: 0}
+  - {name: "4c", charge: 0}
+  - {name: "4e D", charge: 0}
+
+# The weakest, a middle and the strongest binder: these run before the whole set is paid for.
+pilot: ["4q", "4d", "4e D"]
+
+# Differences from the preset "membrane" (POPC around z = 0, 10 ns of free equilibration): the
+# same as in examples/a2a_theophylline, which is the same construct of the receptor.
+config:
+  preset: membrane
+  system:
+    padding: 1.5              # nm of lipid around the receptor in the membrane plane
+    keep_hetero: [NA]         # the sodium ion in the allosteric site
+  membrane:
+    orient: input             # the frame comes from the superposition

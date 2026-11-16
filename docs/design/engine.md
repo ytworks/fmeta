@@ -5,8 +5,9 @@ Status: **Accepted** (2026-11-15, PR #1). Since then: FM-D11 amended and FM-D13 
 FM-D2, FM-D4, FM-D5, FM-D6 and FM-D7 amended (2026-11-15 and 16: the first runs on a GPU);
 FM-D12 amended (2026-11-16: the scatter of the toy gate is on record, criteria unchanged; and by
 the owner: operation on a CPU platform is not guaranteed); FM-D14 added (2026-11-16: run modes
-and the scheduler); FM-D15 added in parts (2026-11-16: real inputs, the membrane part first);
-FM-D16 added (2026-11-16: official defaults as presets).
+and the scheduler); FM-D15 added in two parts (2026-11-16: real inputs, the membrane part and
+the protein part); FM-D16 added (2026-11-16: official defaults as presets) and amended the same
+day (owner: the run length of 500 ns withdrawn); FM-D17 added (2026-11-16: benchmark sets).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -431,3 +432,73 @@ Why: the owner's decision, and two measurements with the default bias: on trypsi
 rebinding events per replica within 40 ns, and on TYK2 with ejm_46 (4.8 nM) the ligand left
 the site within 5 ns and was back within 20 ns. A length chosen from one system's convergence
 diagnostics has a stated origin; a number picked by hand would not.
+
+### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
+Status: **Accepted** (2026-11-16).
+A benchmark set is a directory, `examples/benchmarks/<set>/`, with `set.yaml`, `reference.csv`
+and a `README.md`; `src/fmeta/benchmark.py` knows no target. `set.yaml` names the source
+repository at a commit (40 hexadecimal digits), the files (`protein`, and `ligands`: one SDF
+with a record per ligand) each with its sha256, the ligands with their formal charge, the pilot
+ligands, and `config`: the differences from the default configuration, the same for every
+ligand. Structure files are not committed. `fmeta benchmark prepare SET -o WORKDIR` fetches
+each file into `WORKDIR/inputs`, refuses content whose sha256 is not the one named, and does
+not fetch again a file that is there and matches; what is fetched is read as data and never
+executed. The record of a ligand must be there once and carry the formal charge of `set.yaml`.
+`superpose_on` names a structure (URL, sha256) on which the protein is put before the ligand
+directories are written: a rigid least-squares fit of the alpha carbons of the same residue
+number, refused above `max_rmsd`, and the same rotation and translation for every ligand
+record. That is how a membrane protein gets the orientation of its OPM entry (FM-D8).
+`reference.csv` holds per ligand the experimental value (in kcal/mol as its source gives it, or
+a Ki with the temperature of its measurement, converted at that temperature), the FEP value
+with its error and its kind (`relative`: known up to one constant; `absolute`), an absolute
+alchemical value when one is published, and the DOI of each.
+Every ligand gets an ordinary fmeta work directory (`config.yaml`, `ligand.sdf`) and a marker
+with a hash of everything that decides its free energy: the configuration, the files it names
+by content, the files of the set and the superposition. The devices and the sampling plan
+(`run.length_ns`, `run.replicas`) are not in the hash: a set can be run longer and stay one
+set. A work directory of another hash, or a changed `config.yaml`, is refused, as are ligands
+with different plans. `prepare` takes `pilot`, `all` or names, and a later call adds ligands.
+`fmeta benchmark run` gives what is left to one call of the scheduler (FM-D14), on the devices
+of the run: the build and the equilibration of each ligand are jobs like its replicas, and a
+stage waits for the stage before it of its own ligand. The list order is: all builds, all
+equilibrations, replica 0 of every ligand, then replica 1 of every ligand, and so on; on one
+device this is the order of execution, on several a later replica of a ready ligand uses a
+device that would otherwise wait. A report over the whole set therefore exists early and gets
+better. The work directories are the truth: a finished stage leaves no job, so the same call
+continues, a failed stage holds back only its ligand, and the call ends with an error that
+names it. Every call that starts jobs appends the commit, the image and the lock to
+`runs.jsonl`. `fmeta benchmark status` shows every stage of every ligand.
+`fmeta benchmark report` analyses every prepared ligand with `analyze_replicas` and writes
+`bench/reports/<UTC date>-<commit>-<set>.json`, the same as text (`.md`) and an entry in
+`bench/reports/index.json`. Per ligand: dG0 as the mean of the plateau values of the analysed
+replicas with its 95% Student-t interval, the experimental and the FEP value, the rebinding
+events, what the analysis found, and how many replicas within 1 kT of the empty funnel ("no
+binding", not a binding free energy). Over the set: MUE, RMSE, mean signed error, MUE and RMSE
+after the mean error on the same ligands is removed, Pearson r and Kendall tau, each with a
+bootstrap interval over the ligands (10000 resamples, seed 20261116; none below three ligands),
+for fmeta and for FEP on the same ligands, side by side for all ligands with a value and for
+those whose analysed replicas all passed the checks. No ligand is dropped: one without a value
+is listed with the reason. Energies are given in kcal/mol and in kJ/mol, the standard state is
+1 mol/L, and experimental values are not corrected to the temperature of the simulation. A
+report names the commit, the image and the lock hash of the code that wrote it and of the
+calls that ran the simulations. It has no pass / fail field: `scripts/verify_bench_results.py`
+checks index, file names, image and lock, and rejects a verdict key. `bench/results/` stays
+gate evidence only.
+Sets: `tyk2` (ten of the sixteen ligands of the JACS set, a kinase in water) and `a2a` (eight
+ligands of the A2A set with the protonated His278, a GPCR in POPC, superposed on OPM 5OLZ),
+both from the public FEP+ benchmark of Ross et al. 2023 at one pinned commit; the reasons for
+the choice of ligands are in the `README.md` of each set.
+Not done: a criterion on the agreement (what fmeta guarantees is in the gates; how well a
+force field reproduces an experiment is a measurement, and a threshold on it would invite
+tuning to the benchmark); dropping ligands that did not converge (the statistic would then
+describe the easy ligands only; both columns are given instead); correcting experimental values
+to 300 K (it needs the enthalpy, which is not known); absolute alchemical values for these sets
+(none was found under a licence that allows it: the columns are empty); committing structure
+files (a pinned commit and a sha256 say the same in two lines, and the licence question does
+not arise).
+Why: owner request of 2026-11-15 for benchmarks with experimental and FEP values, run and
+compared. With one scheduler call the GPUs are shared over the ligands and nothing waits for a
+ligand that failed; with replica 0 first the first full comparison comes after one replica per
+ligand, not after the first ligand has all of its replicas. The FEP values of the source are
+shifted so that their mean is the experimental mean, so the offset-free measures are the ones
+in which the two methods can be compared.
