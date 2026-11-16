@@ -62,8 +62,7 @@ Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchm
   5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build from the input as
   `fmeta split` writes it (221110 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the
   funnel into the extracellular water, 1 ns of equilibration, and the membrane-plane estimate
-  against the OPM orientation (14° and 0.2 nm off). Open: 10 ns of equilibration (running), the
-  production run.
+  against the OPM orientation (14° and 0.2 nm off). Open: the production run.
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.

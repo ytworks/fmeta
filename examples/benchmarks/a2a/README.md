@@ -82,7 +82,7 @@ set is 4a (experiment -9.41, FEP+ -7.15 kcal/mol).
 
 ## Configuration
 
-`config` in `set.yaml` is the preset `membrane` (a POPC bilayer around z = 0, 10 ns of free
+`config` in `set.yaml` is the preset `membrane` (a POPC bilayer around z = 0, 2 ns of free
 equilibration) with two differences: `orient: input` (the frame is that of the
 superposition) and the sodium ion kept (`keep_hetero: [NA]`). Everything else is the official
 default, at 300 K. The standard state of every value is 1 mol/L.

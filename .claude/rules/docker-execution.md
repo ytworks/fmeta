@@ -43,3 +43,8 @@ scripts/in_docker.sh --gpus 0,1,2,3 --detach --name run1 fmeta run runs/run1 --g
   Inside the container they are numbered from 0 again: `--gpus 6,7` outside is `0,1` inside.
 - Long runs use `--detach`: follow with `docker logs -f NAME`, stop with `docker stop NAME`,
   continue by running the same command again.
+- Several replicas on one GPU at the same time (`run.per_gpu` above 1) need NVIDIA MPS:
+  `scripts/mps.sh start` runs the daemon in a container of the image, and `--mps` of the
+  wrapper makes a container its client (`scripts/in_docker.sh --mps --gpus 0,1 --detach --name
+  run1 fmeta run runs/run1 --gpus 0,1 --per-gpu 4`). `scripts/mps.sh stop` ends every client:
+  stop the runs first.

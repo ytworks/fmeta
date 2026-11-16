@@ -106,3 +106,20 @@ checkpoints. Look at
 `runs/tb/prepared/funnel.pdb` with the structure before spending GPU time. Record the outcome
 (`summary.json`, the commit, the image, what converged and what did not) in the example's
 README and in `PROGRESS.md`.
+
+### Several replicas on one GPU (NVIDIA MPS)
+
+One replica does not fill a large GPU. With the MPS daemon several replicas compute on it at
+the same time (`run.per_gpu`, `--per-gpu`): on one RTX PRO 6000 Blackwell and 88k atoms, 4
+replicas give 2.1 times and 6 replicas 2.5 times the total speed of one (FM-D14). Without the
+daemon the replicas take turns and nothing is gained.
+
+```bash
+scripts/mps.sh start                             # the daemon, in a container of the image (all GPUs)
+scripts/in_docker.sh --mps --gpus 0,1 --detach --name tb fmeta run runs/tb --gpus 0,1 --per-gpu 4
+scripts/mps.sh status
+scripts/mps.sh stop                              # ends every client: stop the runs first
+```
+
+Only containers started with `--mps` are clients of the daemon. If the MPS server of a GPU
+fails, all its clients end; the same `fmeta run` command continues from the checkpoints.
