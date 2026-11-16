@@ -31,7 +31,13 @@ from .config import Config
 from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
 from .engine.platform import GPU_PLATFORMS, device_record, resolve_devices, select_platform, visible_gpus
-from .engine.runner import MetadynamicsRun, RunSettings, discard_run_without_checkpoint, rollback_to_checkpoint
+from .engine.runner import (
+    MetadynamicsRun,
+    RunSettings,
+    check_same_run,
+    discard_run_without_checkpoint,
+    rollback_to_checkpoint,
+)
 from .funnel.geometry import KB, Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
@@ -190,8 +196,6 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
     if seed:
         integrator.setRandomNumberSeed(seed)
     simulation = app.Simulation(prepared.topology, system, integrator, platform, properties)
-    with open(directory / "device.json", "w") as handle:
-        json.dump(device_record(simulation.context, device, gpus_before), handle, indent=2)
     simulation.context.setState(state)
     # fresh velocities decorrelate replicas and walkers (a restart overwrites them again)
     if seed:
@@ -211,18 +215,24 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
         trajectory_atoms=[int(i) for i in solute] if run_cfg.trajectory_solute_only else None,
         walker_dirs=walker_dirs, sync_hills=run_cfg.walker_sync_hills)
     run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings)
+    with open(directory / "device.json", "w") as handle:    # after a restart was accepted or refused
+        json.dump(device_record(simulation.context, device, gpus_before), handle, indent=2)
     length = run_cfg.length_ns if length_ns is None else length_ns
     run.run(round(length * 1000.0 / hill_ps))
     run.close()
 
 
-def _rollback_walkers(directories: Sequence[Path]) -> None:
+def _rollback_walkers(directories: Sequence[Path], conditions: dict) -> None:
     """Roll every walker of a replica back to its checkpoint, before any of them starts and
     reads the hills of the others. A walker without a checkpoint goes back to the start: the
-    hills it wrote before it was stopped belong to no run."""
+    hills it wrote before it was stopped belong to no run. Nothing is touched when a walker was
+    run under other ``conditions`` (entries of its run.yaml) than the ones it would continue with."""
     for directory in directories:
         if is_locked(directory):
             raise RuntimeError(f"{directory} is in use by another fmeta process")
+    for directory in directories:
+        if (directory / "checkpoint.zip").exists():
+            check_same_run(directory, conditions)
     for directory in directories:
         if (directory / "checkpoint.zip").exists():
             rollback_to_checkpoint(directory)
@@ -253,7 +263,8 @@ def replica_jobs(config: Config, workdir, length_ns: Optional[float] = None) -> 
         before_start = None
         if n_walkers > 1:
             before_start = functools.partial(
-                _rollback_walkers, [replica_directory(workdir, replica, walker) for walker in walkers])
+                _rollback_walkers, [replica_directory(workdir, replica, walker) for walker in walkers],
+                dict(bias=config.metad.to_dict(), timestep_ps=config.run.timestep_fs / 1000.0))
         jobs.append(Job(f"rep{replica}", tasks, devices=n_walkers, before_start=before_start))
     return jobs
 

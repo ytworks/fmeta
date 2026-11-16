@@ -189,6 +189,31 @@ def test_restart_discards_work_after_the_last_checkpoint(tmp_path):
     assert count_dcd_frames(crashed / "traj.dcd") == 10
 
 
+def test_restart_with_other_settings_is_refused_before_any_file_changes(tmp_path):
+    """Hills of another bias, or steps of another length, are never appended to the record of a run."""
+    work, _ = _run(tmp_path, "run", [30])
+    names = ("HILLS", "COLVAR", "checkpoint.zip", "run.yaml")
+    before = {name: (work / name).read_bytes() for name in names}
+
+    for changed, timestep, message in ((dict(bias_factor=2.0), 0.02, "bias.bias_factor: 8.0 there, 2.0 now"),
+                                       ({}, 0.01, "timestep_ps: 0.02 there, 0.01 now")):
+        toy = make_toy()
+        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**{**SETTINGS, **changed}))
+        simulation = make_simulation(toy, timestep=timestep, seed=5)
+        with pytest.raises(RuntimeError, match=message):
+            MetadynamicsRun(simulation, bias, work, toy.restraint_group, RunSettings(checkpoint_hills=25))
+        assert before == {name: (work / name).read_bytes() for name in names}
+
+    # the length and the checkpoint interval are free: the same run goes on
+    toy = make_toy()
+    bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
+    run = MetadynamicsRun(make_simulation(toy, seed=5), bias, work, toy.restraint_group,
+                          RunSettings(checkpoint_hills=10))
+    run.run(40)
+    run.close()
+    assert len(read_hills(work / "HILLS")) == 40
+
+
 def test_run_stops_before_recording_values_that_are_not_finite(tmp_path):
     """A simulation that broke down leaves no NaN in HILLS, COLVAR or the bias."""
     toy = make_toy()

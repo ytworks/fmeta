@@ -65,8 +65,13 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   "no binding", never as a binding free energy.
 - HILLS is the record of the bias (heights stored times `gamma / (gamma - 1)`, as PLUMED does).
   The checkpoint bundle is replaced atomically; a restart rolls HILLS / COLVAR / DCD back to
-  it. With walkers, every walker is rolled back before any of them restarts. A run stops with
-  an error before a value that is not finite is written to HILLS or COLVAR or added to the grid.
+  it. With walkers, every walker is rolled back before any of them restarts, and a walker
+  without a checkpoint goes back to the start. A run stops with an error before a value that is
+  not finite is written to HILLS or COLVAR or added to the grid.
+- One directory holds one run: a restart under another funnel, bias, grid, time step, system
+  or trajectory layout than its `run.yaml` states is refused before a file is touched. Every
+  row of HILLS is decoded with the bias factor of the first; with the factor changed from 10 to
+  2 in a run, the bias rebuilt from the file was off by 1.09 kJ/mol (review of PR #1).
 
 ## Change gate
 

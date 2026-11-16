@@ -64,6 +64,12 @@ ended and every check of it that this machine can run has run. Open: the result 
   criteria 2.0 and 3.0. `replicas_sequential` and `replicas_parallel` ran real child processes
   on the GPUs (FM-D14). Speed values (1351 ns/day plain, 1304 with the bias, 925 membrane)
   decide nothing. The record before it: d4bbcc6, the code before that fix.
+- Review of PR #1 (2026-11-16, 6 findings on ec27496): being fixed one commit each. Done: a
+  walker without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
+  restart under other conditions is refused (FM-D5). Open: protein atoms repaired before
+  residues are dropped, protonation names and bond orders through `fmeta split`, the bias of
+  asynchronous walkers in the cross-checks. The code after 7386d28 has no gate record yet: the
+  gates and the image check run once on the last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -113,6 +119,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D5: a restart under other conditions than the run's `run.yaml` is refused before a file is touched
+- What: before a checkpoint is restored, `MetadynamicsRun` compares the funnel, the bias settings (with the temperature), the grid, the time step, the system (particle count, barostat and pressure: new block `system` in `run.yaml`) and the trajectory layout with `run.yaml` and stops with an error that names the difference. The length, the device, the checkpoint interval and the walker settings may change; an entry that an older `run.yaml` lacks is not judged. With walkers the bias settings and the time step of every walker are checked before any walker is rolled back. `device.json` is written after the check. The new test failed before the fix (the run continued); `ruff` passes, `pytest` 164 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).
+- Why: review of PR #1: with `metad.bias_factor` changed from 10 to 2 after 3 hills, the hills of both went into one HILLS file; every row is decoded with the factor of the first, so the bias rebuilt from the file was off by up to 1.09 kJ/mol. No committed result is affected: each of the 340 HILLS files of the runs holds one factor.
+- Refs: FM-D5 (amendment); `src/fmeta/engine/runner.py`, `src/fmeta/workflow.py`, `tests/test_engine.py`, `tests/test_walkers.py`, `.claude/rules/numerics-invariants.md`, `docs/configuration.md`, `README.md`.
 
 ### 2026-11-16 — [progress] The image of the final code runs without the mounted source (384538e)
 - What: the image built from clean 384538e (the code of c59ec99; documents and evidence since) passed `fmeta check --quick` on CUDA with an empty directory as `/work` (2 GPUs, 19:16 to 19:18 UTC): 17 passed, 0 failed, 0 skipped; the 232 files and directories it wrote belong to the calling user; `fmeta` is imported from the image (`/opt/conda/lib/python3.12/site-packages/fmeta`). A check, not gate evidence. This closes "the image check on the final commit" of the entries on the gates and on the benchmark sets. Every check of the plan that this machine can run has now run. Not verified here: the result of CI (`cpu`, `docker`); the publish workflow (started by the owner); `pytest -m slow` (owner: no CPU verification).

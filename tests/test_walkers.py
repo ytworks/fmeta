@@ -11,6 +11,7 @@ from fmeta.workflow import _rollback_walkers
 
 SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
                 pace=100, points_per_sigma=2.0)
+CONDITIONS = dict(bias=BiasSettings(**SETTINGS).to_dict(), timestep_ps=0.02)     # as the workflow passes them
 
 
 def make_walker(base, index, n_walkers, seed, **run_kwargs):
@@ -109,7 +110,12 @@ def test_walkers_stopped_before_a_checkpoint_leave_no_hills_behind(tmp_path, fir
     for index in ([1] if first_has_checkpoint else [0, 1]):    # stopped before a checkpoint was written
         (tmp_path / f"w{index}" / "checkpoint.zip").unlink()
 
-    _rollback_walkers([tmp_path / "w0", tmp_path / "w1"])
+    if first_has_checkpoint:        # a replica that was run with another bias is refused before a row is lost
+        with pytest.raises(RuntimeError, match="bias.bias_factor: 10.0 there, 2.0 now"):
+            _rollback_walkers([tmp_path / "w0", tmp_path / "w1"],
+                              dict(CONDITIONS, bias=dict(CONDITIONS["bias"], bias_factor=2.0)))
+        assert len(read_hills(tmp_path / "w1" / "HILLS")) == 3
+    _rollback_walkers([tmp_path / "w0", tmp_path / "w1"], CONDITIONS)
     _, a = make_walker(tmp_path, 0, 2, seed=1)
     _, b = make_walker(tmp_path, 1, 2, seed=2)
     assert (a.n_hills, b.n_hills) == (20 if first_has_checkpoint else 0, 0)

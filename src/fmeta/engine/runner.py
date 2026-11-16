@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import math
 import os
 import time
 import zipfile
@@ -74,6 +75,8 @@ class MetadynamicsRun:
                         if Path(d).resolve() != self.workdir.resolve()]
 
         resume = restart and (self.workdir / "checkpoint.zip").exists()
+        if resume:
+            check_same_run(self.workdir, yaml.safe_load(self._metadata()))
         n_frames = self._restore() if resume else None
         if not resume:
             # A fresh run counts steps from zero, whatever equilibration came before.
@@ -93,16 +96,20 @@ class MetadynamicsRun:
                 resume_frames=n_frames)
 
     # ---- bookkeeping ----------------------------------------------------
-    def _write_metadata(self) -> None:
+    def _metadata(self) -> str:
         data = dict(funnel=self.bias.funnel.to_dict(), bias=self.bias.settings.to_dict(),
                     grid=self.bias.grid.spec(), timestep_ps=self.dt,
+                    system=_system_conditions(self.simulation.system),
                     settings=asdict(self.settings))
         if data["settings"]["walker_dirs"] is not None:
             data["settings"]["walker_dirs"] = [str(d) for d in data["settings"]["walker_dirs"]]
         if data["settings"]["trajectory_atoms"] is not None:
             data["settings"]["trajectory_atoms"] = [int(i) for i in data["settings"]["trajectory_atoms"]]
+        return yaml.safe_dump(data, sort_keys=False, default_flow_style=None)
+
+    def _write_metadata(self) -> None:
         with open(self.workdir / "run.yaml", "w") as handle:
-            yaml.safe_dump(data, handle, sort_keys=False, default_flow_style=None)
+            handle.write(self._metadata())
 
     def _restraint_energy(self) -> float:
         if self.restraint_group is None:
@@ -224,6 +231,44 @@ class MetadynamicsRun:
         for writer in (self._hills, self._colvar, self._traj):
             if writer is not None:
                 writer.close()
+
+
+def _system_conditions(system: mm.System) -> dict:
+    """What a run holds fixed about its system: the particle count and the barostat."""
+    record = dict(particles=system.getNumParticles(), barostat=None, pressure_bar=None)
+    for force in system.getForces():
+        if hasattr(force, "getDefaultPressure"):
+            pressure = np.ravel(force.getDefaultPressure().value_in_unit(unit.bar)).tolist()
+            record.update(barostat=type(force).__name__,
+                          pressure_bar=pressure[0] if len(pressure) == 1 else pressure)
+    return record
+
+
+def _differences(stored, now, name: str) -> list:
+    """The entries of ``stored`` (from a run.yaml) that ``now`` does not repeat, as text."""
+    if isinstance(stored, dict) and isinstance(now, dict):
+        return [line for key in stored for line in _differences(stored[key], now.get(key), f"{name}.{key}")]
+    numbers = all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in (stored, now))
+    if math.isclose(stored, now, rel_tol=1e-9, abs_tol=1e-12) if numbers else stored == now:
+        return []
+    return [f"{name}: {stored} there, {now} now" if len(f"{stored}{now}") < 60 else f"{name} differs"]
+
+
+def check_same_run(workdir, now: dict) -> None:
+    """Refuse to continue the run in ``workdir`` under other conditions than its ``run.yaml``
+    states, before any of its files is touched: its hills and samples would no longer be those
+    of one bias and one system. ``now`` holds entries as ``run.yaml`` does; an entry that one
+    side lacks is not judged (a ``run.yaml`` from before the entry existed). The length, the
+    device, the checkpoint interval and the walker settings may change."""
+    stored = load_run_metadata(workdir)
+    judged = [(key, key, stored, now) for key in ("funnel", "bias", "grid", "timestep_ps", "system")]
+    judged += [(f"settings.{key}", key, stored.get("settings", {}), now.get("settings", {}))
+               for key in ("trajectory_hills", "trajectory_atoms")]    # one trajectory file has one layout
+    differences = [line for name, key, there, here in judged if key in there and key in here
+                   for line in _differences(there[key], here[key], name)]
+    if differences:
+        raise RuntimeError(f"{workdir} holds a run made under other conditions and is not continued "
+                           f"({'; '.join(differences)}). Use a new directory, or the conditions of its run.yaml.")
 
 
 def rollback_to_checkpoint(workdir) -> dict:

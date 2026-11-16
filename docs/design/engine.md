@@ -13,7 +13,8 @@ replicas on one GPU with NVIDIA MPS, `run.per_gpu`; one math-library thread per 
 amended three times (2026-11-16, owner: the first 2 ns are not used; then: a replica does not
 converge on its own, the set of replicas is the measurement and there is no verdict; then: the
 value of a replica is measured by the published procedure, from the bias), with FM-D16 and
-FM-D17 amended to follow.
+FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16): FM-D5 (a restart
+under other conditions is refused).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -115,6 +116,17 @@ Amendment (2026-11-16): a run stops with an error before a value that is not fin
 bias or the wall energy) is written to COLVAR or HILLS or added to the grid. The first
 breakdown on a GPU wrote NaN rows and failed only later, inside the spline fit. Now the files
 stay readable and a restart continues from the last checkpoint.
+Amendment (2026-11-16, review of PR #1): a restart is refused, before any file of the run is
+touched, when its conditions differ from those in `run.yaml`: the funnel, the bias settings
+(the temperature is one of them), the grid, the time step, the system (particle count, barostat
+and pressure: the new block `system`) and the layout of the trajectory (interval and atoms: a
+DCD file has one header). The length, the device and platform, the checkpoint interval and the
+walker settings may change. An entry that an older `run.yaml` lacks is not judged. With walkers
+the bias settings and the time step of every walker are checked before any walker is rolled
+back; each walker then makes the whole check. The reviewed code continued whenever a checkpoint
+existed: with `metad.bias_factor` changed from 10 to 2 after 3 hills, the next hills went into
+the same HILLS file, and because every row is decoded with the factor of the first, the bias
+rebuilt from the file was off by up to 1.09 kJ/mol while `run.yaml` still said 10.
 Why: a crash between files must not leave a mixed state; on the Reference platform a split run
 reproduces the continuous one byte for byte, which makes restart testable.
 
