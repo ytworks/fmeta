@@ -17,14 +17,18 @@ from fmeta.benchmark import (
     REFERENCE_COLUMNS,
     agreement,
     fetch_inputs,
+    format_status,
     load_set,
     prepare_set,
     prepared_ligands,
+    run_set,
     sdf_charge,
     sdf_coordinates,
     sdf_records,
+    status_rows,
 )
 from fmeta.config import Config
+from fmeta.scheduler import read_schedule, verify_schedule
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples" / "benchmarks"
 NAMES = ("a", "b D", "c")                                 # "b D": a name that is not a directory name
@@ -230,6 +234,105 @@ def test_prepare_writes_a_work_directory_per_ligand_and_one_configuration_only(t
     assert "temperature: 310.0" in (work / "a" / "config.yaml").read_text()
     with pytest.raises(ValueError, match="config.yaml was changed"):
         prepared_ligands(benchmark, work)
+
+
+# ---- the order of the jobs and the restart ----------------------------------
+
+class Ended:
+    """A child process that has ended."""
+
+    def __init__(self, code):
+        self.pid, self.code = None, code
+
+    def wait(self):
+        return self.code
+
+    def terminate(self):
+        pass
+
+    kill = terminate
+
+
+class Stages:
+    """Stands in for the child processes of ``run_set``: a stage that is started ends at once
+    and leaves in the work directory of its ligand what marks it as finished (a replica: a log
+    that ends at ``hills`` hills). The stages named in ``fail`` end with an error and leave
+    nothing."""
+
+    def __init__(self, hills=4, fail=()):
+        self.started, self.hills, self.fail = [], hills, fail
+
+    def __call__(self, task, device):
+        self.started.append(task.name)
+        if task.name in self.fail:
+            return Ended(1)
+        directory, stage = task.log.parent, task.name.split("/")[1]
+        if stage == "prepare":
+            (directory / "prepared").mkdir()
+            (directory / "prepared" / "meta.json").write_text("{}")
+        elif stage == "equilibrate":
+            (directory / "equil").mkdir()
+            (directory / "equil" / "equil.json").write_text(json.dumps(dict(funnel_checks=dict(ok=True))))
+        else:
+            (directory / stage).mkdir(exist_ok=True)
+            (directory / stage / "run.log").write_text(
+                f"hills {self.hills}/{self.hills}  time {self.hills / 1000:.3f} ns  speed 100.0 ns/day\n")
+        return Ended(0)
+
+
+def stages(stage, ligands=("a", "b_D", "c")) -> list:
+    return [f"{ligand}/{stage}" for ligand in ligands]
+
+
+def test_every_ligand_has_a_first_replica_before_any_has_a_second_and_finished_stages_are_not_run_again(
+        tmp_path, inputs):
+    benchmark = load_set(write_set(tmp_path / "set", inputs))
+    work = tmp_path / "work"
+    prepare_set(benchmark, work, "all")                               # 2 replicas of 4 hills per ligand
+
+    children = Stages()
+    run_set(benchmark, work, until="prepare", launcher=children)
+    assert children.started == stages("prepare")
+    status = run_set(benchmark, work, launcher=children)              # one device: the order of the list
+    assert children.started[3:] == stages("equilibrate") + stages("rep0") + stages("rep1")
+    assert set(status.values()) == {"done"}
+    assert verify_schedule(read_schedule(work / "schedule.jsonl")[-1]) == []
+
+    assert run_set(benchmark, work, launcher=children) == {}          # the work directory is the truth
+    assert len(children.started) == 12 and len(read_schedule(work / "schedule.jsonl")) == 2
+    rows = status_rows(benchmark, work)
+    assert {row["state"] for row in rows} == {"done"}
+    assert format_status(rows).splitlines()[-1] == "3 ligand(s): 6 of 6 run(s) done, 0.024 of 0.024 ns"
+
+    prepare_set(benchmark, work, length_ns=0.008)                     # a longer plan: only the replicas are left
+    longer = Stages(hills=8)
+    run_set(benchmark, work, launcher=longer)
+    assert longer.started == stages("rep0") + stages("rep1")
+
+    shutil.rmtree(work / "a" / "prepared")
+    with pytest.raises(ValueError, match="without the stage before it"):
+        run_set(benchmark, work, launcher=longer)
+
+
+def test_a_stage_that_fails_holds_back_its_own_ligand_only_and_the_next_call_takes_it_up(tmp_path, inputs):
+    benchmark = load_set(write_set(tmp_path / "set", inputs))
+    work = tmp_path / "work"
+    prepare_set(benchmark, work, "all")
+
+    children = Stages(fail=["b_D/prepare"])
+    with pytest.raises(RuntimeError, match=r"^b_D/prepare failed: no output \(see .*/b_D/prepare\.log\)$"):
+        run_set(benchmark, work, launcher=children)
+    others = ("a", "c")
+    assert children.started == (stages("prepare") + stages("equilibrate", others) + stages("rep0", others)
+                                + stages("rep1", others))
+    states = {(row["ligand"], row["stage"]): row["state"] for row in status_rows(benchmark, work)}
+    assert [states["b D", stage] for stage in ("prepare", "equilibrate", "rep0", "rep1")] == [
+        "failed", "skipped", "skipped", "skipped"]
+    assert {state for (ligand, _), state in states.items() if ligand != "b D"} == {"done"}
+
+    again = Stages()
+    run_set(benchmark, work, launcher=again)
+    assert again.started == [f"b_D/{stage}" for stage in ("prepare", "equilibrate", "rep0", "rep1")]
 
 
 # ---- statistics -------------------------------------------------------------

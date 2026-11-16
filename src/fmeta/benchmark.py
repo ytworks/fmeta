@@ -11,6 +11,7 @@ shows where it stands; ``report`` writes the comparison. A report carries no ver
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import csv
 import hashlib
@@ -18,19 +19,22 @@ import json
 import math
 import os
 import re
+import sys
 import urllib.request
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Sequence
 
 import numpy as np
 import yaml
 
 from .analysis import KCAL
 from .config import Config
+from .engine.platform import resolve_devices
 from .funnel.geometry import KB
-from .scheduler import directory_lock
+from .scheduler import Job, Task, directory_lock, is_locked, read_schedule, run_jobs
+from .workflow import replica_jobs, status_table, unfinished_jobs
 
 SET_KEYS = ("name", "title", "source", "files", "superpose_on", "ligands", "pilot", "config")
 SOURCE_KEYS = ("repository", "commit", "raw", "licence")
@@ -658,6 +662,189 @@ def prepare_set(benchmark: BenchmarkSet, workdir, ligands="pilot", length_ns: Op
             lines.append(f"{ligand.name}: {directory}")
         lines.append(f"plan: {plan[1]} replica(s) of {plan[0]:g} ns per ligand")
     return lines
+
+
+# ---- the stages of every ligand: jobs of one call of the scheduler ----------
+
+STAGES = ("prepare", "equilibrate", "run")
+
+
+def _read_json(path: Path):
+    """The content of a JSON file; None when it is not there or not complete."""
+    try:
+        with open(path) as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
+
+
+def _built(directory: Path) -> bool:
+    return isinstance(_read_json(directory / "prepared" / "meta.json"), dict)       # the last file of the stage
+
+
+def _equilibration(directory: Path) -> Optional[bool]:
+    """None when the equilibration did not come to its end; else whether the structure it
+    ended with passed the checks of the funnel. Only then is the stage finished."""
+    summary = _read_json(directory / "equil" / "equil.json")
+    try:
+        return bool(summary["funnel_checks"]["ok"])
+    except (TypeError, KeyError):
+        return None
+
+
+def _replica_rows(item: Prepared) -> dict:
+    """Replica number -> its rows of :func:`fmeta.workflow.status_table` (one per walker),
+    measured against the plan as it is now: a replica that reached a shorter target is
+    ``stopped``, not ``done``."""
+    hill_ps = item.config.metad.pace * item.config.run.timestep_fs / 1000.0
+    target = round(item.config.run.length_ns * 1000.0 / hill_ps)
+    rows: dict = {}
+    for row in status_table(item.directory):
+        if row["state"] == "done" and row["hills"] < target:
+            row["state"] = "stopped"
+        row["target_ns"] = target * hill_ps / 1000.0
+        rows.setdefault(int(row["name"].split("/")[0][3:]), []).append(row)
+    return rows
+
+
+def benchmark_jobs(prepared: Sequence[Prepared], until: str = "run") -> list:
+    """What is left to do for the prepared ligands, as the jobs of one call of
+    :func:`fmeta.scheduler.run_jobs`.
+
+    Their order is the order in which a free device is given out: the systems of all ligands
+    are built, then all are equilibrated, then replica 0 of every ligand runs before any
+    replica 1, so that a report over the whole set exists early and gets better. A stage
+    waits for the stage before it of its own ligand, and a stage that fails holds back only
+    that ligand. The work directories are the truth: a stage that is finished there leaves
+    no job, so the same call again continues. ``until`` ends the list with that stage.
+
+    A key, which is also the name of the task, is ``<ligand directory>/<stage>``; the output
+    of the task goes to the file of that name with ``.log`` under the work directory."""
+    if until not in STAGES:
+        raise ValueError(f"until must be one of {', '.join(STAGES)}")
+    builds, equilibrations, replicas = [], [], {}
+    for item in prepared:
+        directory, prefix = item.directory, item.directory.name
+        built, equilibrated, rows = _built(directory), _equilibration(directory), _replica_rows(item)
+        ran = any(row["state"] != "not started" for group in rows.values() for row in group)
+        if (not built and (equilibrated is not None or ran)) or (not equilibrated and ran):
+            raise ValueError(f"{directory} has the output of a stage without the stage before it. Remove its "
+                             "prepared/, equil/ and rep*/ directories to start this ligand again")
+        cli = [sys.executable, "-m", "fmeta.cli"]
+        after: list = []
+        if not built:
+            key = f"{prefix}/prepare"
+            builds.append(Job(key, [Task(key, cli + ["benchmark", "build", str(directory)],
+                                         directory / "prepare.log")]))
+            after = [key]
+        if until == "prepare":
+            continue
+        if not equilibrated:
+            key = f"{prefix}/equilibrate"
+            equilibrations.append(Job(key, [Task(key, cli + ["equilibrate", str(directory)],
+                                                 directory / "equilibrate.log")], after=after))
+            after = [key]
+        if until == "equilibrate":
+            continue
+        for job in replica_jobs(item.config, directory):
+            number = int(job.key[3:])
+            if all(row["state"] == "done" for row in rows[number]):
+                continue
+            tasks = [Task(f"{prefix}/{task.name}", task.command, task.log) for task in job.tasks]
+            replicas.setdefault(number, []).append(Job(f"{prefix}/{job.key}", tasks, devices=job.devices,
+                                                       after=after, before_start=job.before_start))
+    return builds + equilibrations + [job for number in sorted(replicas) for job in replicas[number]]
+
+
+def run_set(benchmark: BenchmarkSet, workdir, gpus=None, mode: Optional[str] = None, until: str = "run",
+            launcher=None) -> dict:
+    """Run what is left of the prepared ligands of ``workdir``: every stage of every ligand
+    in one call of the scheduler, on the devices of the run (``gpus`` and ``mode`` stand in
+    for ``run.gpus`` and ``run.mode`` of the configuration of the set).
+
+    Every decision is appended to ``workdir/schedule.jsonl``. A stage that failed or was
+    stopped is a ``RuntimeError`` after everything that could run has run; the same call
+    again continues. Returns the status of the jobs. ``launcher`` replaces the start of a
+    child process (for tests)."""
+    workdir = Path(workdir).resolve()
+    record: list = []
+    with contextlib.ExitStack() as held:
+        held.enter_context(directory_lock(workdir))
+        prepared = prepared_ligands(benchmark, workdir)
+        for item in prepared:                                # a 'fmeta run' of one ligand beside this is refused
+            held.enter_context(directory_lock(item.directory))
+        jobs = benchmark_jobs(prepared, until)
+        if not jobs:
+            return {}
+        run = prepared[0].config.run
+        devices = resolve_devices(mode or run.mode, gpus if gpus is not None else run.gpus, run.platform)
+        status = run_jobs(jobs, devices, launcher, log=workdir / "schedule.jsonl", events=record.append)
+    problem = unfinished_jobs(status, record, workdir)
+    if problem:
+        raise RuntimeError(problem)
+    return status
+
+
+# ---- status -----------------------------------------------------------------
+
+def _last_call(workdir: Path) -> dict:
+    """Job -> how it ended in the last call of ``run_set`` (``running`` when it did not)."""
+    path = workdir / "schedule.jsonl"
+    states: dict = {}
+    for event in (read_schedule(path)[-1] if path.exists() else []):
+        if event["event"] == "start":
+            states[event["job"]] = "running"
+        elif event["event"] == "end":
+            states[event["job"]] = event["status"]
+        elif event["event"] == "skip":
+            states[event["job"]] = "skipped"
+    if not is_locked(workdir):                               # that call is over, however it ended
+        states = {job: "stopped" if state == "running" else state for job, state in states.items()}
+    return states
+
+
+def status_rows(benchmark: BenchmarkSet, workdir) -> list:
+    """Where the set stands: one row per stage of each prepared ligand (``prepare``,
+    ``equilibrate``, then each replica, or each walker of it).
+
+    ``state`` is ``done`` when the work directory says so; else what the last call of
+    ``run_set`` made of the stage (``running``, ``failed``, ``stopped``, ``skipped``), or
+    ``not started``. A replica has its time, the target of the plan, speed and device."""
+    workdir = Path(workdir).resolve()
+    last = _last_call(workdir)
+    rows = []
+    for item in prepared_ligands(benchmark, workdir):
+        name, prefix = item.ligand.name, item.directory.name
+        equilibrated = _equilibration(item.directory)
+        states = dict(prepare="done" if _built(item.directory) else last.get(f"{prefix}/prepare", "not started"),
+                      equilibrate="done" if equilibrated else last.get(
+                          f"{prefix}/equilibrate", "not started" if equilibrated is None else "failed"))
+        rows += [dict(ligand=name, stage=stage, state=state, time_ns=None, target_ns=None, speed_ns_day=None,
+                      device=None) for stage, state in states.items()]
+        for number, group in _replica_rows(item).items():
+            for row in group:
+                state = row["state"]
+                if state in ("stopped", "not started") and last.get(f"{prefix}/rep{number}") in ("failed", "skipped"):
+                    state = last[f"{prefix}/rep{number}"]
+                rows.append(dict(ligand=name, stage=row["name"], state=state, time_ns=row["time_ns"],
+                                 target_ns=row["target_ns"], speed_ns_day=row["speed_ns_day"],
+                                 device=row["device"]))
+    return rows
+
+
+def format_status(rows: Sequence[dict]) -> str:
+    width = max([len("ligand")] + [len(row["ligand"]) for row in rows])
+    lines = [f"{'ligand':{width}s}  {'stage':12s} {'state':12s} {'time / target (ns)':>22s} {'ns/day':>9s}  device"]
+    for row in rows:
+        progress = "" if row["time_ns"] is None else f"{row['time_ns']:.3f} / {row['target_ns']:.3f}"
+        speed = "" if row["speed_ns_day"] is None else f"{row['speed_ns_day']:.1f}"
+        lines.append(f"{row['ligand']:{width}s}  {row['stage']:12s} {row['state']:12s} {progress:>22s} "
+                     f"{speed:>9s}  {row['device'] or ''}".rstrip())
+    runs = [row for row in rows if row["time_ns"] is not None]
+    lines.append(f"{len({row['ligand'] for row in rows})} ligand(s): "
+                 f"{sum(row['state'] == 'done' for row in runs)} of {len(runs)} run(s) done, "
+                 f"{sum(row['time_ns'] for row in runs):.3f} of {sum(row['target_ns'] for row in runs):.3f} ns")
+    return "\n".join(lines)
 
 
 # ---- statistics -------------------------------------------------------------
