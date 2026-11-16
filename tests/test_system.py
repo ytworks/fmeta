@@ -13,7 +13,7 @@ from scipy.spatial import cKDTree
 
 from fmeta.cli import main as cli
 from fmeta.config import Config
-from fmeta.engine.equilibration import EquilibrationResult, _add_position_restraints
+from fmeta.engine.equilibration import EquilibrationResult, _add_position_restraints, block_means
 from fmeta.engine.hills import read_colvar
 from fmeta.funnel.geometry import compute_cvs, funnel_frame
 from fmeta.funnel.validate import required_image_distance
@@ -302,3 +302,12 @@ def test_full_pipeline_with_restart(inputs, tmp_path):
     merged = analyze_stage(shared)
     assert merged["n_replicas"] == 1
     assert json.loads((shared / "rep0" / "result.json").read_text())["n_walkers"] == 2
+
+
+def test_the_free_stage_is_reported_in_equal_blocks():
+    area = np.arange(20.0)                              # one sample every 2 ps
+    blocks = block_means(area, 2.0 * area, sample_ps=2.0, blocks=4)
+    assert [block["end_ps"] for block in blocks] == [10.0, 20.0, 30.0, 40.0]
+    assert [block["area"] for block in blocks] == [2.0, 7.0, 12.0, 17.0]
+    assert blocks[-1]["height"] == 34.0
+    assert len(block_means(area[:3], area[:3], sample_ps=1.0)) == 3     # fewer samples than blocks

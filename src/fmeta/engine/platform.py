@@ -120,10 +120,14 @@ def device_record(context: mm.Context, requested=None, before: Optional[list] = 
     return record
 
 
-def check_devices(mode: str, gpus) -> None:
-    """Raise ``ValueError`` when ``run.mode`` and ``run.gpus`` contradict each other."""
+def check_devices(mode: str, gpus, per_gpu: int = 1) -> None:
+    """Raise ``ValueError`` when ``run.mode``, ``run.gpus`` and ``run.per_gpu`` contradict each other."""
     if mode not in MODES:
         raise ValueError(f"run.mode is one of {', '.join(MODES)}, not {mode!r}")
+    if isinstance(per_gpu, bool) or not isinstance(per_gpu, int) or per_gpu < 1:
+        raise ValueError(f"run.per_gpu is the number of replicas that share a GPU, 1 or more, not {per_gpu!r}")
+    if mode == "sequential" and per_gpu > 1:
+        raise ValueError("run.mode sequential runs one replica at a time: leave run.per_gpu at 1")
     if gpus is None or gpus == "all":
         if mode == "sequential" and gpus == "all":
             raise ValueError("run.mode sequential runs on one GPU: give its number, not 'all'")
@@ -137,32 +141,35 @@ def check_devices(mode: str, gpus) -> None:
         raise ValueError(f"run.mode sequential runs on one GPU: give one device number, not {list(gpus)}")
 
 
-def resolve_devices(mode: str = "auto", gpus=None, platform: str = "auto", visible=visible_gpus) -> list:
-    """The devices that the replicas of a run are spread over, one replica per device.
+def resolve_devices(mode: str = "auto", gpus=None, platform: str = "auto", visible=visible_gpus,
+                    per_gpu: int = 1) -> list:
+    """The places that the replicas of a run are spread over, one replica per place.
 
+    A device is named ``per_gpu`` times, once per replica that may share it; the list goes
+    through the devices ``per_gpu`` times, so the first replicas each get a device of their own.
     ``[None]`` is one device, the one the platform picks by itself.
 
     - ``sequential``: one device, so the replicas run one after another.
     - ``parallel``: the devices of ``gpus``, or every GPU that is visible when ``gpus`` is
       None or ``'all'``. Inside a container those are the GPUs passed to it, numbered from 0.
-    - ``auto``: ``parallel`` when ``gpus`` is given, ``sequential`` otherwise.
+    - ``auto``: ``parallel`` when ``gpus`` is given, one device otherwise.
 
     On the CPU and Reference platforms a device number is only a place in the queue:
     ``gpus: [0, 1]`` runs two replicas side by side. ``visible`` returns the visible GPUs
     (anything with a length) or None when that is unknown.
     """
-    check_devices(mode, gpus)
+    check_devices(mode, gpus, per_gpu)
     if mode == "auto":
         mode = "sequential" if gpus is None else "parallel"
     if mode == "sequential":
-        return [gpus[0]] if gpus else [None]
+        return ([gpus[0]] if gpus else [None]) * per_gpu
     listed = visible() if platform == "auto" or platform in GPU_PLATFORMS else None
     if gpus is None or gpus == "all":
         if not listed:
             raise ValueError("run.mode parallel without device numbers needs GPUs that nvidia-smi lists; "
                              "name the devices instead, such as gpus: [0, 1]")
-        return list(range(len(listed)))
+        return list(range(len(listed))) * per_gpu
     if listed is not None and max(gpus) >= len(listed):
         raise ValueError(f"device {max(gpus)} is not there: nvidia-smi lists {len(listed)} GPU(s), numbered "
                          "from 0. Inside a container the GPUs passed to it are numbered from 0 again.")
-    return list(gpus)
+    return list(gpus) * per_gpu

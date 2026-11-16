@@ -26,8 +26,9 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
-FM-D2, D4, D5, D6, D7, D11, D12 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
-Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
+FM-D2, D4, D5, D6, D7, D11, D12, D13, D14 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run
+lengths, the scan and the GPU use as changed by the Change Log entries of 2026-11-16.
 
 | Milestone | Status |
 |---|---|
@@ -45,18 +46,18 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates not run on this code yet |
 | GPU plan M2: real inputs (R8, FM-D15) | Merged, both parts. Membrane part: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule. Protein part: chain gaps capped (NME / ACE), caps and protonation states of the input kept, kept hetero in their own chain, `info.protein_input` in `prepared/report.json`. `pytest` 128 passed. GPU gates not run on this code yet, and the real `addMembrane` test (`-m slow`) not rerun. On real files (GPU, 200 ps of free equilibration, zero wall energy): 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set; protein model alone on both A2A files |
-| GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). Both pilots are equilibrating on GPUs 5–7 (containers `fmeta-bench-tyk2` since 01:26 UTC, `fmeta-bench-a2a` since 01:42 UTC). Not done: a run of a set, GPU gates on this code |
-| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the defaults | Running: 5 replicas from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, 57–61 ns each at 2026-11-16 01:33 UTC (615–655 ns/day). Analysed at 40 ns: not converged (3–5 rebinding events per replica, drift +12 to +22 kJ/mol). The default length of 500 ns is withdrawn (owner); the run ends at the length its convergence gives: 100, 150 or 200 ns (rule in `examples/trypsin_benzamidine/README.md`, FM-D16 amendment). Scan, compared at that length: `dt2` running at 2 fs on GPUs 5–7 (container `fmeta-scan-dt2`) since 00:22 UTC; `pace2` and `srho03` prepared, run only if the rule can still change a default. No result yet |
-| GPU plan M5: kinase example (R10) | Paused: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms, commit 8d1f10a). Replica 0 ran on GPU 5 from 2026-11-15 23:30 UTC and was stopped at 2026-11-16 00:22 UTC for the scan; all replicas continue from the checkpoints when GPUs are free. No result yet |
-| GPU plan M6: GPCR example (R3) | In progress: `examples/a2a_theophylline` (OPM file of 5MZJ). On b54292f the input as `fmeta split` writes it builds without a workaround: 221110 atoms, gap LEU208–GLU219 capped (NME / ACE), sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation (README of the example). Equilibration at 300 K with 10 ns of free stage running on GPU 7 since 01:08 UTC (container `fmeta-a2a-eq`). No metadynamics yet |
+| GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). TYK2 pilot: equilibrated, 4 of its 15 replicas near 17 ns of 20 with the default bias (606 ns/day alone on a GPU); it continues with 6 replicas on one GPU. A2A pilot: built, not equilibrated. Not done: a finished run of a set, GPU gates on this code |
+| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Official run (5 replicas from PDB entry 3PTB, default bias, commit 8d1f10a) stopped at 75–81 ns: 0 of 5 replicas converged at 20 ns (dG0 −50.6 kJ/mol), 2 of 5 at 75 ns (−16.0 kJ/mol; experiment −26.8 to −30.5), table in FM-D16. The 100 / 150 / 200 ns rule is withdrawn (owner). The scan of five faster bias settings (5 replicas each, GPUs 3–7, analysed at 10 to 40 ns) starts from this commit; its rule (FM-D16, second amendment) sets `run.length_ns`, at most 40 ns, and the default bias. Code and presets hold 500 until then. No result of the scan yet |
+| GPU plan M5: kinase example (R10) | Stopped: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms, commit 8d1f10a), replica 0 at 18.6 ns with the default bias. It is run again from its README with the final defaults. No result yet |
+| GPU plan M6: GPCR example (R3) | In progress: `examples/a2a_theophylline` (OPM file of 5MZJ). On b54292f the input as `fmeta split` writes it builds without a workaround: 221110 atoms, gap LEU208–GLU219 capped (NME / ACE), sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation (README of the example). The equilibration with 10 ns of free stage was stopped (owner: shorter); the free stage of a membrane system is 2 ns now, with `free_blocks` in `equil/equil.json`. The example is prepared again and run for 5 × 20 ns from this commit. No metadynamics yet |
 | GPU plan M7: benchmark runs (R10) | Not started |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 8d1f10a
   (CUDA, mixed precision, 2 GPUs, in the image):
   `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
   (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 157 passed on
-  the merge of FM-D17. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 160 passed on
+  the code of `run.per_gpu`. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
@@ -71,18 +72,21 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare, and
   about 1 run in 30 of its 10 ns misses the criterion on every platform (FM-D12), so a change
   of the toy trajectory (another GPU, another OpenMM) can fail it without a defect.
-- GPUs (plan decision changed 2026-11-16, see the Change Log): 0–4 trypsin, 5–7 the scan, shared
-  with the equilibrations of the A2A example, the TYK2 pilot and the lipid patch work. Gates run
-  on 6–7 with those containers stopped for the run and restarted with the same commands.
-- Time estimate for 5 replicas per ligand, from the measured speeds (72k atoms 660, 88k atoms
-  570 ns/day at 4 fs; the A2A example, 221k atoms, 167 ns/day at 2 fs in equilibration, taken
-  twice for 4 fs) and an unmeasured 430 ns/day for the 116k atoms of the A2A set (scaled by
-  atoms): about 20 GPU-days at 100 ns per replica (10 TYK2 ligands 9, 8 A2A ligands 9, the A2A
-  example 1.5), 40 at 200 ns.
+- GPUs (owner, 2026-11-16: all 8 are for this task): every GPU carries several replicas with
+  NVIDIA MPS (`run.per_gpu`, FM-D14 amendment). First wave: GPU 0 the TYK2 pilot, 1 the A2A
+  pilot, 2 the A2A example, 3–7 the bias scan. Gates run once, on the commit of the final defaults.
+- Time estimate (measured: 88k atoms 606 ns/day alone and 1283 / 1541 / 1620 ns/day per GPU with
+  4 / 6 / 8 replicas under MPS; not measured: A2A production): both full sets and the three
+  examples at 5 × 20 ns are about 1.75 GPU-days, 5 to 6 hours on 8 GPUs; twice that at 40 ns.
 - Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] 20 ns first and a scan of faster bias settings; several replicas per GPU with MPS; 2 ns membrane free stage
+- What: owner decisions of 2026-11-16: 100 to 200 ns per replica is still too long, run 20 ns first and judge, shorten the equilibration, all 8 GPUs are for this task. The 100 / 150 / 200 ns rule is withdrawn; the trypsin run was stopped at 75–81 ns (0 of 5 replicas converged at 20 ns, 2 of 5 at 75 ns). New rule, written before the scan: five faster bias settings on trypsin (bias factor 20, height 3.0, sigma × 2 and combinations), 5 replicas each, analysed at 10, 15, 20, 30 and 40 ns; the first length at which a setting has all five replicas converged gives `run.length_ns` and the default bias; at most 40 ns. `run.per_gpu` / `--per-gpu` put several replicas on one GPU (NVIDIA MPS in a container: `scripts/mps.sh`, `scripts/in_docker.sh --mps`): 1283 / 1541 / 1620 ns/day per GPU with 4 / 6 / 8 replicas of 88k atoms, against 606 alone. Membrane free stage 2 ns (was 10), with `free_blocks`. `ruff` passes, `pytest` 160 passed. Not run: GPU gates on this code (once, on the final defaults); `--mps` of the wrapper by an actual call.
+- Why: the owner's decisions. With the default bias 20 ns is not enough on trypsin, so a shorter run needs a faster bias; it is selected on trypsin by the convergence diagnostics only, never on a benchmark. Five replicas and every criterion stay.
+- Refs: FM-D14 (amendment), FM-D16 (second amendment), FM-D13, `docs/configuration.md`, `tests/test_scheduler.py`, `tests/test_system.py`.
 
 ### 2026-11-16 — [progress] A2A benchmark set at the preset's lipid padding: 116k atoms instead of 231k
 - What: `examples/benchmarks/a2a/set.yaml` no longer sets `system.padding: 1.5`; the preset's 1.2 nm holds. The three pilot ligands built on c41c08b: 115625, 117494 and 116949 atoms, 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm, no error in the validation, unbound ligand 2.43–2.54 nm from the nearest periodic image. `examples/a2a_theophylline` keeps 1.5 nm: in its frame (OPM file of 5MZJ) the membrane is 2 × 2 patches with either value (221110 and 221176 atoms).

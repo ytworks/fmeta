@@ -7,7 +7,9 @@ FM-D12 amended (2026-11-16: the scatter of the toy gate is on record, criteria u
 the owner: operation on a CPU platform is not guaranteed); FM-D14 added (2026-11-16: run modes
 and the scheduler); FM-D15 added in two parts (2026-11-16: real inputs, the membrane part and
 the protein part); FM-D16 added (2026-11-16: official defaults as presets) and amended the same
-day (owner: the run length of 500 ns withdrawn); FM-D17 added (2026-11-16: benchmark sets).
+day (owner: the run length of 500 ns withdrawn; then: 20 ns pilots first and a shorter
+equilibration); FM-D17 added (2026-11-16: benchmark sets); FM-D14 amended (2026-11-16: several
+replicas on one GPU with NVIDIA MPS, `run.per_gpu`).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -238,6 +240,8 @@ packages; the `docker` job builds the image and tests in it) and the SessionStar
 `scripts/gpu_gates.py` records evidence only when the lock installed in the image is the lock
 of the repository; the record names the image, the hash of the lock and the UUIDs of the GPUs,
 and `scripts/verify_bench_results.py` requires that. Rule: `.claude/rules/docker-execution.md`.
+The NVIDIA MPS daemon of FM-D14 also runs in a container of the image (`scripts/mps.sh`), and
+`scripts/in_docker.sh --mps` starts a container as its client: nothing is installed on the host.
 Why: owner rule of 2026-11-15 (execution and tests run on Docker, except CI). `environment.yml`
 pins nothing, so it resolves differently over time: evidence taken in a conda environment does
 not describe the environment a later user gets. With one locked image, the environment that is
@@ -280,6 +284,43 @@ from the time between checkpoints: one run 569 ns/day; two runs 322 + 296 = 618;
 206 + 202 + 207 = 615. That is 9% more in total at best. With MPS: not measured).
 Why: owner request of 2026-11-15 for both modes. A stopped container must leave nothing on a
 GPU, and what was run where has to be checkable afterwards from a record, on the GPU machine.
+Amendment (2026-11-16): several replicas may share a GPU, and the "not done" above no longer
+holds for that key. `run.per_gpu` (`--per-gpu` for one call; default 1) is the number of
+replicas on one GPU at a time. The devices of the scheduler are places: a place is used by one
+job at a time, and a device that is named twice carries two jobs side by side.
+`resolve_devices` goes through the devices `per_gpu` times (`[0, 1]` with 2 gives
+`[0, 1, 0, 1]`), so the first replicas each get a GPU of their own. `sequential` with `per_gpu`
+above 1 is an error, `auto` without GPUs is one device with `per_gpu` places, and a device
+named twice in `run.gpus` stays an error. Like mode and GPUs, the key is outside the
+configuration hash of a benchmark. Above 1 the processes need NVIDIA MPS: `scripts/mps.sh
+start` runs the daemon in a container of the official image, and `scripts/in_docker.sh --mps`
+starts a container as its client (the same user, the daemon's pipe directory and its shared
+memory). Only those containers are clients; any other process keeps the GPU as before.
+Why: the measurement that was missing, asked for by the owner. TYK2 with ejm_44, 88k atoms,
+4 fs, default bias, one RTX PRO 6000 Blackwell per configuration, speed from the hills written
+in about 300 s:
+
+| On one GPU | Total (ns/day) | Per replica (ns/day) | Total against one | Replica against alone |
+|---|---|---|---|---|
+| 1 replica | 606 | 606 | 1.00 | 1.00 |
+| 2, MPS | 776 | 388 | 1.28 | 0.64 |
+| 3, MPS | 1066 | 355 | 1.76 | 0.59 |
+| 4, MPS | 1283 | 321 | 2.12 | 0.53 |
+| 6, MPS | 1541 | 257 | 2.54 | 0.42 |
+| 8, MPS | 1620 | 203 | 2.67 | 0.33 |
+| 2, no MPS | 579 | 289 | 0.96 | 0.48 |
+
+The single replica is the one of the pilot run on its own GPU (3501 ps of hills in 499 s); in
+the 300 s window of this measurement a single replica gave 426 ns/day, which the pilot does not
+confirm, so the factors are against 606. One run leaves the GPU at 80%: hills are fitted on the
+CPU between the steps. A benchmark of many replicas has 2.1 times the throughput at 4 per GPU
+and 2.5 to 2.7 times at 6 to 8; time slicing without MPS gains nothing, as the first
+measurement said.
+Not done: a default above 1 (alone a replica is fastest, and MPS is a daemon that somebody has
+to start); starting the daemon from fmeta, or a check for it in the client (without MPS the
+replicas still run, time-sliced); a gate item, since the scheduler's rules for places are
+tested on the CPU and MPS is NVIDIA's. An MPS server that fails ends every client on it; the
+runs continue from their checkpoints.
 
 ### FM-D15 — Real inputs. Membrane part: parts dropped first, kept components are receptor
 Accepted 2026-11-16.
@@ -315,7 +356,9 @@ change goes into the height. In the same time the height the rule asks for rose 
 `box_cv`, as it must. The two effects are 4.9%; 8% leaves room for a longer equilibration and
 another bilayer and costs 5% more atoms. Built with 8% (221 143 atoms, 13.24 nm high) the same
 system lost 3.7% in the same protocol and passed: 12.76 nm against 12.28 nm asked. Two runs of
-1 ns on one system: the 10 ns equilibration of the A2A example is to confirm the number.
+1 ns on one system. The free stage of a membrane system is 2 ns by default (FM-D16, second
+amendment) and `equil/equil.json` holds its box area and height in ten blocks (`free_blocks`):
+those records of the A2A example and the A2A set are to confirm the number.
 Not done: restraining a kept water (it stays mobile water and is no obstacle); a configuration
 key for dropping (the `input.complex` route cannot drop yet); a finer orientation estimate. On
 the OPM-oriented A2A the estimate is 14 deg and 0.2 nm from the OPM plane, so the 25 deg limit
@@ -432,6 +475,66 @@ Why: the owner's decision, and two measurements with the default bias: on trypsi
 rebinding events per replica within 40 ns, and on TYK2 with ejm_46 (4.8 nM) the ligand left
 the site within 5 ns and was back within 20 ns. A length chosen from one system's convergence
 diagnostics has a stated origin; a number picked by hand would not.
+Second amendment (2026-11-16, owner): the rule above is replaced before it gave a value. The
+owner decided that 100 to 200 ns per replica is still too long: run 20 ns first and judge from
+that, the shorter the better, and shorten the equilibration with it. What holds now:
+- The 100 / 150 / 200 ns rule is withdrawn. The trypsin run was stopped at 75 to 81 ns.
+- The pilots of both benchmark sets and the examples run 5 × 20 ns. `run.length_ns` and the
+  default bias are set by the scan below; until then the code and the presets hold 500 and
+  every run names its length (`--length-ns`). A run can be extended exactly (FM-D5).
+- `equilibration.free_ps: null` is 2000 ps with a membrane (it was 10000) and 1000 ps without
+  (unchanged). `equil/equil.json` gains `free_blocks`: the box area and height of the free
+  stage in ten blocks, so a box that is still relaxing shows as a trend. The warning for an
+  area change above 3% between the halves of the stage stays.
+- Five replicas stay and no criterion changes: a run that is too short for the criteria is
+  reported as not converged, with its numbers.
+
+What 20 ns gives on trypsin-benzamidine (the official run, 5 replicas, default bias, analysed
+at cut lengths; a replica passes when it has no convergence problem):
+
+| Cut (ns) | dG0 (kJ/mol) | 95% interval (kJ/mol) | Rebinding events per replica | Replicas that pass |
+|---|---|---|---|---|
+| 10 | −67.8 | −87.4 to −48.3 | 1, 1, 1, 1, 0 | 0 |
+| 20 | −50.6 | −65.7 to −35.5 | 2, 4, 1, 2, 2 | 0 |
+| 30 | −37.9 | −51.5 to −24.2 | 2, 5, 3, 2, 3 | 0 |
+| 40 | −29.1 | −43.8 to −14.3 | 4, 5, 3, 4, 3 | 0 |
+| 60 | −19.6 | −30.6 to −8.6 | 7, 6, 4, 6, 4 | 0 |
+| 75 | −16.0 | −24.2 to −7.8 | 9, 10, 5, 8, 5 | 2 |
+
+At 20 ns four replicas have fewer than three rebinding events, the drift of the plateau is +8
+to +33 kJ/mol and the reweighted estimate is 6 to 35 kJ/mol away. The mean still rises at
+75 ns. So with the default bias 20 ns is not enough on this system, and the pilots are
+expected to report the same: a short run needs a faster bias.
+
+Scan of the bias (rule written before a scan run started). Five settings on the equilibrated
+trypsin system, 5 replicas each, started for 40 ns and analysed at cut lengths; the default
+bias above is the baseline:
+
+| Setting | `bias_factor` | `height` (kJ/mol) | `sigma_s` / `sigma_rho` (nm) |
+|---|---|---|---|
+| default | 10 | 1.5 | 0.025 / 0.05 |
+| `bf20` | 20 | 1.5 | 0.025 / 0.05 |
+| `h3` | 10 | 3.0 | 0.025 / 0.05 |
+| `sig2` | 10 | 1.5 | 0.05 / 0.10 |
+| `bf20_h3` | 20 | 3.0 | 0.025 / 0.05 |
+| `bf20_h3_sig2` | 20 | 3.0 | 0.05 / 0.10 |
+
+- The lengths 10, 15, 20, 30 and 40 ns are taken in that order. The first length at which a
+  setting has all five replicas without a convergence problem becomes `run.length_ns`, and
+  that setting the default bias; of several at the same length, the one with the smallest
+  standard error of the five.
+- If no setting has five at 40 ns: the setting with the most passing replicas at 40 ns and
+  40 ns become the defaults, and the documentation states the count. Nothing runs longer.
+- Selection uses the convergence diagnostics on trypsin only. The distance to experiment is
+  reported beside it and decides nothing; no benchmark is tuned; no criterion changes.
+- Walkers are not in the scan: a benchmark is bound by the total throughput of the GPUs, which
+  walkers do not change.
+- This replaces the scan of `dt2`, `pace2` and `srho03` (first amendment), which compared at
+  100 ns or more: `dt2` was stopped at 15 to 18 ns without a result, the other two never ran.
+
+Why: the owner's decision. The cost it removes: at the measured speeds (FM-D14, amendment) a
+20 ns replica of 88k atoms takes 48 min alone and 90 min with four on a GPU, so a set of 50
+replicas is hours on 8 GPUs, where 100 ns per replica without sharing was days.
 
 ### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
 Status: **Accepted** (2026-11-16).

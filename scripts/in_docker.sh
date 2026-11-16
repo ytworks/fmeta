@@ -15,6 +15,8 @@
 #                    started from this repository is replaced, so the same command continues
 #                    a stopped run; any other container of that name is left alone (error).
 #   --mount SRC:DST  additional bind mount (repeatable)
+#   --mps           make the processes clients of the NVIDIA MPS daemon that `scripts/mps.sh start`
+#                    runs: for replicas that share a GPU (run.per_gpu above 1)
 #   --image IMAGE    image to run (default: $FMETA_IMAGE, else fmeta:dev)
 #   --build          build the image from the Dockerfile first
 #
@@ -28,6 +30,9 @@ GPUS=""
 DETACH=0
 BUILD=0
 NAME=""
+MPS=0
+MPS_NAME="${FMETA_MPS_NAME:-fmeta-mps}"
+MPS_DIR="${FMETA_MPS_DIR:-/tmp/fmeta-mps-$(id -u)}"
 MOUNTS=()
 
 while [[ $# -gt 0 ]]; do
@@ -36,6 +41,7 @@ while [[ $# -gt 0 ]]; do
         --detach) DETACH=1; shift ;;
         --name) NAME="$2"; shift 2 ;;
         --mount) MOUNTS+=(-v "$2"); shift 2 ;;
+        --mps) MPS=1; shift ;;
         --image) IMAGE="$2"; shift 2 ;;
         --build) BUILD=1; shift ;;
         --) shift; break ;;
@@ -80,6 +86,14 @@ if [[ "$GPUS" == all ]]; then
     ARGS+=(--gpus all)
 elif [[ -n "$GPUS" ]]; then
     ARGS+=(--gpus "\"device=$GPUS\"")
+fi
+if [[ $MPS -eq 1 ]]; then
+    if [[ "$(docker container inspect --format '{{.State.Status}}' "$MPS_NAME" 2> /dev/null || true)" != running ]]; then
+        echo "in_docker.sh: --mps needs the MPS daemon: scripts/mps.sh start" >&2
+        exit 2
+    fi
+    # A client reaches the daemon through its pipe directory and its shared memory.
+    ARGS+=(--ipc "container:$MPS_NAME" -v "$MPS_DIR/pipe":/tmp/nvidia-mps)
 fi
 if [[ -n "$NAME" ]]; then
     FOUND="$(docker container inspect \

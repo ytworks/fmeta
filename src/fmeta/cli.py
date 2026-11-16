@@ -58,9 +58,11 @@ def _config_from_args(args) -> Config:
         config.run.gpus = args.gpus
     if args.mode:
         config.run.mode = args.mode
+    if args.per_gpu is not None:
+        config.run.per_gpu = args.per_gpu
     if args.platform:
         config.run.platform = args.platform
-    check_devices(config.run.mode, config.run.gpus)
+    check_devices(config.run.mode, config.run.gpus, config.run.per_gpu)
     return config
 
 
@@ -82,6 +84,9 @@ def _add_setup_options(parser) -> None:
     parser.add_argument("--mode", choices=MODES,
                         help="parallel: one replica per GPU, side by side; sequential: one replica after "
                              "another on one GPU; auto (default): parallel if GPUs are given")
+    parser.add_argument("--per-gpu", type=int, metavar="N",
+                        help="replicas that share one GPU at a time (default 1; above 1 start the "
+                             "container with scripts/in_docker.sh --mps)")
     parser.add_argument("--platform", help="OpenMM platform (default: auto)")
 
 
@@ -133,7 +138,7 @@ def cmd_run(args) -> None:
     if args.replica is not None:
         run_stage(config, args.workdir, args.replica, args.device, args.length_ns, args.walker)
     else:
-        run_replicas(config, args.workdir, args.gpus, args.length_ns, args.mode)
+        run_replicas(config, args.workdir, args.gpus, args.length_ns, args.mode, per_gpu=args.per_gpu)
 
 
 def cmd_status(args) -> None:
@@ -229,7 +234,7 @@ def cmd_benchmark_run(args) -> None:
     from .benchmark import format_status, load_set, run_set, status_rows
     benchmark = load_set(args.set)
     try:
-        status = run_set(benchmark, args.out, args.gpus, args.mode, args.until)
+        status = run_set(benchmark, args.out, args.gpus, args.mode, args.until, per_gpu=args.per_gpu)
     finally:
         try:
             print(format_status(status_rows(benchmark, args.out)))
@@ -283,6 +288,9 @@ def _add_benchmark_commands(commands) -> None:
               "run or continue every stage of every prepared ligand in one scheduler call")
     sub.add_argument("--gpus", type=_gpus, help="device numbers such as 0,1, or all (default: run.gpus of the set)")
     sub.add_argument("--mode", choices=MODES, help="parallel, sequential or auto (default: run.mode of the set)")
+    sub.add_argument("--per-gpu", type=int, metavar="N",
+                     help="jobs that share one GPU at a time (default: run.per_gpu of the set; above 1 "
+                          "start the container with scripts/in_docker.sh --mps)")
     sub.add_argument("--until", choices=("prepare", "equilibrate", "run"), default="run",
                      help="stop after this stage of every ligand (default: run)")
 
@@ -346,6 +354,9 @@ def main(argv=None) -> None:
     sub.add_argument("--mode", choices=MODES,
                      help="for this run: parallel (one replica per GPU, side by side), sequential (one "
                           "replica after another on one GPU) or auto (default: run.mode)")
+    sub.add_argument("--per-gpu", type=int, metavar="N",
+                     help="for this run: replicas that share one GPU at a time (default: run.per_gpu; "
+                          "above 1 start the container with scripts/in_docker.sh --mps)")
     sub.add_argument("--length-ns", type=float, help="total length per replica")
     sub.set_defaults(func=cmd_run)
 

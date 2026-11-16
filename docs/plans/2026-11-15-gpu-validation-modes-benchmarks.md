@@ -78,6 +78,27 @@ bootstrap intervals, raw and with the mean offset removed. Reports carry no verd
 Three-ligand pilots come first; the full sets follow once throughput and convergence are
 measured.
 
+## Amendment (2026-11-16, owner)
+
+The owner's decisions of 2026-11-16 change M4–M7; the detail is in FM-D14 and FM-D16
+(amendments) and the Change Log of `PROGRESS.md`.
+
+- Run length: 20 ns first, at most 40 ns. A scan of five faster bias settings on trypsin sets
+  `run.length_ns` and the default bias by the rule of FM-D16 (second amendment), written before
+  the scan. The 100 / 150 / 200 ns rule is withdrawn; `pytest -m slow` and checks on a CPU
+  platform are not rerun.
+- All 8 GPUs carry several replicas each with NVIDIA MPS (`run.per_gpu`). The GPU gates run
+  once, on the commit of the final defaults.
+- Done when, per item of the request: (1) the gates `replicas_parallel` and
+  `replicas_sequential` pass on the final code and the trypsin example has run on one GPU in
+  `sequential` mode; (2) the image of the final commit runs without the mounted source and the
+  CI job `docker` passes; (3) the defaults from the scan are the same in the code, the presets,
+  `docs/configuration.md` and the examples; (4) the three examples (trypsin, TYK2 ejm_46, A2A
+  theophylline) run from their READMEs to dG0, written beside experiment; (5) both sets (10
+  TYK2 and 8 A2A ligands) run with the official defaults and their reports are in
+  `bench/reports/`. A replica that does not converge is reported as NOT CONVERGED; nothing is
+  extended.
+
 ## Invariants
 
 - No criterion in `.claude/rules/numerics-invariants.md` is relaxed. New gate items

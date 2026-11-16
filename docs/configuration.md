@@ -198,7 +198,7 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 | `equilibration.heating_ps` | ps | `100.0` | Heating from 10 K to `system.temperature` at constant volume, restrained. Convention. |
 | `equilibration.release_ps` | ps | `400.0` | Constant pressure, split evenly over the stages of `release_factors`. Convention. |
 | `equilibration.release_factors` | - | `[1.0, 0.5, 0.2, 0.05]` | The restraint is scaled by these factors, one stage each. Convention. |
-| `equilibration.free_ps` | ps | `null` | Without restraints, funnel walls on. `null`: 1000, with a membrane 10000 (the bilayer relaxes around the protein). Convention; the membrane value is checked in roadmap R3. |
+| `equilibration.free_ps` | ps | `null` | Without restraints, funnel walls on. `null`: 1000, with a membrane 2000 (the bilayer relaxes around the protein). Convention; `equil/equil.json` holds the box area and height of the stage in ten blocks (`free_blocks`), and a change of the area above 3% between its halves is a warning: extend the stage then. The membrane value is checked in roadmap R3. |
 | `equilibration.timestep_fs` | fs | `2.0` | Time step of the equilibration. Convention (the production time step of [E20] and of [BSS-P]). |
 | `equilibration.friction` | 1/ps | `1.0` | Friction of the Langevin thermostat. [OMM] (its example), [BSS-P] (time constant 1 ps). |
 | `equilibration.seed` | - | `0` | Seed of the velocities and the thermostat; `0`: random. |
@@ -218,6 +218,7 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 | `run.precision` | - | `mixed` | Precision of a GPU platform: `single`, `mixed` or `double`. The measurements behind FM-D2 and FM-D4 were taken in mixed precision. Convention. |
 | `run.mode` | - | `auto` | `parallel`: one replica per GPU, side by side; `sequential`: one after another on one GPU; `auto`: parallel when `gpus` is set (design: FM-D14). |
 | `run.gpus` | - | `null` | The GPUs of the run: device numbers such as `[0, 1]`, or `all`; `null`: one device, picked by the platform (design: FM-D14). |
+| `run.per_gpu` | - | `1` | Replicas that share one GPU at a time. Above 1 the container needs NVIDIA MPS (`scripts/mps.sh start`, then `scripts/in_docker.sh --mps`): measured on one RTX PRO 6000 Blackwell with an 88k-atom system, 2, 3, 4 and 6 replicas give 1.8, 2.5, 3.0 and 3.6 times the total speed of one, each replica running at 0.91, 0.83, 0.75 and 0.60 of its speed alone; without MPS two replicas give 1.4 times (design: FM-D14). The default leaves a GPU to one replica: the shortest wall time of a single run. |
 | `run.checkpoint_ps` | ps | `250.0` | Time between checkpoints; a restart continues from the last one (design: FM-D5). Convention. |
 | `run.trajectory_ps` | ps | `100.0` | Time between trajectory frames; `0`: no trajectory. Convention. |
 | `run.trajectory_solute_only` | - | `true` | Write only the solute (protein, ligand, kept hetero groups) to the trajectory. |

@@ -6,11 +6,12 @@ the calling thread hands out the devices, so the same jobs on the same devices a
 assigned the same way. Every decision is appended to ``schedule.jsonl``, and
 :func:`verify_schedule` checks such a record against the rules:
 
-- A device is used by one job at a time. A job takes as many devices as it asks for (all of
-  them, if there are fewer) and spreads its tasks over them.
+- Every entry of the device list is a place for one job at a time: a device named twice
+  carries two jobs side by side (``run.per_gpu``). A job takes as many places as it asks
+  for (all of them, if there are fewer) and spreads its tasks over their devices.
 - A job starts when the jobs it comes after have ended successfully and its devices are free.
   Jobs start in the order of the list: a job that waits for devices holds back the jobs behind
-  it, a job that waits for another job does not. Free devices are handed out in list order.
+  it, a job that waits for another job does not. Free places are handed out in list order.
 - A task that fails stops the other tasks of its job; the other jobs go on. A job that comes
   after a job that did not end successfully is not started.
 - After a stop request (SIGINT, SIGTERM) nothing is started, every child is terminated with
@@ -90,8 +91,8 @@ def launch_subprocess(task: Task, device) -> _Child:
 
 
 class _Running:
-    def __init__(self, job: Job, devices: list):
-        self.job, self.devices = job, devices
+    def __init__(self, job: Job, places: list, devices: list):
+        self.job, self.places, self.devices = job, places, devices
         self.handles: dict = {}
         self.codes: dict = {}
         self.cause: Optional[str] = None            # why its tasks were told to stop, if they were
@@ -114,8 +115,8 @@ class Scheduler:
         self.record = record or (lambda event, **fields: None)
         self.grace = grace                          # seconds a terminated child gets before it is killed
         self._inbox: queue.SimpleQueue = queue.SimpleQueue()
-        if not self.devices or len(set(self.devices)) != len(self.devices):
-            raise ValueError(f"the devices must be distinct and at least one: {self.devices}")
+        if not self.devices:
+            raise ValueError("there must be at least one device")
         seen: set = set()
         for job in self.jobs:
             if job.key in seen or not job.tasks or job.devices < 1:
@@ -131,8 +132,9 @@ class Scheduler:
     def _wait(self, key: str, name: str, handle) -> None:
         self._inbox.put(("exit", key, name, handle.wait()))
 
-    def _start(self, job: Job, mine: list) -> Optional[_Running]:
-        running = _Running(job, mine)
+    def _start(self, job: Job, places: list) -> Optional[_Running]:
+        mine = [self.devices[place] for place in places]
+        running = _Running(job, places, mine)
         try:
             if job.before_start is not None:
                 job.before_start()
@@ -156,7 +158,7 @@ class Scheduler:
         need = {job.key: min(job.devices, len(self.devices)) for job in self.jobs}
         status: dict = {}
         waiting, running = list(self.jobs), {}
-        free = set(self.devices)
+        free = set(range(len(self.devices)))        # places: positions in the device list
         stopping: Optional[str] = None
         self.record("begin", devices=self.devices,
                     jobs=[dict(key=job.key, tasks=[task.name for task in job.tasks], devices=need[job.key],
@@ -175,12 +177,12 @@ class Scheduler:
                     held_back = held_back or ready
                     still.append(job)
                     continue
-                mine = [device for device in self.devices if device in free][:need[job.key]]
-                started = self._start(job, mine)
+                places = sorted(free)[:need[job.key]]
+                started = self._start(job, places)
                 if started is None:
                     status[job.key] = FAILED
                 else:
-                    free.difference_update(mine)
+                    free.difference_update(places)
                     running[job.key] = started
             waiting = still
             if not running:
@@ -208,7 +210,7 @@ class Scheduler:
                 entry.stop(FAILED)                  # the tasks of a job stop together
             if len(entry.codes) == len(entry.handles):
                 del running[key]
-                free.update(entry.devices)
+                free.update(entry.places)
                 failed = any(entry.codes.values())
                 status[key] = (entry.cause or FAILED) if failed else DONE
                 self.record("end", job=key, devices=entry.devices, status=status[key], returncodes=entry.codes)

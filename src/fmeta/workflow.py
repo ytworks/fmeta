@@ -128,6 +128,7 @@ def equilibrate_stage(config: Config, workdir, device: Optional[int] = None) -> 
     summary = dict(wall_energy_mean=result.wall_energy_mean, wall_energy_max=result.wall_energy_max,
                    wall_ok=wall_ok, box_lengths=result.box_lengths.tolist(),
                    area_per_lipid=result.area_per_lipid, area_drift=result.area_drift,
+                   free_blocks=result.free_blocks,
                    funnel_checks=report.to_dict())
     with open(out / "state.xml", "w") as handle:
         handle.write(mm.XmlSerializer.serialize(result.state))
@@ -287,12 +288,13 @@ def unfinished_jobs(status: dict, record: Sequence[dict], workdir) -> Optional[s
 
 
 def run_replicas(config: Config, workdir, gpus=None, length_ns: Optional[float] = None,
-                 mode: Optional[str] = None, launcher=None) -> list[Path]:
+                 mode: Optional[str] = None, launcher=None, per_gpu: Optional[int] = None) -> list[Path]:
     """Run all replicas (and their walkers) as child processes on the devices of the run.
 
-    ``gpus`` and ``mode`` stand in for ``run.gpus`` and ``run.mode`` in this call (see
-    :func:`fmeta.engine.platform.resolve_devices`). On one device the replicas run one after
-    another; on several they run side by side, and the next replica starts on the device that
+    ``gpus``, ``mode`` and ``per_gpu`` stand in for ``run.gpus``, ``run.mode`` and
+    ``run.per_gpu`` in this call (see :func:`fmeta.engine.platform.resolve_devices`). On one
+    device the replicas run one after another; on several they run side by side, ``per_gpu``
+    of them on each device, and the next replica starts on the place that
     becomes free. Every decision is appended to ``workdir/schedule.jsonl`` (see
     :mod:`fmeta.scheduler`), the output of a child to ``workdir/rep0.log`` and so on.
 
@@ -302,7 +304,7 @@ def run_replicas(config: Config, workdir, gpus=None, length_ns: Optional[float] 
     """
     workdir = Path(workdir)
     devices = resolve_devices(mode or config.run.mode, gpus if gpus is not None else config.run.gpus,
-                              config.run.platform)
+                              config.run.platform, per_gpu=per_gpu or config.run.per_gpu)
     record: list = []
     with directory_lock(workdir):
         status = run_jobs(replica_jobs(config, workdir, length_ns), devices, launcher,

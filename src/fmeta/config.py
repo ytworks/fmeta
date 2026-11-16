@@ -78,6 +78,7 @@ class RunConfig:
     precision: str = "mixed"
     mode: str = "auto"                       # auto, parallel (one replica per GPU), sequential (one GPU)
     gpus: Optional[list | str] = None        # device numbers, or "all": every GPU that is visible
+    per_gpu: int = 1                         # replicas that share one GPU at a time (above 1: with NVIDIA MPS)
     checkpoint_ps: float = 250.0
     trajectory_ps: float = 100.0             # 0 disables the trajectory
     trajectory_solute_only: bool = True
@@ -101,7 +102,7 @@ class Config:
         self.metad.pace = max(1, round(self.run.pace_ps / dt))
         if self.run.timestep_fs > 2.0 and not self.system.hydrogen_mass:
             raise ValueError("a time step above 2 fs needs system.hydrogen_mass (e.g. 1.5)")
-        check_devices(self.run.mode, self.run.gpus)
+        check_devices(self.run.mode, self.run.gpus, self.run.per_gpu)
         # the ligand force field is named, so that a saved configuration says which one was used
         if self.system.ligand_forcefield is None:
             self.system.ligand_forcefield = DEFAULT_FORCEFIELD.get(self.system.ligand_method)

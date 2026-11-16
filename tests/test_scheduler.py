@@ -96,6 +96,18 @@ def test_three_jobs_on_two_devices_the_third_starts_on_the_released_device():
     assert verify_schedule(run.record) == []
 
 
+def test_a_device_named_twice_carries_two_jobs_side_by_side():
+    run = Run([job("a"), job("b"), job("c")], devices=[0, 0])
+    assert run.take(2) == [("start", "a", [0]), ("start", "b", [0])]
+    run.children["a"].end()
+    assert run.take(2) == [("end", "a", "done"), ("start", "c", [0])]
+    run.children["b"].end()
+    assert run.take(1) == [("end", "b", "done")]
+    run.children["c"].end()
+    assert run.take(2) == [("end", "c", "done"), ("finish", {"a": "done", "b": "done", "c": "done"})]
+    assert verify_schedule(run.record) == []
+
+
 def test_a_failed_task_stops_its_job_and_what_comes_after_it_while_other_jobs_go_on():
     jobs = [job("rep0", ["w0", "w1"], devices=2), job("next", after=["rep0"]), job("other")]
     run = Run(jobs, devices=[0, 1, 2])
@@ -194,6 +206,13 @@ def test_a_record_that_breaks_a_rule_of_the_scheduler_is_reported(record, proble
 ])
 def test_mode_and_gpus_give_the_devices_of_the_replicas(mode, gpus, visible, devices):
     assert resolve_devices(mode, gpus, "CUDA", visible=lambda: [{}] * visible) == devices
+
+
+def test_per_gpu_names_every_device_that_many_times_and_the_first_replicas_get_their_own():
+    assert resolve_devices("parallel", [0, 1], "CUDA", visible=lambda: [{}] * 2, per_gpu=2) == [0, 1, 0, 1]
+    assert resolve_devices("auto", None, "CUDA", per_gpu=3) == [None, None, None]
+    with pytest.raises(ValueError, match="leave run.per_gpu at 1"):
+        resolve_devices("sequential", [0], "CUDA", per_gpu=2)
 
 
 def test_devices_that_are_not_there_are_refused():

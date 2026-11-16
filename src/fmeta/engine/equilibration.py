@@ -34,7 +34,7 @@ class EquilibrationSettings:
     heating_ps: float = 100.0               # NVT, 10 K -> target
     release_ps: float = 400.0               # NPT, split evenly over the release stages
     release_factors: Sequence[float] = (1.0, 0.5, 0.2, 0.05)
-    free_ps: Optional[float] = None         # unrestrained NPT; default 1 ns (10 ns with a membrane)
+    free_ps: Optional[float] = None         # unrestrained NPT; default 1 ns (2 ns with a membrane)
     timestep_fs: float = 2.0
     friction: float = 1.0                   # 1/ps
     seed: int = 0                           # 0: random
@@ -49,10 +49,22 @@ class EquilibrationResult:
     area_per_lipid: Optional[float] = None  # nm^2: box area over lipids per leaflet (membrane only;
     area_drift: Optional[float] = None      #   includes the protein's footprint). Relative change
                                             #   between the two halves of the free stage.
+    free_blocks: Optional[list] = None      # the free stage in equal blocks (:func:`block_means`)
 
     def wall_ok(self, temperature: float) -> bool:
         """The funnel leaves the bound state alone if it does less than 0.1 kT of work."""
         return self.wall_energy_mean < 0.1 * KB * temperature
+
+
+def block_means(area, height, sample_ps: float, blocks: int = 10) -> list:
+    """The samples of the free stage in up to ``blocks`` equal blocks: for each its end time
+    (ps) and the means of the box area ``a.x * b.y`` (nm^2) and the box height ``c.z`` (nm).
+
+    A box that is still relaxing shows as a trend over the blocks."""
+    edges = np.linspace(0, len(area), min(blocks, len(area)) + 1).astype(int)
+    return [dict(end_ps=float(stop * sample_ps), area=float(np.mean(area[start:stop])),
+                 height=float(np.mean(height[start:stop])))
+            for start, stop in zip(edges[:-1], edges[1:])]
 
 
 def _clone(system: mm.System) -> mm.System:
@@ -92,7 +104,7 @@ def equilibrate(prepared: Prepared, platform: mm.Platform, properties: Optional[
     temperature = prepared.settings.temperature
     dt = settings.timestep_fs / 1000.0
     free_ps = settings.free_ps if settings.free_ps is not None else (
-        10000.0 if prepared.membrane else 1000.0)
+        2000.0 if prepared.membrane else 1000.0)
 
     def integrator(start_temperature: float) -> mm.LangevinMiddleIntegrator:
         result = mm.LangevinMiddleIntegrator(start_temperature * unit.kelvin,
@@ -133,16 +145,18 @@ def equilibrate(prepared: Prepared, platform: mm.Platform, properties: Optional[
 
     n_free = max(1, int(round(free_ps / dt)))
     stride = max(1, int(round(1.0 / dt)))           # sample the walls every ps
-    wall, area = [], []
+    wall, area, height = [], [], []
     for _ in range(max(1, n_free // stride)):
         simulation.step(min(stride, n_free))
         energy = simulation.context.getState(getEnergy=True, groups={prepared.restraint_group})
         wall.append(energy.getPotentialEnergy().value_in_unit(_KJ))
         vectors = energy.getPeriodicBoxVectors().value_in_unit(unit.nanometer)
         area.append(vectors[0][0] * vectors[1][1])
+        height.append(vectors[2][2])
     state = simulation.context.getState(getPositions=True, getVelocities=True)
     box = np.diag(np.array(state.getPeriodicBoxVectors().value_in_unit(unit.nanometer)))
     result = EquilibrationResult(state, float(np.mean(wall)), float(np.max(wall)), box)
+    result.free_blocks = block_means(area, height, stride * dt)
     if prepared.membrane:
         atoms = list(prepared.topology.atoms())
         n_lipids = sum(atoms[i].element.symbol == "P" for i in prepared.selection.heavy_atoms("lipid"))

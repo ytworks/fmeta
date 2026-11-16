@@ -518,7 +518,7 @@ def configuration_hash(benchmark: BenchmarkSet, config: Config) -> str:
     (``run.length_ns``, ``run.replicas``), which may grow while the results stay comparable."""
     data = config.to_dict()
     del data["input"]
-    for option in ("mode", "gpus", "length_ns", "replicas"):
+    for option in ("mode", "gpus", "per_gpu", "length_ns", "replicas"):
         del data["run"][option]
     data["system"]["ligand_xml"] = [_sha256(path) for path in data["system"]["ligand_xml"]]
     if data["membrane"] is not None and data["membrane"].get("patch"):
@@ -759,10 +759,10 @@ def benchmark_jobs(prepared: Sequence[Prepared], until: str = "run") -> list:
 
 
 def run_set(benchmark: BenchmarkSet, workdir, gpus=None, mode: Optional[str] = None, until: str = "run",
-            launcher=None) -> dict:
+            launcher=None, per_gpu: Optional[int] = None) -> dict:
     """Run what is left of the prepared ligands of ``workdir``: every stage of every ligand
-    in one call of the scheduler, on the devices of the run (``gpus`` and ``mode`` stand in
-    for ``run.gpus`` and ``run.mode`` of the configuration of the set).
+    in one call of the scheduler, on the devices of the run (``gpus``, ``mode`` and ``per_gpu``
+    stand in for ``run.gpus``, ``run.mode`` and ``run.per_gpu`` of the configuration of the set).
 
     Every decision is appended to ``workdir/schedule.jsonl``. A stage that failed or was
     stopped is a ``RuntimeError`` after everything that could run has run; the same call
@@ -779,7 +779,8 @@ def run_set(benchmark: BenchmarkSet, workdir, gpus=None, mode: Optional[str] = N
         if not jobs:
             return {}
         run = prepared[0].config.run
-        devices = resolve_devices(mode or run.mode, gpus if gpus is not None else run.gpus, run.platform)
+        devices = resolve_devices(mode or run.mode, gpus if gpus is not None else run.gpus, run.platform,
+                                  per_gpu=per_gpu or run.per_gpu)
         _record_run(workdir)
         status = run_jobs(jobs, devices, launcher, log=workdir / "schedule.jsonl", events=record.append)
     problem = unfinished_jobs(status, record, workdir)

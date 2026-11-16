@@ -92,7 +92,7 @@ equilibration:
   heating_ps: 100.0               # [ps] heating from 10 K at constant volume, restrained
   release_ps: 400.0               # [ps] constant pressure, split evenly over the stages of release_factors
   release_factors: [1.0, 0.5, 0.2, 0.05]   # [-] the restraint is scaled by these factors, one stage each
-  free_ps: null                   # [ps] without restraints, funnel walls on; null: 1000, with a membrane 10000
+  free_ps: null                   # [ps] without restraints, funnel walls on; null: 1000, with a membrane 2000
   timestep_fs: 2.0                # [fs] time step of the equilibration
   friction: 1.0                   # [1/ps] friction of the Langevin thermostat
   seed: 0                         # [-] 0: random
@@ -109,6 +109,7 @@ run:
   precision: mixed                # [-] precision of a GPU platform: single, mixed or double
   mode: auto                      # [-] parallel: one replica per GPU; sequential: one after another on one GPU; auto: parallel if gpus is set
   gpus: null                      # [-] the GPUs of the run: device numbers such as [0, 1], or all; null: one device, picked by the platform
+  per_gpu: 1                      # [-] replicas that share one GPU at a time; above 1: start the container with scripts/in_docker.sh --mps (NVIDIA MPS)
   checkpoint_ps: 250.0            # [ps] time between checkpoints (a restart continues from the last one)
   trajectory_ps: 100.0            # [ps] time between trajectory frames; 0: no trajectory
   trajectory_solute_only: true    # [-] write only the solute (protein, ligand, kept hetero groups) to the trajectory
