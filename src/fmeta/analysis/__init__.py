@@ -25,7 +25,7 @@ __all__ = ["analyze_run", "analyze_replicas", "walker_directories", "binding_fre
 # Thresholds of the diagnostics of a replica: notes beside its value, never a verdict (see
 # ``analyze_run``). Only MIN_BINDING_EXCESS decides something: what is reported as no binding.
 MIN_REBINDING = 3
-MAX_DRIFT = 4.184        # kJ/mol (1 kcal/mol): linear trend of dG(t) across the plateau window
+MAX_DRIFT = 4.184        # kJ/mol (1 kcal/mol): change of dG(t) from the bias over the last part of a run
 MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
 MAX_REWEIGHT_GAP = 4.0   # kJ/mol, between two estimates of the same run
 MIN_BINDING_EXCESS = 1.0  # kT by which dG must beat an empty funnel of the same shape
@@ -103,10 +103,12 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     ``plateau_fraction`` of the run of dG0(t) from the bias accumulated since the start.
     Where the samples give no estimate, ``dG`` is ``dG_plateau``.
 
-    ``diagnostics`` are notes on what the replica did (rebinding events, drift, the two
-    cross-checks): a replica of the default length does not converge on its own, so they say
-    how far it is from that and decide nothing. ``no_binding`` says that the value is within
-    1 kT of what the empty funnel gives, and then it is not a binding free energy.
+    ``diagnostics`` are notes on what the replica did (rebinding events, the change of dG(t)
+    from the bias, the two cross-checks). The bias fills the free-energy surface for as long as
+    the run lasts, so dG(t), the difference between two regions of that surface, moves by
+    principle: the notes say how far the filling went and decide nothing. ``no_binding`` says
+    that the value is within 1 kT of what the empty funnel gives, and then it is not a binding
+    free energy.
     """
     workdir = Path(workdir)
     # With multiple walkers the bias is the sum over all of them, ordered in time.
@@ -164,7 +166,8 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     if rebinding < MIN_REBINDING:
         notes.append(f"{rebinding} rebinding event(s), fewer than {MIN_REBINDING}")
     if abs(plateau["drift"]) > MAX_DRIFT:
-        notes.append(f"dG still drifting ({plateau['drift']:+.2f} kJ/mol over the plateau window)")
+        notes.append(f"dG(t) from the bias changed by {plateau['drift']:+.2f} kJ/mol over the last "
+                     f"{100 * plateau_fraction:.0f}% of the run")
     if estimate.unbound_roughness > MAX_ROUGHNESS:
         notes.append(f"unbound region not flat (std {estimate.unbound_roughness:.2f} kJ/mol)")
     if dg_reweighted is None:

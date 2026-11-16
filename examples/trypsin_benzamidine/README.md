@@ -79,11 +79,12 @@ ends.
 What the diagnostics of `fmeta analyze` say about those three:
 
 - Replica 0 never left the site in 40 ns. There is no estimate from its samples, and its value
-  is the mean of dG(t) from the bias, which still drifts (+98.8 kJ/mol over the plateau window).
+  is the mean of dG(t) from the bias, which changed by +98.8 kJ/mol over the last half of the
+  run: the bias was filling the site all that time.
 - Replica 1 is within 1 kT of what an empty funnel gives (−0.83 kJ/mol): "no binding beyond the
   funnel volume".
-- Replica 2 still drifts (+15.3 kJ/mol), and its value changes by +38.2 kJ/mol when only the
-  second half of the run is used.
+- For replica 2, dG(t) from the bias changed by +15.3 kJ/mol over the last half of the run, and
+  its value changes by +38.2 kJ/mol when only the second half is used.
 
 The mean of the five lies near the experimental range (−26.8 to −30.5 kJ/mol). That is an
 average over replicas that differ by 76 kJ/mol, with an interval that includes zero: it says
@@ -119,8 +120,9 @@ GPUs at the same time) was stopped at 75 to 81 ns. Cut at a length and analysed:
 | 60 | −18.42 | −30.49 to −6.36 | 7, 6, 4, 6, 4 | 0 of 5 |
 | 75 | −14.30 | −25.06 to −3.54 | 9, 10, 5, 8, 5 | 1 of 5 |
 
-The mean still rises at 75 ns. With that bias the ligand stays in the site for 4.5 to 10 ns
-while the bias fills, so most of what the samples after 2 ns see at short lengths is the site.
+The mean rises with the length over the whole range. With that bias the ligand stays in the
+site for 4.5 to 10 ns while the bias fills, so most of what the samples after 2 ns see at short
+lengths is the site.
 
 **The scan.** Five faster bias settings, five replicas each, from the equilibrated system of
 that run (commit f2ea653, one setting per GPU, the five replicas sharing it with NVIDIA MPS).

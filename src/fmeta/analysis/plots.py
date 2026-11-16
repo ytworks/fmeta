@@ -149,7 +149,7 @@ def plot_run(workdir, path=None, theme: str = "light"):
         pad = 0.15 * max(high - low, 1.0)
         ax.set_ylim(low - pad, high + 2.2 * pad)
         ax.text(0.5 * (start + time[-1]), high + 1.9 * pad,
-                f"plateau mean {result['dG_plateau']:.1f} ± {result['dG_plateau_std']:.1f}",
+                f"mean of the last half {result['dG_plateau']:.1f} ± {result['dG_plateau_std']:.1f}",
                 fontsize=8, color=colours["secondary"], ha="center", va="top")
         ax.set_title("Binding free energy as the bias accumulates")
         ax.set_xlabel("time per walker (ns)" if result["n_walkers"] > 1 else "time (ns)")
