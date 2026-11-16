@@ -23,12 +23,13 @@ The set definitions are in `examples/benchmarks/<set>/`.
 
 Three ligands per set ran before the scan of the bias gave the defaults: 5 replicas of 20 ns
 with the hill widths that were the default then (`metad.sigma_s` 0.025 and `sigma_rho`
-0.05 nm), on commits eeb5302 and f2ea653. They measured the throughput and showed defects.
-Nothing was selected from them, and they are not results of the official defaults.
+0.05 nm), on commits eeb5302, c41c08b and f2ea653. They measured the throughput and showed
+defects. Nothing was selected from them, and they are not results of the official defaults.
 
 | Report | Set | Ligands |
 |---|---|---|
 | `2026-11-16-45055cc99-tyk2` | TYK2 | ejm_44, ejm_31, ejm_46 |
+| `2026-11-16-80bf2209b-a2a` | A2A | 4q, 4d, 4e D |
 
 The set definition of a pilot report is that of `examples/benchmarks/<set>/` with one
 difference, `config: {metad: {sigma_s: 0.025, sigma_rho: 0.05}}`: the `set.yaml` hash in the
