@@ -1030,7 +1030,7 @@ def _analysed(directory: Path) -> tuple:
 def ligand_result(item: Prepared, reference: Reference) -> dict:
     """What the replicas of one ligand give, beside its reference values.
 
-    ``dg`` is the mean of the plateau values of the replicas that were analysed, ``ci95`` its
+    ``dg`` is the mean of the dG0 of the replicas that were analysed, ``ci95`` its
     Student-t interval (None for one replica). ``converged`` says that each of them passed
     every check of the analysis; ``no_binding`` counts those within 1 kT of what the empty
     funnel gives, whose value is not a binding free energy. A ligand without a value keeps its
@@ -1042,7 +1042,7 @@ def ligand_result(item: Prepared, reference: Reference) -> dict:
         result = _read_json(directory / "result.json") or {}
         excess, temperature = result.get("binding_excess"), result.get("temperature")
         replicas.append(dict(
-            name=directory.name, simulated_ns=_rounded(run["simulated_ns"]), dg=_energy(run["dG_plateau"]),
+            name=directory.name, simulated_ns=_rounded(run["simulated_ns"]), dg=_energy(run["dG"]),
             rebinding_events=int(run["rebinding_events"]), converged=bool(run["converged"]),
             no_binding=bool(excess is not None and temperature is not None
                             and excess < MIN_BINDING_EXCESS * KB * temperature)))
@@ -1259,8 +1259,9 @@ def format_report(report: dict) -> str:
         "This report states what was measured. It holds no verdict.", ""]
     for unit, label in UNITS:
         lines += [f"## Ligands ({label})", "",
-                  "dG0 of fmeta is the mean over the analysed replicas of the plateau mean of dG0(t); the interval "
-                  "is the 95% Student-t interval of that mean (none for a single replica).", ""]
+                  "dG0 of fmeta is the mean over the analysed replicas of the dG0 of a replica (from its samples "
+                  "after the first 2 ns, or of its second half when it is shorter than 4 ns); the interval is the "
+                  "95% Student-t interval of that mean (none for a single replica).", ""]
         lines += _ligand_table(ligands, unit) + [""]
     notes = [f"- {ligand['name']}, {replica}: {problem}" for ligand in ligands
              for replica, problems in ligand["problems"].items() for problem in problems]

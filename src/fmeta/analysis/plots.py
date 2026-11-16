@@ -103,14 +103,14 @@ def plot_run(workdir, path=None, theme: str = "light"):
                                                       right=0.97, top=0.86, bottom=0.08))
 
         # -- headline -------------------------------------------------------
-        figure.text(0.07, 0.955, f"ΔG° = {result['dG_plateau']:.1f} kJ/mol"
-                    f"  ({result['dG_plateau_kcal']:.2f} kcal/mol)", fontsize=15,
+        figure.text(0.07, 0.955, f"ΔG° = {result['dG']:.1f} kJ/mol"
+                    f"  ({result['dG_kcal']:.2f} kcal/mol)", fontsize=15,
                     fontweight="bold", color=colours["ink"], ha="left", va="center")
         detail = (f"{workdir.name} · {result['simulated_ns']:.1f} ns simulated"
                   + (f" over {result['n_walkers']} walkers" if result["n_walkers"] > 1 else "")
                   + f" · {result['rebinding_events']} rebinding events")
-        if result["dG_reweighted"] is not None:
-            detail += f" · reweighted estimate {result['dG_reweighted']:.1f} kJ/mol"
+        if result["dG_source"] == "samples":
+            detail += f" · from the samples after the first {result['discard_ns']:.1f} ns"
         figure.text(0.07, 0.918, detail, fontsize=9, color=colours["secondary"], ha="left",
                     va="center")
         if not result["converged"]:
@@ -229,7 +229,7 @@ def plot_summary(workdir, path=None, theme: str = "light"):
         ax = figure.subplots(gridspec_kw=dict(left=0.1, right=0.86, top=0.78, bottom=0.12))
         headline = f"ΔG° = {summary['dG']:.1f} kJ/mol  ({summary['dG_kcal']:.2f} kcal/mol)"
         figure.text(0.1, 0.93, headline, fontsize=15, fontweight="bold", ha="left", va="center")
-        detail = (f"plateau mean of {summary['n_replicas']} replica"
+        detail = (f"mean of {summary['n_replicas']} replica"
                   + ("s" if summary["n_replicas"] > 1 else ""))
         if summary["ci95"] is not None:
             detail += f" · 95% confidence interval {summary['ci95'][0]:.1f} to {summary['ci95'][1]:.1f} kJ/mol"

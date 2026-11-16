@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy.optimize import minimize
+from scipy.special import logsumexp
 
 from ..engine.grid import BiasGrid
 
@@ -27,29 +29,43 @@ def projection_profile(grid: BiasGrid, fes_scale: float, kT: float) -> np.ndarra
     return profile - profile.min()
 
 
-def reweighting_offset(grid: BiasGrid, fes_scale: float, kT: float) -> float:
-    """The time-dependent offset c(t) of well-tempered metadynamics for the bias
-    currently on ``grid`` (Tiwary and Parrinello, J. Phys. Chem. B 2015):
+def sliced_log_weights(reduced_bias: np.ndarray, counts: np.ndarray) -> np.ndarray:
+    """Log-weights that turn samples drawn under several static biases into the unbiased ensemble.
 
-        c = kT ln [ int exp(-F/kT) / int exp(-(F + V)/kT) ],   F = -fes_scale * V
+    ``reduced_bias[k, i]`` is bias ``k`` at sample ``i`` over kT; ``counts[k]`` is the number of
+    samples drawn under bias ``k``. The free energies ``f_k`` of the biased ensembles solve
 
-    For plain metadynamics (fes_scale = 1) the denominator is flat, as it should be.
+        exp(-f_k) = sum_i exp(-V_k(x_i)/kT) / sum_l N_l exp(f_l - V_l(x_i)/kT)
+
+    (the multistate Bennett acceptance ratio equations: Shirts and Chodera, J. Chem. Phys. 129,
+    124105, 2008), here as the minimum of a convex function of ``f``. The weight of sample ``i``
+    is then ``1 / sum_l N_l exp(f_l - V_l(x_i)/kT)``. Only the samples enter: the offsets come
+    from them and not from a model of how the bias grew. Raises ``ArithmeticError`` when the
+    equations are not solved.
     """
-    bias = grid.values / kT
-    top = fes_scale * bias
-    bottom = (fes_scale - 1.0) * bias
-    log_top = top.max() + np.log(np.exp(top - top.max()).sum())
-    log_bottom = bottom.max() + np.log(np.exp(bottom - bottom.max()).sum())
-    return float(kT * (log_top - log_bottom))
+    reduced_bias = np.asarray(reduced_bias, dtype=float)
+    counts = np.asarray(counts, dtype=float)
+    log_counts = np.log(counts)
+    fraction = counts / counts.sum()
+
+    def objective(f):
+        terms = (log_counts + f)[:, None] - reduced_bias
+        total = logsumexp(terms, axis=0)
+        return total.mean() - fraction @ f, np.exp(terms - total).mean(axis=1) - fraction
+
+    found = minimize(objective, np.zeros(counts.size), jac=True, method="L-BFGS-B",
+                     options=dict(maxiter=5000, maxfun=20000, gtol=1e-10, ftol=1e-15))
+    residual = float(np.abs(objective(found.x)[1]).max())
+    if not np.isfinite(residual) or residual > 1e-6:
+        raise ArithmeticError(f"the reweighting equations were not solved (residual {residual:.1e})")
+    return -logsumexp((log_counts + found.x)[:, None] - reduced_bias, axis=0)
 
 
 def reweighted_profile(s_samples, log_weights, kT: float, s_edges) -> np.ndarray:
     """W(s) from a weighted histogram of samples, shifted so its minimum is zero.
 
-    For metadynamics the weight of a sample taken at time t is
-    exp((V(s, rho, t) - c(t))/kT), with V the bias the system felt at that
-    moment and c(t) from :func:`reweighting_offset`. Bins without samples are
-    returned as ``inf``.
+    The weights of the samples of a metadynamics run come from :func:`sliced_log_weights`.
+    Bins without samples are returned as ``inf``.
     """
     log_weights = np.asarray(log_weights, dtype=float)
     weights = np.exp(log_weights - log_weights.max())

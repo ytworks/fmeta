@@ -148,7 +148,7 @@ def cmd_status(args) -> None:
 
 def cmd_analyze(args) -> None:
     from .workflow import analyze_stage, format_summary
-    print(format_summary(analyze_stage(args.workdir, plot=args.plot)))
+    print(format_summary(analyze_stage(args.workdir, plot=args.plot, discard_ns=args.discard_ns)))
     if args.plot:
         print(f"figures: {Path(args.workdir) / 'summary.png'} and rep*/analysis.png")
 
@@ -367,6 +367,8 @@ def main(argv=None) -> None:
     sub = commands.add_parser("analyze", help="binding free energy and convergence")
     sub.add_argument("workdir")
     sub.add_argument("--plot", action="store_true", help="also write figures (needs matplotlib)")
+    sub.add_argument("--discard-ns", type=float, default=2.0,
+                     help="dG0 uses the samples after this much of every replica (default 2)")
     sub.set_defaults(func=cmd_analyze)
 
     sub = commands.add_parser("auto", help="prepare, equilibrate, run and analyse")

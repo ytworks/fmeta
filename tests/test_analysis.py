@@ -8,7 +8,7 @@ import pytest
 from fmeta.analysis import analyze_replicas, analyze_run
 from fmeta.analysis.binding import binding_free_energy, empty_funnel_free_energy
 from fmeta.analysis.convergence import count_transitions, plateau_statistics, summarize_replicas
-from fmeta.analysis.fes import projection_profile, reweighted_profile, reweighting_offset
+from fmeta.analysis.fes import projection_profile, reweighted_profile, sliced_log_weights
 from fmeta.engine import BiasGrid, BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.funnel.geometry import KB, STANDARD_VOLUME
 from fmeta.testing.toy import make_simulation, make_toy
@@ -89,17 +89,17 @@ def test_reweighted_profile_recovers_the_unbiased_profile():
     assert np.allclose(profile - profile.min(), expected - expected.min(), atol=0.25)
 
 
-def test_reweighting_offset_limits():
-    grid = BiasGrid(0.0, 2.0, 41, 1.0, 21, 0.05, 0.05)
-    assert reweighting_offset(grid, 1.25, KT) == pytest.approx(0.0)       # no bias yet
-    grid.values[...] = 7.0                                                 # uniform bias
-    assert reweighting_offset(grid, 1.25, KT) == pytest.approx(7.0)       # c equals the bias
-    # one biased cell among n: both integrals are two-term sums
-    grid.values[...] = 0.0
-    grid.values[5, 10] = 40.0
-    n, scale = grid.values.size, 10.0 / 9.0
-    expected = KT * np.log((np.exp(scale * 40.0 / KT) + n - 1) / (np.exp((scale - 1) * 40.0 / KT) + n - 1))
-    assert reweighting_offset(grid, scale, KT) == pytest.approx(expected)
+def test_sliced_weights_recover_the_unbiased_populations():
+    """Three states with populations 1/2, 1/4, 1/4. Four samples without a bias and four under a
+    bias that turns the populations into 1/4, 1/4, 1/2, each set in exactly those proportions:
+    the weights then give the unbiased populations exactly, whatever constant a bias carries."""
+    states = np.array([0, 0, 1, 2, 0, 1, 2, 2])
+    second = np.log(2.0) * np.array([1.0, 0.0, -1.0])
+    for constant in (0.0, 30.0):
+        reduced = np.array([np.zeros(8), second[states] + constant])
+        weights = np.exp(sliced_log_weights(reduced, np.array([4, 4])))
+        populations = np.bincount(states, weights=weights) / weights.sum()
+        assert populations == pytest.approx([0.5, 0.25, 0.25], abs=1e-7)
 
 
 def test_transition_counting_uses_hysteresis():
@@ -142,8 +142,9 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     # (the well is 14 kJ/mol deep); the replica test below checks the mean tightly.
     assert result["dG_plateau"] == pytest.approx(exact, abs=2.0)
     assert not [p for p in result["problems"] if "rebinding" in p or "flat" in p]
-    # the reweighted histogram is the more precise of the two estimators here
+    # the headline is the estimate from the samples after the first 2 ns, the more precise of the two
     assert result["dG_reweighted"] == pytest.approx(exact, abs=1.0)
+    assert (result["dG"], result["dG_source"], result["discard_ns"]) == (result["dG_reweighted"], "samples", 2.0)
     assert (tmp_path / "result.json").exists() and (tmp_path / "fes.npz").exists()
 
 
@@ -158,7 +159,7 @@ def test_toy_binding_free_energy_replicas(tmp_path, reflect):
     summary = analyze_replicas(dirs, write_to=tmp_path / "summary.json")
     exact = toy.exact_binding_free_energy(T, 2.9)
     for replica in summary["replicas"]:
-        assert replica["dG_plateau"] == pytest.approx(exact, abs=1.5)
+        assert replica["dG"] == pytest.approx(exact, abs=1.5)
     assert summary["dG"] == pytest.approx(exact, abs=0.75)
     assert summary["ci95"][0] - 1.0 < exact < summary["ci95"][1] + 1.0
 
@@ -190,9 +191,10 @@ def test_run_without_binding_is_flagged(tmp_path):
     run.run(10000)
     run.close()
     result = analyze_run(tmp_path, write=False)
-    # 20 ns: the plateau scatters by about 0.5 kJ/mol between seeds (1.0 at 8 ns), so both
-    # bounds below are four or more standard deviations wide
-    assert result["dG_plateau"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
+    # 20 ns: dG0 scatters by 0.43 kJ/mol between eight seeds, around a mean 0.2 kJ/mol below the
+    # empty funnel, so both bounds below are four or more standard deviations wide
+    assert result["dG_source"] == "samples"
+    assert result["dG"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
     assert result["binding_excess"] < 1.0 * KT
     assert any("empty funnel" in p for p in result["problems"]) and not result["converged"]
 

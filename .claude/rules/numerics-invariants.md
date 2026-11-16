@@ -46,9 +46,13 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
 - dG0 uses the effective cross-section `A_eff` (hard disc plus the thermally populated skin of
   the harmonic wall). The free-energy surface over `(s, rho)` already contains the `2 pi rho`
   measure: do not apply the Jacobian a second time.
-- The headline is the plateau mean of dG0(t), not the last value. Reweighting uses the bias a
-  sample felt at its own time and the offset c(t); reweighting with the final bias was wrong by
-  several kJ/mol on the toy system.
+- The headline is the estimate from the samples after the first 2 ns (`discard_ns`; of a run
+  shorter than 4 ns, its second half): the start of a run, where the bias changes fastest, is
+  not used (owner, 2026-11-16; FM-D9 amendment). A sample is weighted with the bias of its own
+  time slice, and the slices are combined by solving for their free energies; reweighting with
+  the final bias was wrong by several kJ/mol on the toy system. The same estimate from the
+  second half alone and the plateau mean of dG0(t) from the bias are cross-checks: a difference
+  above 4 kJ/mol is a convergence problem, never a reason to pick one of them.
 - A result within 1 kT of the empty-funnel value (`empty_funnel_free_energy`) is reported as
   "no binding", never as a binding free energy.
 - HILLS is the record of the bias (heights stored times `gamma / (gamma - 1)`, as PLUMED does).

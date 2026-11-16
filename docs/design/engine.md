@@ -168,6 +168,30 @@ unbound end must clear the head groups; `addMembrane` trusts the input orientati
 time-dependent reweighting. Reference: the empty-funnel value.
 Why: the usual shortcut (well depth + area / 1660 Å³) fixes the bound-state length at 1 Å and
 ignores the soft wall (≈ 20 % of the area at default settings).
+Amendment (2026-11-16, owner): the first 1 to 2 ns of a run change the most and are not used.
+The headline is now the estimate from the samples after the first 2 ns (`discard_ns` of
+`analyze_run`, `fmeta analyze --discard-ns`; of a run shorter than 4 ns, its second half). The
+part that is kept is cut into time slices of 250 ps (at most 300 slices), each with the bias of
+its middle. Every sample is evaluated under the bias of every slice, and the free energies of
+the slices follow from the self-consistent equations of the multistate Bennett acceptance ratio
+(Shirts and Chodera, J. Chem. Phys. 129, 124105, 2008); the weights give the profile along `s`,
+and `K_b` and `dG0` as above. The hills of the discarded part still define the bias: only its
+samples are left out. Kept as cross-checks, each a convergence problem above 4 kJ/mol
+(`MAX_REWEIGHT_GAP`, unchanged): the same estimate from the second half alone (new), and the
+plateau mean of dG0(t) from the bias (the former headline). The former cross-check, weights
+`exp((V − c(t))/kT)` on the last 80% of the samples, is removed. When the samples do not cover
+the unbound region the headline falls back to the plateau mean and the replica is reported as
+not converged. No threshold changed.
+Measured on the toy (8 seeds of 20 ns each, error of the mean ± standard error and RMSE against
+the exact value, kJ/mol): well of 20 kJ/mol, new headline −0.03 ± 0.15 and 0.40, plateau mean
++0.31 ± 0.15 and 0.52; well of 40 kJ/mol, −0.11 ± 0.08 and 0.25 against +0.41 ± 0.15 and 0.58;
+all 16 runs pass every check. Without a well all 8 runs are reported as no binding (−0.91 ± 0.15
+against −0.69 of the empty funnel). The second-half check is there because the gap to the
+plateau mean alone no longer shows what the old cross-check showed on trypsin (FM-D16): with
+the default bias at 40 ns the new headline and the plateau mean agree (−28.0 and −29.1) while
+the estimate from the second half alone is 11 to 45 kJ/mol higher in every replica.
+Why: the owner's instruction. At the start the ligand sits in the site while the bias fills it,
+which is not a sample of the equilibrium the estimate assumes.
 
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
@@ -573,8 +597,8 @@ names it. Every call that starts jobs appends the commit, the image and the lock
 `runs.jsonl`. `fmeta benchmark status` shows every stage of every ligand.
 `fmeta benchmark report` analyses every prepared ligand with `analyze_replicas` and writes
 `bench/reports/<UTC date>-<commit>-<set>.json`, the same as text (`.md`) and an entry in
-`bench/reports/index.json`. Per ligand: dG0 as the mean of the plateau values of the analysed
-replicas with its 95% Student-t interval, the experimental and the FEP value, the rebinding
+`bench/reports/index.json`. Per ligand: dG0 as the mean of the dG0 of the analysed replicas
+(FM-D9, amendment) with its 95% Student-t interval, the experimental and the FEP value, the rebinding
 events, what the analysis found, and how many replicas within 1 kT of the empty funnel ("no
 binding", not a binding free energy). Over the set: MUE, RMSE, mean signed error, MUE and RMSE
 after the mean error on the same ligands is removed, Pearson r and Kendall tau, each with a

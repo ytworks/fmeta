@@ -262,13 +262,16 @@ class Checker:
         toy = self._toy_run(directory, n_hills, seed=12)
         result = analyze_run(directory)
         exact = toy.exact_binding_free_energy(300.0, result["site_max"])
-        text = (f"{result['simulated_ns']:.0f} ns: dG0 reweighted {result['dG_reweighted']:.2f}, "
+        reweighted = result["dG_reweighted"]
+        text = (f"{result['simulated_ns']:.0f} ns: dG0 reweighted "
+                f"{'none' if reweighted is None else format(reweighted, '.2f')}, "
                 f"plateau {result['dG_plateau']:.2f}, exact {exact:.2f} kJ/mol; "
                 f"{result['rebinding_events']} rebinding events")
         tolerance = self.profile["toy_tolerance"]
         if tolerance is None:
             return text + " (quick mode: too short to assert agreement)"
-        if abs(result["dG_reweighted"] - exact) > tolerance or abs(result["dG_plateau"] - exact) > 1.5 * tolerance:
+        if (reweighted is None or abs(reweighted - exact) > tolerance
+                or abs(result["dG_plateau"] - exact) > 1.5 * tolerance):
             raise AssertionError(text + f"; outside the tolerance of {tolerance} kJ/mol")
         return text
 

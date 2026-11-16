@@ -395,9 +395,9 @@ def format_summary(summary: dict) -> str:
         low, high = summary["ci95"]
         lines.append(f"95% CI: [{low:.2f}, {high:.2f}] kJ/mol   (SEM {summary['sem']:.2f})")
     for replica in summary["replicas"]:
-        lines.append(f"  {Path(replica['workdir']).name}: {replica['dG_plateau']:8.2f} "
-                     f"+/- {replica['dG_plateau_std']:.2f} kJ/mol over {replica['simulated_ns']:.1f} ns, "
-                     f"{replica['rebinding_events']} rebinding event(s)")
+        lines.append(f"  {Path(replica['workdir']).name}: {replica['dG']:8.2f} kJ/mol (from the bias "
+                     f"{replica['dG_plateau']:.2f} +/- {replica['dG_plateau_std']:.2f}) "
+                     f"over {replica['simulated_ns']:.1f} ns, {replica['rebinding_events']} rebinding event(s)")
     if not summary["converged"]:
         lines.append("NOT CONVERGED:")
         for directory, problems in summary["problems"].items():
