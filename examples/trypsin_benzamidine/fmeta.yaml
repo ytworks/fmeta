@@ -17,7 +17,7 @@
 # Steps as run on the real entry, measured values and the result: README.md in this directory.
 #
 # Only the difference from the preset is here. Every other value is the official default
-# (5 replicas of 500 ns, OpenFF ligand parameters, ...): "fmeta init --preset soluble" writes
+# (5 replicas of 40 ns, OpenFF ligand parameters, ...): "fmeta init --preset soluble" writes
 # them all, docs/configuration.md gives the reasons, and run/config.yaml records the values
 # that were used. In the analysis, watch dG(t) and the rebinding count.
 preset: soluble

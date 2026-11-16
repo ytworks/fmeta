@@ -5,7 +5,7 @@
 #   ejm_46.sdf   - the ligand in its bound pose, cut out of the entry by `fmeta split`
 #
 # Only the difference from the preset is here. Every other value is the official default
-# (5 replicas of 500 ns, 300 K, OpenFF ligand parameters, bias factor 10, ...):
+# (5 replicas of 40 ns, 300 K, OpenFF ligand parameters, bias factor 10, ...):
 # "fmeta init --preset soluble" writes them all, docs/configuration.md gives the reasons, and
 # run/config.yaml records the values that were used.
 preset: soluble

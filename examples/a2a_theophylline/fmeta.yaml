@@ -6,7 +6,7 @@
 #   inputs/ligand.sdf   - theophylline in the crystal pose, cut from the same file
 #
 # Only the difference from the preset is here. Every other value is the official default
-# (POPC, 5 replicas of 500 ns, 300 K, 2 ns of free equilibration with a membrane, OpenFF ligand
+# (POPC, 5 replicas of 40 ns, 300 K, 2 ns of free equilibration with a membrane, OpenFF ligand
 # parameters, bias factor 10, ...): "fmeta init --preset membrane" writes them all,
 # docs/configuration.md gives the reasons, and work/config.yaml records the values that were used.
 preset: membrane

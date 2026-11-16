@@ -82,8 +82,8 @@ periodic images, which the item `periodic_images` exists to exclude.
 
 ## Production runs (reported, not gated)
 
-Binding free energies of real systems (`examples/<name>/`) need hundreds of nanoseconds per
-replica and are not analytic: they are reported, not gated. Run them on a clean commit, the
+Binding free energies of real systems (`examples/<name>/`) are long runs (40 ns per
+replica by default) and are not analytic: they are reported, not gated. Run them on a clean commit, the
 long stage as a detached container:
 
 ```bash

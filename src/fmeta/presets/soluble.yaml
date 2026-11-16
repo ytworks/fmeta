@@ -71,8 +71,8 @@ funnel_overrides: {}
 metad:
   bias_factor: 10.0               # [-] well-tempered bias factor; null: plain metadynamics
   height: 1.5                     # [kJ/mol] height of the first hills
-  sigma_s: 0.025                  # [nm] hill width along the funnel axis (s)
-  sigma_rho: 0.05                 # [nm] hill width away from the axis (rho)
+  sigma_s: 0.05                   # [nm] hill width along the funnel axis (s)
+  sigma_rho: 0.1                  # [nm] hill width away from the axis (rho)
   points_per_sigma: 3.0           # [-] grid points per hill width
   grid_margin: 0.3                # [nm] how far the grid extends past the walls
   reflect: true                   # [-] mirror the hills at rho = 0
@@ -92,7 +92,7 @@ equilibration:
   seed: 0                         # [-] 0: random
 
 run:
-  length_ns: 500.0                # [ns] production length of each replica (of each walker, with walkers > 1)
+  length_ns: 40.0                 # [ns] production length of each replica (of each walker, with walkers > 1)
   replicas: 5                     # [-] independent runs, each with its own bias, for the error estimate
   walkers: 1                      # [-] walkers that share one bias within a replica
   walker_sync_hills: 1            # [-] a walker reads the hills of the others after every N of its own

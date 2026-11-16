@@ -67,7 +67,7 @@ class InputConfig:
 
 @dataclass
 class RunConfig:
-    length_ns: float = 500.0                 # per replica
+    length_ns: float = 40.0                  # per replica
     replicas: int = 5                        # independent runs (separate biases), for error bars
     walkers: int = 1                         # walkers sharing one bias within each replica
     walker_sync_hills: int = 1               # a walker reads the others' hills every N of its own

@@ -23,8 +23,8 @@ class BiasSettings:
     temperature: float = 300.0
     bias_factor: Optional[float] = 10.0   # None: plain (non-tempered) metadynamics
     height: float = 1.5                   # initial hill height
-    sigma_s: float = 0.025
-    sigma_rho: float = 0.05
+    sigma_s: float = 0.05
+    sigma_rho: float = 0.1
     pace: int = 250                       # MD steps between hills
     points_per_sigma: float = 3.0         # grid resolution (see note below)
     grid_margin: float = 0.3              # grid extends this far past the walls

@@ -70,5 +70,5 @@ with its confidence interval, the rebinding counts and the convergence verdict, 
 turn out to be.
 
 What to expect: the convergence verdict needs at least three rebinding events per replica. For
-a ligand that binds this tightly, 500 ns may not give them; the run is then reported as not
+a ligand that binds this tightly, the default 40 ns may not give them; the run is then reported as not
 converged, and the criterion is not changed.

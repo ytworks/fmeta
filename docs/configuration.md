@@ -58,9 +58,11 @@ sources are listed at the end.
 
 - **A source in brackets**, e.g. [E20]: the source uses or states this value.
 - **measured**: a measurement of this project; the place of the record is named.
-- **M4**: no source. The value is confirmed or changed on trypsin-benzamidine in milestone M4
-  of `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, from convergence diagnostics
-  and before any benchmark run. It is never tuned against experimental values.
+- **M4**: no source. Milestone M4 of
+  `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md` set the hill widths and the run
+  length on trypsin-benzamidine, from convergence diagnostics and before any benchmark run
+  (the scan of FM-D16). A value that still carries this tag was not in that scan and stands
+  unconfirmed. Nothing is tuned against experimental values.
 - **convention**: no source. Common practice, not checked against the literature here.
 - **design**: follows from a decision of `docs/design/engine.md`, which is named.
 
@@ -174,8 +176,8 @@ Well-tempered metadynamics on `s` and `rho`.
 |---|---|---|---|
 | `metad.bias_factor` | - | `10.0` | Well-tempered bias factor; `null`: plain metadynamics. [E20] (for all its systems) and [BSS-T]. |
 | `metad.height` | kJ/mol | `1.5` | Height of the first hills. [E20] and [BSS-T]. [E20] deposits one every 2 ps, fmeta every 1 ps (`run.pace_ps`). |
-| `metad.sigma_s` | nm | `0.025` | Hill width along the axis. [BSS-F] and [E20]. |
-| `metad.sigma_rho` | nm | `0.05` | Hill width away from the axis. [BSS-F]; [E20] used 0.03 nm. M4. |
+| `metad.sigma_s` | nm | `0.05` | Hill width along the axis. Measured: the scan of FM-D16 on trypsin-benzamidine, where this width and `sigma_rho` 0.1 nm had the most replicas without a convergence problem at 40 ns (2 of 5; none with 0.025 nm, the value of [BSS-F] and [E20]). |
+| `metad.sigma_rho` | nm | `0.1` | Hill width away from the axis. Measured: the same scan. [BSS-F] has 0.05 nm; [E20] used 0.03 nm. |
 | `metad.points_per_sigma` | - | `3.0` | Grid points per hill width. Measured: the cubic spline through the grid reproduces a Gaussian to about 2e-4 of its height at 3 points per sigma; a finer grid only costs time (`src/fmeta/engine/grid.py`, design: FM-D4). |
 | `metad.grid_margin` | nm | `0.3` | How far the grid extends past the walls. The bias is clamped at the edge of the grid, so the CVs have to stay inside: 0.3 nm beyond a default wall costs 450 kJ/mol. Convention. |
 | `metad.reflect` | - | `true` | Mirror the hills at `rho = 0`, so that a hill next to the axis does not lose the part that falls below zero (rule of `.claude/rules/numerics-invariants.md`). |
@@ -207,7 +209,7 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 
 | Key | Unit | Default | What it does; where the value comes from |
 |---|---|---|---|
-| `run.length_ns` | ns | `500.0` | Production length of each replica (of each walker, with `walkers` above 1). [E20] ran 500 ns per simulation; BioSimSpace recommends "of the order of 500 - 2000 ns" [L23]. The default is the lower end: the analysis has to show a plateau of dG(t) and rebinding (at least one event [BSS-T]), otherwise the run is extended. M4. |
+| `run.length_ns` | ns | `40.0` | Production length of each replica (of each walker, with `walkers` above 1). Measured, with the owner's limit of 40 ns: in the scan of FM-D16 on trypsin-benzamidine no bias setting had five replicas without a convergence problem at 10, 15, 20, 30 or 40 ns, and the default bias had 2 of 5 at 40 ns. A run of the default length can therefore end as NOT CONVERGED; it is extended exactly by running `fmeta run` again with a larger `--length-ns` (design: FM-D5). [E20] ran 500 ns per simulation; BioSimSpace recommends "of the order of 500 - 2000 ns" [L23]. |
 | `run.replicas` | - | `5` | Independent runs, each with its own bias; their spread is the error estimate (design: FM-D10). Five repeats in [L23] and [BSS-T]. |
 | `run.walkers` | - | `1` | Walkers that share one bias within a replica, for wall time on several GPUs (design: FM-D10). |
 | `run.walker_sync_hills` | - | `1` | A walker reads the hills of the others after every N of its own. |
@@ -226,17 +228,22 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 
 ## Where the defaults differ from the literature that was read
 
-None of these was changed for this file (FM-D16): a default changes by measurement in M4, with
-a design amendment. They are listed so that M4 looks at them first. The first three are run on
-trypsin-benzamidine; the variants and the rule that decides, written before the runs, are in
-`examples/trypsin_benzamidine/README.md` ("Scan of the defaults").
+Two of these were set by measurement: the hill widths and the run length, by the scan of the
+bias on trypsin-benzamidine (FM-D16 in `docs/design/engine.md` has the settings, the rule that
+was written before the runs, and the result). The others stand as they were chosen for this
+file. None was tuned against experimental values.
 
+- **Hill widths.** 0.05 nm along the axis and 0.1 nm in rho, from the scan. The BioSimSpace
+  defaults are 0.025 and 0.05 nm [BSS-F]; [E20] used 0.03 nm for its second variable.
+- **Length.** 40 ns per replica, the longest the scan ran. [E20] ran 500 ns per simulation and
+  [L23] recommends 500 to 2000 ns. On trypsin-benzamidine 2 of 5 replicas pass the convergence
+  criteria at 40 ns with the defaults.
 - **Deposition rate.** Hills of 1.5 kJ/mol every 1 ps; [E20] and the BioSimSpace protocol
   default [BSS-P] deposit every 2 ps (1000 steps of 2 fs). At the same height the bias starts
-  to grow twice as fast.
-- **Hill width in rho.** 0.05 nm, the BioSimSpace default [BSS-F]; [E20] used 0.03 nm for its
-  second variable.
+  to grow twice as fast. Hills of 3.0 kJ/mol and a bias factor of 20 were in the scan and
+  passed fewer replicas.
 - **Time step.** 4 fs with hydrogens of 1.5 amu; [E20] and [BSS-P] use 2 fs with real masses.
+  Not in the scan.
 - **Wall force constants.** 10000 kJ/mol/nm^2 in `0.5 k x^2`; the BioSimSpace bounds have
   `force_constant=2000.0` with exponent 2 and no unit on the page [BSS-F]; the PLUMED example
   has `KAPPA=35100` [PLUMED].
@@ -247,7 +254,6 @@ trypsin-benzamidine; the variants and the rule that decides, written before the 
   BioSimSpace [L23]; the original method and PLUMED use a cone attached to a cylinder
   [PLUMED]. [E20] fixed the unbound state beyond 3.0 nm and the upper limit at 4.5 nm; fmeta
   derives both from the clearance of the pocket (design: FM-D7).
-- **Length.** 500 ns is the lower end of the range that [L23] recommends.
 
 ## Sources
 

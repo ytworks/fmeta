@@ -560,6 +560,42 @@ Why: the owner's decision. The cost it removes: at the measured speeds (FM-D14, 
 20 ns replica of 88k atoms takes 48 min alone and 90 min with four on a GPU, so a set of 50
 replicas is hours on 8 GPUs, where 100 ns per replica without sharing was days.
 
+Result of the scan (2026-11-16; all 25 replicas at 40 ns, analysed at the cut lengths). No
+setting has five replicas without a convergence problem at 10, 15, 20, 30 or 40 ns: 0 of 5
+for every setting up to 30 ns, and at 40 ns the table below. This holds with the analysis of
+the FM-D9 amendment (first 2 ns not used; the product analysis) and with the analysis before
+it. By the second point of the rule the default bias is `sig2` (`sigma_s` 0.05 nm,
+`sigma_rho` 0.1 nm; `bias_factor` 10 and `height` 1.5 kJ/mol stay) and `run.length_ns` is 40:
+2 of 5 replicas pass at 40 ns.
+
+| Setting at 40 ns | dG0 (kJ/mol) | SEM | 95% interval (kJ/mol) | Replicas that pass | Analysis before the amendment: dG0, SEM, pass | Rebinding events per replica |
+|---|---|---|---|---|---|---|
+| default (until now) | −27.95 | 5.94 | −44.43 to −11.47 | 0 | −29.05, 5.33, 0 | 4, 5, 3, 4, 3 |
+| `bf20` | −8.07 | 5.14 | −22.34 to 6.20 | 1 | −15.12, 5.78, 0 | 7, 2, 14, 16, 3 |
+| `h3` | −12.68 | 6.96 | −32.00 to 6.64 | 0 | −14.94, 6.06, 0 | 4, 8, 7, 5, 4 |
+| `sig2` | −27.35 | 14.88 | −68.67 to 13.98 | 2 | −28.28, 13.92, 2 | 0, 3, 5, 5, 5 |
+| `bf20_h3` | −15.67 | 11.05 | −46.35 to 15.02 | 0 | −22.51, 12.94, 0 | 6, 17, 1, 17, 5 |
+| `bf20_h3_sig2` | −2.89 | 1.42 | −6.84 to 1.06 | 0 | −15.82, 4.10, 0 | 11, 17, 4, 8, 7 |
+
+What the count does not say:
+- `sig2` has the widest scatter of the six. Its replicas give −78.2, −1.7, −44.3, −3.4 and
+  −9.1 kJ/mol; the first never left the site in 40 ns, and the two that pass are the last two.
+  The rule counts passing replicas and that is what was applied; the scatter is reported here.
+- The defaults do not give a converged binding free energy of trypsin-benzamidine in 40 ns: a
+  run with them is expected to end as NOT CONVERGED, which is what the diagnostics are for.
+  Roadmap R2 ("five replicas to convergence") is not met within the length the owner allows.
+- With the faster settings the ligand leaves early, the bias at the site overfills, and the
+  samples after the first 2 ns rarely visit the site: the estimate from the samples is
+  shallow (1 to 4 replicas per setting within 1 kT of the empty funnel) while the bias sum is
+  deep. Their difference is one of the convergence checks, and it fires.
+- With the bias that was the default until now the ligand stays in the site well beyond 2 ns
+  (first exit at 4.5 to 10 ns), so the estimate without the first 2 ns follows the plateau
+  mean: −66.7, −48.6, −36.5, −28.0, −18.4 and −14.3 kJ/mol at 10, 20, 30, 40, 60 and 75 ns
+  (0 of 5 up to 60 ns, 1 of 5 at 75 ns). The table of that run above holds the numbers of the
+  analysis before the amendment.
+- Experiment is −26.8 to −30.5 kJ/mol (`examples/trypsin_benzamidine/README.md`). It decided
+  nothing.
+
 ### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
 Status: **Accepted** (2026-11-16).
 A benchmark set is a directory, `examples/benchmarks/<set>/`, with `set.yaml`, `reference.csv`
