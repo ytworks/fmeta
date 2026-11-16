@@ -205,6 +205,98 @@ def cmd_doctor(args) -> None:
           f"max force difference {np.abs(selected[1] - reference[1]).max():.2e} kJ/mol/nm")
 
 
+# ---- benchmark sets (FM-D17): fmeta benchmark prepare | run | status | report ----
+
+def cmd_benchmark_prepare(args) -> None:
+    from .benchmark import load_set, prepare_set
+    print("\n".join(prepare_set(load_set(args.set), args.out, args.ligands, args.length_ns, args.replicas)))
+    print(f"next: fmeta benchmark run {args.set} -o {args.out}")
+
+
+def cmd_benchmark_build(args) -> None:
+    """One job of 'benchmark run': the prepare stage of one ligand, on the device the scheduler gave."""
+    from .workflow import prepare_stage
+    config = Config.load(Path(args.workdir) / "config.yaml")
+    prepared = prepare_stage(config, args.workdir, _first_device(config, args.device))
+    print(prepared.report)
+    print(f"\n{prepared.topology.getNumAtoms()} atoms; files in {Path(args.workdir) / 'prepared'}")
+
+
+def cmd_benchmark_run(args) -> None:
+    from .benchmark import format_status, load_set, run_set, status_rows
+    benchmark = load_set(args.set)
+    try:
+        status = run_set(benchmark, args.out, args.gpus, args.mode, args.until)
+    finally:
+        try:
+            print(format_status(status_rows(benchmark, args.out)))
+        except ValueError:                   # nothing is prepared: the error of run_set says so
+            pass
+    if not status:
+        print(f"nothing left to do up to the stage '{args.until}'")
+
+
+def cmd_benchmark_status(args) -> None:
+    from .benchmark import format_status, load_set, status_rows
+    print(format_status(status_rows(load_set(args.set), args.out)))
+
+
+def cmd_benchmark_report(args) -> None:
+    from .benchmark import code_version, load_set, report_set
+    path = report_set(load_set(args.set), args.out, args.reports, code_version(args.commit))
+    report = json.loads(path.read_text())
+    print(path.with_suffix(".md").read_text())
+    print(f"wrote {path} and {path.with_suffix('.md')}")
+    unknown = [name for name, value in (("the image", report["environment"]["image"]),
+                                        ("the lock of the image", report["environment"]["lock_sha256"]),
+                                        ("whether the code differs from the commit", report["dirty"]))
+               if value is None]
+    if unknown or report["dirty"]:
+        print("note: " + "; ".join(([f"not known: {', '.join(unknown)}"] if unknown else [])
+                                   + (["the code differs from the commit"] if report["dirty"] else []))
+              + ". A report to commit is written in the official image (scripts/in_docker.sh) from a clean commit.")
+
+
+def _add_benchmark_commands(commands) -> None:
+    benchmark = commands.add_parser(
+        "benchmark", help="a set of ligands with experimental values: prepare, run, status, report")
+    stages = benchmark.add_subparsers(dest="benchmark_command", required=True)
+
+    def add(name, function, text):
+        sub = stages.add_parser(name, help=text)
+        sub.add_argument("set", help="directory of the set definition (set.yaml, reference.csv)")
+        sub.add_argument("-o", "--out", required=True, help="work directory of the benchmark")
+        sub.set_defaults(func=function)
+        return sub
+
+    sub = add("prepare", cmd_benchmark_prepare,
+              "fetch and verify the inputs, write one fmeta work directory per ligand")
+    sub.add_argument("--ligands", default="pilot",
+                     help="pilot (default), all, or names of ligands separated by commas")
+    sub.add_argument("--length-ns", type=float, help="length per replica (default: that of the set)")
+    sub.add_argument("--replicas", type=int, help="replicas per ligand (default: that of the set)")
+
+    sub = add("run", cmd_benchmark_run,
+              "run or continue every stage of every prepared ligand in one scheduler call")
+    sub.add_argument("--gpus", type=_gpus, help="device numbers such as 0,1, or all (default: run.gpus of the set)")
+    sub.add_argument("--mode", choices=MODES, help="parallel, sequential or auto (default: run.mode of the set)")
+    sub.add_argument("--until", choices=("prepare", "equilibrate", "run"), default="run",
+                     help="stop after this stage of every ligand (default: run)")
+
+    add("status", cmd_benchmark_status, "where every stage of every prepared ligand stands")
+
+    sub = add("report", cmd_benchmark_report,
+              "analyse the ligands and write the comparison with experiment and FEP")
+    sub.add_argument("--reports", default="bench/reports", help="directory of the reports (default: bench/reports)")
+    sub.add_argument("--commit", help="full hash of the commit of this code, where git cannot tell it "
+                                      "(in a container: the output of 'git rev-parse HEAD' on the host)")
+
+    sub = stages.add_parser("build")         # what 'benchmark run' starts for the prepare stage of one ligand
+    sub.add_argument("workdir")
+    sub.add_argument("--device", type=int)
+    sub.set_defaults(func=cmd_benchmark_build)
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="fmeta", description="Funnel metadynamics with OpenMM")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -278,6 +370,8 @@ def main(argv=None) -> None:
     sub = commands.add_parser("doctor", help="quick look at platforms and optional packages")
     sub.add_argument("--platform")
     sub.set_defaults(func=cmd_doctor)
+
+    _add_benchmark_commands(commands)
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,

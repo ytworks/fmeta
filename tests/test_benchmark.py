@@ -31,6 +31,7 @@ from fmeta.benchmark import (
     set_statistics,
     status_rows,
 )
+from fmeta.cli import main
 from fmeta.config import Config
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.scheduler import read_schedule, verify_schedule
@@ -520,3 +521,27 @@ def test_the_commit_of_a_report_is_given_where_git_cannot_tell(tmp_path):
         code_version(root=tmp_path)
     with pytest.raises(ValueError, match="full hash"):
         code_version("0123456", root=tmp_path)
+
+
+# ---- the commands -----------------------------------------------------------
+
+def test_the_commands_prepare_build_show_and_report_a_set(tmp_path, inputs, capsys, monkeypatch):
+    """The prepare stage is a real child process of the scheduler here: the command it is given
+    builds the system of the ligand."""
+    common = [str(write_set(tmp_path / "set", inputs)), "-o", str(tmp_path / "work")]
+    main(["benchmark", "prepare", *common, "--ligands", "b D", "--replicas", "1", "--length-ns", "0.002"])
+    assert "plan: 1 replica(s) of 0.002 ns per ligand" in capsys.readouterr().out
+
+    main(["benchmark", "run", *common, "--until", "prepare"])
+    meta = json.loads((tmp_path / "work" / "b_D" / "prepared" / "meta.json").read_text())
+    assert len(meta["ligand_atoms"]) == 12                            # benzene, in the system that was built
+    capsys.readouterr()
+    main(["benchmark", "status", *common])
+    rows = [line.split() for line in capsys.readouterr().out.splitlines()]
+    assert ["b", "D", "prepare", "done"] in rows and ["b", "D", "equilibrate", "not", "started"] in rows
+
+    monkeypatch.setattr("fmeta.benchmark.code_version", lambda commit: VERSION)    # git or --commit: not the subject
+    main(["benchmark", "report", *common, "--reports", str(tmp_path / "reports")])
+    (path,) = (tmp_path / "reports").glob("*-012345678-toy.json")
+    (ligand,) = json.loads(path.read_text())["ligands"]
+    assert (ligand["name"], ligand["error"]) == ("b D", "no replica has hills yet")
