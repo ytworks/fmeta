@@ -63,24 +63,30 @@ Verified on CPU only (see `PROGRESS.md`).
   is the measurement (FM-D9, second amendment). The value depends on the bias setting (FM-D16,
   third amendment). Not reached: a value with a narrow interval on a real system; the settings
   for it are deferred by the owner until everything is shown to work.
+- **R3 — Membrane validation** (2026-11-16). A GPCR with a weak ligand: adenosine A2A with
+  theophylline in POPC from the OPM file of 5MZJ (`examples/a2a_theophylline`). The steps of
+  its README ran from the download to dG0 on 47e84f7: the build from the input as `fmeta split`
+  writes it (221101 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the funnel into
+  the extracellular water, the equilibration with 2 ns free, five replicas of 40 ns with the
+  official defaults. dG0 −18.6 kJ/mol (95% interval −33.3 to −4.0); the measurement on the
+  simulated construct is −33.0 kJ/mol, all measurements −33.0 to −27.0. The site is closed for
+  a 0.3 nm probe in the crystal structure, and theophylline left and came back along the funnel
+  in every replica (2, 7, 1, 3, 9 rebinding events). The membrane-plane estimate is 14° and
+  0.2 nm off the OPM orientation. Reported, not gated. Not reached: a narrow interval (as R2).
 
 ## Next
 
-Plan for R3 and R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
+Plan for R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
-- **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
-  5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build from the input as
-  `fmeta split` writes it (221110 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the
-  funnel into the extracellular water, 1 ns of equilibration, and the membrane-plane estimate
-  against the OPM orientation (14° and 0.2 nm off). Open: the production run.
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.
 - **R10 — Examples and benchmarks.** A kinase (TYK2, 4GIH) and a GPCR (A2A, 5MZJ) example with
   experimental values. In (2026-11-16, FM-D17): `fmeta benchmark prepare | run | status | report`
   and the sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental
-  and FEP+ values; a report goes to `bench/reports/` and holds no verdict. Open: the examples'
-  results, the pilot runs (3 ligands per set), the whole sets, the reports.
+  and FEP+ values; a report goes to `bench/reports/` and holds no verdict. Done: the results of
+  both examples in their READMEs; the pilot runs (3 ligands per set) with their reports. Open:
+  the whole sets and their reports.
 
 ## Not planned
 

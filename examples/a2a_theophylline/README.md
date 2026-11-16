@@ -1,9 +1,10 @@
 # Adenosine A2A receptor with theophylline
 
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
-theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the inputs are made
-by the steps below and the system builds from them; its equilibration is running; no
-metadynamics has been run and no free energy is reported ("State" below).
+theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the steps below ran
+to a binding free energy with the official defaults: dG0 = −18.6 kJ/mol (−4.45 kcal/mol), 95%
+interval −33.3 to −4.0 kJ/mol, from five replicas of 40 ns. The measurement on the simulated
+construct is −33.0 kJ/mol (−7.89 kcal/mol) ("Result" below).
 
 Numbers in this file come from four places, and are marked: **[entry]** the header of the
 RCSB entry 5MZJ, **[file]** the OPM file and fmeta runs on it (both read or run on 2026-11-16),
@@ -110,19 +111,68 @@ scripts/in_docker.sh --gpus 0 fmeta prepare runs/a2a_theophylline/fmeta.yaml -o 
 scripts/in_docker.sh fmeta funnel runs/a2a_theophylline/work
 scripts/in_docker.sh --gpus 0 fmeta equilibrate runs/a2a_theophylline/work --device 0
 
-# production and analysis (not run yet for this system)
+# production and analysis
 scripts/in_docker.sh --gpus 0,1,2,3 --detach --name a2a fmeta run runs/a2a_theophylline/work --gpus 0,1,2,3
+scripts/in_docker.sh fmeta status runs/a2a_theophylline/work
 scripts/in_docker.sh fmeta analyze runs/a2a_theophylline/work --plot
 ```
 
 The SMILES is neutral theophylline with the hydrogen on N7: a choice of this example.
+`docker stop a2a` stops the run; the same `fmeta run` command continues it from the last
+checkpoints.
+
+## Result
+
+Measured on 2026-11-16 (UTC): the steps above with the official defaults (5 replicas of 40 ns)
+on commit 47e84f7 in the official image. One difference from the `fmeta run` line above: the
+five replicas ran at the same time on one GPU with NVIDIA MPS
+(`scripts/in_docker.sh --mps --gpus 4 ... fmeta run runs/a2a_theophylline/work --gpus 0 --per-gpu 5`),
+at 106 to 107 ns/day each (221 101 atoms, 4 fs). The run took 9 h 5 min. It was stopped once
+with `docker stop` after 35 min, to give each replica one CPU thread, and the same `fmeta run`
+command continued the five replicas from their checkpoints (`schedule.jsonl`); each ended with
+40 000 hills. The numbers are those of `fmeta analyze runs/a2a_theophylline/work --plot` with
+the analysis of the third amendment of FM-D9 (`docs/design/engine.md`, code of c59ec99): the
+value of a replica is the mean over the second half of the run of dG(t) from the accumulated
+bias, with a block error.
+
+| Quantity | fmeta | Experiment |
+|---|---|---|
+| dG0 | −18.64 kJ/mol (−4.45 kcal/mol) | −33.0 kJ/mol (−7.89 kcal/mol) on the simulated construct; all measurements −33.0 to −27.0 kJ/mol (−7.89 to −6.46 kcal/mol) |
+| 95% interval of the five replicas | −33.31 to −3.97 kJ/mol (standard error 5.28) | |
+| Each replica, with its block error | −27.40 ± 2.01, −4.60 ± 1.05, −33.60 ± 7.00, −11.17 ± 0.82, −16.41 ± 4.99 kJ/mol | |
+| From the samples after the first 2 ns (cross-check) | −22.33, −4.47, −28.40, −4.19, −16.96 kJ/mol | |
+| Rebinding events per replica | 2, 7, 1, 3, 9 | |
+| Replicas with a note in the diagnostics | 5 of 5 | |
+
+The value is 14.4 kJ/mol (3.4 kcal/mol) above the measurement on the simulated construct. The
+experimental values lie inside the 95% interval, at its lower end; the interval is 29 kJ/mol
+wide. It is reported as measured: nothing was tuned on this system, and the five replicas
+together are the measurement (FM-D9, second amendment).
+
+What the diagnostics of `fmeta analyze` say:
+
+- The site is closed for a 0.3 nm probe in the crystal structure ("Preparation" below), and
+  theophylline still left and came back along this funnel in every replica: s was above
+  3.0 nm for the first time at 0.8 to 1.9 ns (`COLVAR`), and the ligand returned from the
+  unbound region to the site 1 to 9 times in 40 ns. Two replicas have fewer than 3 returns.
+- One replica (−4.60 kJ/mol) is within 1 kT of what an empty funnel gives (−2.18 kJ/mol): for
+  that replica alone the analysis reports no binding beyond the funnel volume. The value of the
+  five together is not within 1 kT of it.
+- In four of the five replicas an estimate from the samples (after the first 2 ns, or of the
+  second half) differs from the value by 5.1 to 25.0 kJ/mol.
+- In four of the five replicas dG(t) from the bias changed by 4.7 to 41.8 kJ/mol over the last
+  half of the run. The bias fills the free-energy surface for as long as the run lasts, and
+  the difference between the site and the unbound region moves with it
+  (`runs/a2a_theophylline/work/summary.png`).
+
+The run can be extended exactly (`fmeta run runs/a2a_theophylline/work --length-ns 80`); that
+was not done, because nothing runs longer than 40 ns by the owner's decision of 2026-11-16.
 
 ## State (2026-11-16)
 
 - `fmeta prepare` builds the system from the files as `fmeta split` writes them: no editing of
   the protein file is needed (the code before b54292f stopped at SER 305, and bonded across the chain break).
-- The equilibration of that system was started on 2026-11-16 and had not ended when this was
-  written. No metadynamics has been run and no free energy is reported.
+- The steps ran from the download to dG0 ("Result" above).
 - Open choices, none examined yet:
   - The 116 crystal waters are removed (`system.keep_water` is off), also those near the ligand
     and the sodium ion.
@@ -130,8 +180,8 @@ The SMILES is neutral theophylline with the hydrogen on N7: a choice of this exa
     hydrogens: all six histidines are neutral with the hydrogen on ND1. The prepared structure
     of the benchmark set (`examples/benchmarks/a2a`, from 5OLZ) has HIS 264 and HIS 278 doubly
     protonated instead.
-  - Run length and replicas are the official defaults; the first run says whether that is
-    enough here.
+  - Run length, replicas and bias are the official defaults. Settings for a narrower interval
+    are deferred by the owner until everything is shown to work.
 
 ## Preparation (2026-11-16)
 
@@ -154,15 +204,22 @@ this frame it is 2 x 2 patches with `system.padding: 1.5` and also with the pres
 receptor of the benchmark set, in the frame of 5OLZ, fits 2 x 1 patches with 1.2 nm (about
 116 000 atoms).
 
+The equilibration of the run of "Result" (commit 47e84f7, 300 K; 100 ps heating, 400 ps
+release, 2 ns free; 2 fs, NPT). The build of that commit has 221 101 atoms. **[file]**
+
+| Quantity | Value |
+|---|---|
+| Wall energy on the bound ligand, free stage | mean 0.000, max 0.000 kJ/mol; ligand 0.46 nm inside the wall at s = 1.36 nm |
+| Box after the equilibration | 12.57 x 13.19 x 12.99 nm. Area per lipid 0.685 nm² (box area over 242 lipids per leaflet, receptor included); box area 168.2 nm² in the first 200 ps of the free stage and 166.2 nm² in the last |
+| Funnel checks on the equilibrated structure | no errors: unbound region 1.21 nm clear of the solute and 1.79 nm above the membrane; no lipid in the funnel; box z 12.99 nm against 12.28 nm; the unbound ligand is 4.05 nm from the nearest periodic image |
+
 Earlier measurements on a placeholder model of the same file (charged ends at the break,
-310 K, 221 143 atoms), kept because the 300 K equilibration has not ended:
+310 K, 221 143 atoms):
 
 | Quantity | Value |
 |---|---|
 | fmeta's own orientation estimate | 14 deg from the OPM normal, midplane 0.2 nm off (confident): `orient: check` would pass it, `orient: auto` would turn a correct input by 14 deg |
 | Equilibration, 1 ns (100 ps heating, 400 ps release, 500 ps free) | 558 s; about 167 ns/day at 2 fs, NPT, one NVIDIA RTX PRO 6000 Blackwell |
-| Wall energy on the bound ligand, free stage | mean 0.000, max 0.000 kJ/mol; ligand 0.40 nm inside the wall at s = 1.21 nm |
-| Box after 1 ns | 12.74 x 13.38 x 12.76 nm (height -3.7%). Area per lipid 0.70 nm² (box area over 242 lipids per leaflet, receptor included) |
 
-The warning about the closed site is the point to watch in the first run: whether theophylline
-leaves along this funnel within the run length has not been tried.
+The warning about the closed site was the point to watch in the first run. Theophylline left
+along this funnel and came back in every replica within 40 ns ("Result" above).

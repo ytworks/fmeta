@@ -20,8 +20,9 @@ that runs on GPUs, end to end, from two files.
   verdict.
 - OpenMM only: no input from other MD programs.
 - Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
-  after another on one GPU (R7); official presets (R9). Planned: real inputs (R8); a kinase and
-  a GPCR example, benchmarks against experiment and FEP (R10).
+  after another on one GPU (R7); official presets (R9); real inputs (R8); a kinase and a GPCR
+  example with results beside experiment (R3, R10). Open: the benchmark sets against experiment
+  and FEP (R10).
 - Hardware: an 8-GPU machine (since 2026-11-15). Everything except CI runs in the official
   Docker image (FM-D13).
 
@@ -51,7 +52,7 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). The pilot runs are under M7. GPU gates passed on 47e84f7. Not done: a finished run of a set |
 | GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Defaults from the scan by its rule (FM-D16): the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40, with 2 of 5 replicas passing the convergence check of that time. Read without a verdict, with the headline of the third amendment of FM-D9: dG0 −28.3 kJ/mol, 95% interval −66.9 to 10.4, replicas −78.2 to −4.6 (experiment −26.8 to −30.5, not used). The six settings of the scan give −14.9 to −29.1 kJ/mol at 40 ns with this headline; with the estimate from the samples, the headline when the scan was read, −2.9 to −28.0: the value depends on the bias setting, and two mean-force estimators over the pooled replicas did not reduce that (spread 25.1 kJ/mol against 32.8 and 42.0; FM-D16, third amendment). R2 is reworded: the value with its interval. The example ran again by its README steps with the defaults, one replica after another on one GPU (47e84f7, 5 × 40 ns, exit 0, `docker stop` and the same command twice): dG0 −44.04 kJ/mol, 95% interval −80.51 to −7.57, replicas −85.3 to −10.9; the ten replicas of both runs −36.16 (95% −57.42 to −14.90). R2 is closed as reworded |
 | GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). Run from its README with the defaults (5 × 40 ns, 47e84f7, the five replicas on one GPU with MPS), headline of the third amendment of FM-D9: dG0 −14.85 kJ/mol (−3.55 kcal/mol), 95% interval −26.60 to −3.11, replicas −29.00 to −3.97, rebinding events 5, 0, 1, 1, 1; experiment −47.3 kJ/mol, outside the interval. Reported as measured in the README |
-| GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. It is run again from its README with the defaults of this commit (5 × 40 ns). No result yet |
+| GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. Run again from its README with the defaults (5 × 40 ns, 47e84f7, 221101 atoms, the five replicas on one GPU with MPS at 106–107 ns/day each, exit 0, one `docker stop` and the same command): dG0 −18.64 kJ/mol (−4.45 kcal/mol), 95% interval −33.31 to −3.97, replicas −33.60 to −4.60, rebinding events 2, 7, 1, 3, 9; the measurement on the simulated construct is −33.0 kJ/mol, all measurements −33.0 to −27.0, inside the interval at its lower end. The site is closed for a 0.3 nm probe in the crystal structure; theophylline left and came back in every replica. R3 is closed. Reported as measured in the README |
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) run from 47e84f7 in fresh work directories. No report of a whole set yet |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean d4bbcc6,
@@ -84,7 +85,8 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
     value depends on the bias setting;
-    TYK2 with ejm_46: −26.6 to −3.1 kJ/mol, 32 kJ/mol above experiment);
+    TYK2 with ejm_46: −26.6 to −3.1 kJ/mol, 32 kJ/mol above experiment; A2A with
+    theophylline: −33.3 to −4.0 kJ/mol, 14 kJ/mol above the measurement on the construct);
   - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
     owner until everything is shown to work; walkers operate on trypsin, their accuracy is not
     measured;
@@ -107,8 +109,10 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   The A2A pilot ended at 12:04 UTC; its GPU 1 is with the A2A set. Since 13:17 UTC, after the
   function checks: the TYK2 set on GPUs 0, 3 and 5 with 13 replicas each (every remaining
   replica in flight; about 1600 ns/day per GPU), the A2A set on GPUs 1, 6 and 7. The trypsin
-  run ended at 13:43 UTC; since 13:55 UTC the A2A set has GPUs 1, 2, 6 and 7 with 7 replicas
-  each (its 28 remaining replicas in flight, about 150 ns/day each).
+  run ended at 13:43 UTC; from 13:55 UTC the A2A set had GPUs 1, 2, 6 and 7. The A2A example
+  ended at 16:11 UTC; since 16:12 UTC the A2A set has GPUs 1, 2, 4, 6 and 7 with 5 replicas
+  each (its 25 remaining replicas in flight). Both sets are expected to end at about 19:00 to
+  19:30 UTC.
 - Time estimate (measured: 88k atoms 606 ns/day alone and 1283 / 1541 / 1620 ns/day per GPU with
   4 / 6 / 8 replicas under MPS; A2A set system about 1015 ns/day per GPU with 6 replicas, A2A
   example about 506 with 5): both full sets and the three examples at 5 × 40 ns are about
@@ -117,6 +121,11 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] A2A with theophylline by its README steps (membrane, 221101 atoms): dG0 −18.64 kJ/mol; R3 closed
+- What: `examples/a2a_theophylline` ran from its README on 47e84f7 with the defaults (5 × 40 ns; the five replicas on one GPU with MPS, 106–107 ns/day each, 9 h 5 min, exit 0; one `docker stop` after 35 min and the same `fmeta run` command, every replica 40000 hills). Analysis with the code of c59ec99: dG0 −18.64 kJ/mol (−4.45 kcal/mol), 95% interval −33.31 to −3.97, replicas −27.40, −4.60, −33.60, −11.17, −16.41; rebinding events 2, 7, 1, 3, 9; first exit (s above 3.0 nm) at 0.8 to 1.9 ns. Measurement on the simulated construct −33.0 kJ/mol (SPR), all measurements −33.0 to −27.0: inside the interval at its lower end, the value 14.4 kJ/mol above. One replica (−4.60) is within 1 kT of the empty-funnel value (−2.18) and is noted as no binding for that replica; the set is not. Equilibrated box 12.57 × 13.19 × 12.99 nm, 0.685 nm² per lipid, zero wall energy. With this, the three examples have run from their READMEs to dG0. Roadmap R3 moved to done.
+- Why: item 4 of the owner request (a GPCR example with an experimental value) and the open question of the preparation: the site is closed for a 0.3 nm probe in the crystal structure, and the ligand still left and came back along the funnel in every replica.
+- Refs: `examples/a2a_theophylline/README.md`, `README.md`, `docs/roadmap.md` (R3, R10); FM-D9, FM-D15. Not committed: the run directory (`runs/`, ignored).
 
 ### 2026-11-16 — [progress] Trypsin by its README steps, one GPU, sequential: dG0 −44.04 kJ/mol; the cross-check from the samples lost bins of low weight (fixed, c59ec99)
 - What: `examples/trypsin_benzamidine` ran from its README on 47e84f7 with `--mode sequential` on one GPU (5 × 40 ns, 703–725 ns/day, exit 0; `docker stop` and the same command twice, every replica 40000 hills): dG0 −44.04 kJ/mol (−10.53 kcal/mol), 95% interval −80.51 to −7.57, replicas −60.16, −39.03, −10.94, −85.27, −24.80; rebinding events 2, 3, 6, 3, 4. With the scan run of the same settings (−28.28): ten replicas −36.16, 95% −57.42 to −14.90; experiment −26.8 to −30.5. Roadmap R2 is closed as reworded. Defect found by this run: replica 3 had "no estimate from the samples" although 3837 samples lay in the unbound region. `reweighted_profile` summed the weights with `numpy.histogram` (differences of a cumulative sum), which returns 0 for a bin more than about 16 digits below the sum before it; the log-weights spanned 53.6. Each bin is now summed relative to its own largest weight; the new test failed before the fix. After it: replica 3 −75.35 from the samples, replica 0 of the scan run −87.04 (was none), every other number of both trypsin runs and of the TYK2 example unchanged. `ruff` passes, `pytest` 161 passed. Not run on this code: GPU gates (`toy_free_energy` reads this function) and the image check; both once more on the final code.
