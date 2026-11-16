@@ -51,19 +51,23 @@ Verified on CPU only (see `PROGRESS.md`).
   `TER` gets its own chain; `prepared/report.json` lists gaps, caps, states, disulfides and
   alternate locations. Built and equilibrated on the GPU from 3PTB, 4GIH and the prepared TYK2
   protein of the Schrödinger set. Gates passed on 47e84f7 (same record).
+- **R2 — Real-system validation** (2026-11-16, as reworded that day). Trypsin-benzamidine
+  (`examples/trypsin_benzamidine`): five replicas of 40 ns with the official defaults, their
+  value with its interval beside experiment and the published funnel-metadynamics value.
+  Reported, not gated. Two runs with the values of the defaults (the value of a replica from
+  the bias, FM-D9, third amendment): the scan run −28.3 kJ/mol (95% interval −66.9 to 10.4) and
+  the run by the steps of the README on one GPU with `--mode sequential` −44.0 kJ/mol (−80.5
+  to −7.6); their ten replicas together −36.2 kJ/mol (−57.4 to −14.9). Experiment: −26.8 to
+  −30.5 kJ/mol; published funnel metadynamics: −35.6 ± 2.9 kJ/mol. R2 read "five replicas to
+  convergence" before: a replica of 40 ns does not converge on its own, and the set of replicas
+  is the measurement (FM-D9, second amendment). The value depends on the bias setting (FM-D16,
+  third amendment). Not reached: a value with a narrow interval on a real system; the settings
+  for it are deferred by the owner until everything is shown to work.
 
 ## Next
 
-Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
+Plan for R3 and R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
-- **R2 — Real-system validation.** Trypsin-benzamidine (`examples/trypsin_benzamidine`): five
-  replicas with the official defaults, their value with its interval, compared with experiment
-  and published funnel-metadynamics values. Reported, not gated. Reworded on 2026-11-16 (it
-  read "five replicas to convergence"): a replica of 40 ns does not converge on its own, and
-  the set of replicas is the measurement (FM-D9, second amendment). Measured with the values
-  of the defaults: −28.3 kJ/mol, 95% interval −66.9 to 10.4 (the value of a replica from the
-  bias, FM-D9, third amendment); the value depends on the bias setting (FM-D16, third
-  amendment). Open: the run by the steps of the README.
 - **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
   5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build from the input as
   `fmeta split` writes it (221110 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the

@@ -7,7 +7,7 @@ the S1 pocket of bovine beta-trypsin. No membrane.
 |---|---|---|
 | Experimental binding free energy | −6.4 to −7.3 kcal/mol | the measurements quoted by Limongelli et al. (their references 40 and 41) |
 | Funnel metadynamics, published | −8.5 ± 0.7 kcal/mol | Limongelli, Bonomi, Parrinello, PNAS 110, 6358 (2013), doi:10.1073/pnas.1303186110 |
-| fmeta, official defaults (5 replicas of 40 ns) | −6.5 kcal/mol, 95% interval −16.4 to 3.3 | see "Result" below |
+| fmeta, official defaults (5 replicas of 40 ns), two runs | −6.8 kcal/mol, 95% interval −16.0 to 2.5; −10.5 kcal/mol, 95% interval −19.2 to −1.8 | see "Result" below |
 
 ## Inputs
 
@@ -67,35 +67,59 @@ Two runs have the values of the defaults. The first is the scan run `sig2` of th
 below (commit f2ea653): five replicas at the same time on one GPU with NVIDIA MPS, from the
 equilibrated system of the first run of this example. The second follows the steps above on the
 commit of the defaults (47e84f7) with one replica after another on one GPU
-(`--mode sequential`). It was started on 2026-11-16 (UTC); its numbers are added here when it
-ends.
+(`--mode sequential`), on 2026-11-16 (UTC). Both were analysed with the code of commit c59ec99.
 
-| Quantity | Scan run with the values of the defaults (5 replicas on one GPU with MPS) |
-|---|---|
-| dG0 | −28.28 kJ/mol (−6.76 kcal/mol) |
-| 95% interval of the five replicas | −66.93 to 10.37 kJ/mol (standard error 13.92) |
-| Each replica, with its block error | −78.17 ± 16.18, −4.60 ± 1.06, −39.18 ± 2.57, −6.60 ± 1.61, −12.87 ± 2.21 kJ/mol |
-| From the samples after the first 2 ns (cross-check) | none, −1.73, −44.29, −3.42, −9.13 kJ/mol |
-| Rebinding events per replica | 0, 3, 5, 5, 5 |
-| Replicas with a note in the diagnostics | 3 of 5 |
+| Quantity | Scan run `sig2` (5 replicas at the same time on one GPU with MPS) | Run by the steps above (`--mode sequential`, one GPU) |
+|---|---|---|
+| dG0 | −28.28 kJ/mol (−6.76 kcal/mol) | −44.04 kJ/mol (−10.53 kcal/mol) |
+| 95% interval of the five replicas | −66.93 to 10.37 kJ/mol (standard error 13.92) | −80.51 to −7.57 kJ/mol (standard error 13.14) |
+| Each replica, with its block error (kJ/mol) | −78.17 ± 16.18, −4.60 ± 1.06, −39.18 ± 2.57, −6.60 ± 1.61, −12.87 ± 2.21 | −60.16 ± 3.60, −39.03 ± 2.87, −10.94 ± 2.93, −85.27 ± 3.57, −24.80 ± 4.81 |
+| From the samples after the first 2 ns (cross-check, kJ/mol) | −87.04, −1.73, −44.29, −3.42, −9.13 | −36.48, −43.22, −5.18, −75.35, −20.89 |
+| Rebinding events per replica | 0, 3, 5, 5, 5 | 2, 3, 6, 3, 4 |
+| Replicas with a note in the diagnostics | 3 of 5 | 5 of 5 |
 
-What the diagnostics of `fmeta analyze` say about those three:
+What the diagnostics of `fmeta analyze` say about the scan run:
 
 - Replica 0 left the site once, at 27.5 ns, and did not come back (`COLVAR`). dG(t) from the
   bias changed by +98.8 kJ/mol over the last half of the run: the bias was filling the site for
-  most of it. Its samples after the first 2 ns give no estimate, so the value has no cross-check
-  from them; the samples of the second half alone give a value 24.4 kJ/mol higher.
+  most of it. Its samples after the first 2 ns give a value 8.9 kJ/mol lower, and those of the
+  second half alone one 24.4 kJ/mol higher.
 - For replica 1, dG(t) from the bias changed by +6.5 kJ/mol over the last half of the run, and
   the samples of the second half give a value 4.0 kJ/mol higher.
 - For replica 2, dG(t) from the bias changed by +15.3 kJ/mol over the last half of the run; the
   samples after the first 2 ns give a value 5.1 kJ/mol lower and those of the second half one
   33.1 kJ/mol higher.
 
-The mean of the five lies near the experimental range (−26.8 to −30.5 kJ/mol). That is an
-average over replicas that differ by 74 kJ/mol, with an interval that includes zero: it says
-nothing about agreement. The block error of a replica (1.1 to 16.2 kJ/mol) is far below that
-difference: it says how far a value moved within the second half of its own run, not how far
-the run is from the answer.
+And about the sequential run:
+
+- dG(t) from the bias changed over the last half of the run by +21.6, +18.1, +14.8 and
+  +28.3 kJ/mol for replicas 0, 1, 2 and 4.
+- The samples after the first 2 ns differ from dG by +23.7, −4.2, +5.8 and +9.9 kJ/mol for
+  replicas 0, 1, 2 and 3; those of the second half alone by +39.9 and +8.7 kJ/mol for replicas
+  1 and 4.
+- Replica 0 has 2 rebinding events, fewer than the 3 of the check.
+
+The two runs of the same settings differ by 15.8 kJ/mol, which is within their standard errors.
+The ten replicas together give −36.16 kJ/mol with a standard error of 9.40 and a 95% interval
+from −57.42 to −14.90 kJ/mol. The experimental range is −26.8 to −30.5 kJ/mol. The replicas of
+one run differ by 74 kJ/mol, so a mean near or away from that range says nothing about agreement.
+The block error of a replica (1.1 to 16.2 kJ/mol) is far below that difference: it says how far
+a value moved within the second half of its own run, not how far the run is from the answer.
+
+The sequential run is also the record of that mode on a real system. The steps above, from the
+download to `fmeta equilibrate`, took 6 minutes. The five replicas ran one after another on one
+GPU at 703 to 725 ns/day (the first replica at 555 to 593 ns/day until the restart with
+`OMP_NUM_THREADS=1`, see `docs/gpu-runbook.md`). `docker stop` was tried twice during the run.
+The first stop returned in 0.4 s with exit code 1 and the message "stopped (SIGTERM) before
+rep1, rep2, rep3, rep4, rep0 finished; run the same command again to continue". The same command
+continued replica 0 from its checkpoint at 2.5 ns: the 2500 hills before it were identical to
+the file saved at the stop, with no gap and no duplicate after it. At the end every replica has
+40000 hills, and the run ended with exit code 0.
+
+The cross-check from the samples of replica 0 of the scan run and of replica 3 of the
+sequential run was missing before commit c59ec99: the weighted histogram lost the bins of the
+unbound region, whose weights are more than 16 digits below those of the site. The values from
+the bias were not affected.
 
 The calcium ion is removed by default. Keeping it (`system.keep_hetero`) is a variation that
 has not been run.
