@@ -65,13 +65,25 @@ def reweighted_profile(s_samples, log_weights, kT: float, s_edges) -> np.ndarray
     """W(s) from a weighted histogram of samples, shifted so its minimum is zero.
 
     The weights of the samples of a metadynamics run come from :func:`sliced_log_weights`.
-    Bins without samples are returned as ``inf``.
+    Bins without samples are returned as ``inf``. The sum of a bin is taken relative to its own
+    largest weight: the weights in a deep site and in the unbound region differ by more than the
+    digits of a float, and a histogram of the weights themselves returned the lighter bins as
+    empty.
     """
+    s_samples = np.asarray(s_samples, dtype=float)
     log_weights = np.asarray(log_weights, dtype=float)
-    weights = np.exp(log_weights - log_weights.max())
-    histogram, _ = np.histogram(s_samples, bins=s_edges, weights=weights)
+    s_edges = np.asarray(s_edges, dtype=float)
+    n_bins = s_edges.size - 1
+    # The bins of numpy.histogram: half-open, the last one closed.
+    index = np.searchsorted(s_edges, s_samples, side="right") - 1
+    index[s_samples == s_edges[-1]] = n_bins - 1
+    inside = (index >= 0) & (index < n_bins) & (log_weights > -np.inf)
+    index, log_weights = index[inside], log_weights[inside]
+    peak = np.full(n_bins, -np.inf)
+    np.maximum.at(peak, index, log_weights)
+    total = np.bincount(index, weights=np.exp(log_weights - peak[index]), minlength=n_bins)
     with np.errstate(divide="ignore"):
-        profile = -kT * np.log(histogram / np.diff(s_edges))
+        profile = -kT * (np.log(total) + peak - np.log(np.diff(s_edges)))
     finite = np.isfinite(profile)
     if finite.any():
         profile = profile - profile[finite].min()

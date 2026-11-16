@@ -89,6 +89,15 @@ def test_reweighted_profile_recovers_the_unbiased_profile():
     assert np.allclose(profile - profile.min(), expected - expected.min(), atol=0.25)
 
 
+def test_reweighted_profile_keeps_a_bin_far_below_the_heaviest():
+    """Two bins whose weights differ by 60 kT, more than the digits of a float hold: the profile
+    has the difference. A histogram of the weights themselves returned the lighter bin as empty,
+    and a replica with a deep site then had no estimate from its samples (trypsin, 2026-11-16)."""
+    s = np.array([0.25, 0.25, 0.75, 0.75])
+    profile = reweighted_profile(s, np.array([0.0, 0.0, -60.0, -60.0]), KT, np.array([0.0, 0.5, 1.0]))
+    assert profile == pytest.approx([0.0, 60.0 * KT], abs=1e-9)
+
+
 def test_sliced_weights_recover_the_unbiased_populations():
     """Three states with populations 1/2, 1/4, 1/4. Four samples without a bias and four under a
     bias that turns the populations into 1/4, 1/4, 1/2, each set in exactly those proportions:
