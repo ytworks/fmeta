@@ -57,8 +57,12 @@ Verified on CPU only (see `PROGRESS.md`).
 Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 - **R2 — Real-system validation.** Trypsin-benzamidine (`examples/trypsin_benzamidine`): five
-  replicas to convergence, compared with experiment and published funnel-metadynamics values.
-  Reported, not gated.
+  replicas with the official defaults, their value with its interval, compared with experiment
+  and published funnel-metadynamics values. Reported, not gated. Reworded on 2026-11-16 (it
+  read "five replicas to convergence"): a replica of 40 ns does not converge on its own, and
+  the set of replicas is the measurement (FM-D9, second amendment). Measured with the values
+  of the defaults: −27.4 kJ/mol, 95% interval −68.7 to 14.0; the value depends on the bias
+  setting (FM-D16, third amendment). Open: the run by the steps of the README.
 - **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
   5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build from the input as
   `fmeta split` writes it (221110 atoms; the gap LEU208–GLU219 capped, the sodium ion kept), the

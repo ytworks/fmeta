@@ -84,6 +84,11 @@ def launch_subprocess(task: Task, device) -> _Child:
     Path(task.log).parent.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ, PYTHONUNBUFFERED="1")
     environment.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")      # device numbers as nvidia-smi shows them
+    # One math-library thread per replica: the work is on the GPU. With the default (a thread per
+    # CPU core in every process) 41 replicas on 128 cores gave a load average above 1200, and the
+    # limit made them 3 to 30% faster (measured 2026-11-16). A value the caller sets is kept.
+    for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        environment.setdefault(variable, "1")
     with open(task.log, "a") as logfile:
         return _Child(subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=logfile,
                                        stderr=subprocess.STDOUT, env=environment,

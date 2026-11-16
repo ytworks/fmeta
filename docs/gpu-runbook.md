@@ -106,8 +106,8 @@ the scheduler terminates its child processes before it returns, and `runs/tb/sch
 records what ran where. Running the same `fmeta run` command again continues from the last
 checkpoints. Look at
 `runs/tb/prepared/funnel.pdb` with the structure before spending GPU time. Record the outcome
-(`summary.json`, the commit, the image, what converged and what did not) in the example's
-README and in `PROGRESS.md`.
+(`summary.json`, the commit, the image, the value with its interval and the diagnostics) in the
+example's README and in `PROGRESS.md`.
 
 ### Several replicas on one GPU (NVIDIA MPS)
 
@@ -125,3 +125,9 @@ scripts/mps.sh stop                              # ends every client: stop the r
 
 Only containers started with `--mps` are clients of the daemon. If the MPS server of a GPU
 fails, all its clients end; the same `fmeta run` command continues from the checkpoints.
+
+The scheduler starts every replica with one math-library thread (`OMP_NUM_THREADS`,
+`MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS`; a value the caller sets is kept). With the default
+of the libraries, a thread per CPU core in every process, 41 replicas on 128 cores had a load
+average above 1200 and ran 3 to 30% slower (FM-D14). A load average far above the number of
+replicas is the sign to look for.

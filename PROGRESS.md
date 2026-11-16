@@ -14,8 +14,9 @@ that runs on GPUs, end to end, from two files.
   `Modeller.addMembrane`, with the funnel pointing into water.
 - Engine: well-tempered metadynamics on the funnel CVs (projection `s`, extent `rho`) with
   OpenMM custom forces; replicas for error bars, shared-bias walkers for speed; exact restart.
-- Result: standard binding free energy (from the samples after the first 2 ns, 95 % confidence
-  interval over replicas) with convergence diagnostics that say NOT CONVERGED or "no binding".
+- Result: standard binding free energy from the samples after the first 2 ns. The replicas
+  together are the measurement: mean and 95 % interval, diagnostics per replica, a "no binding"
+  statement, no convergence verdict.
 - OpenMM only: no input from other MD programs.
 - Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
   after another on one GPU (R7); official presets (R9). Planned: real inputs (R8); a kinase and
@@ -26,7 +27,7 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
-FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run
 lengths, the scan and the GPU use as changed by the Change Log entries of 2026-11-16.
 
@@ -47,10 +48,10 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
 | GPU plan M2: real inputs (R8, FM-D15) | Merged, both parts. Membrane part: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule. Protein part: chain gaps capped (NME / ACE), caps and protonation states of the input kept, kept hetero in their own chain, `info.protein_input` in `prepared/report.json`. `pytest` 128 passed. GPU gates passed on 47e84f7; the real `addMembrane` test (`-m slow`) not rerun. On real files (GPU, 200 ps of free equilibration, zero wall energy): 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set; protein model alone on both A2A files |
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). The pilot runs are under M7. GPU gates passed on 47e84f7. Not done: a finished run of a set |
-| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Verdict of the scan (FM-D16, result): no bias setting has five replicas without a convergence problem at 10, 15, 20, 30 or 40 ns, with the analysis of the FM-D9 amendment or the one before it. By the rule the defaults are the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40: 2 of 5 replicas pass at 40 ns (dG0 −27.4 kJ/mol, SEM 14.9, replicas −78.2 to −1.7; experiment −26.8 to −30.5, not used). The former default bias: 0 of 5 at 40 ns (−28.0, SEM 5.9), 1 of 5 at 75 ns. R2 ("five replicas to convergence") is not met within the 40 ns the owner allows; nothing runs longer. The example is run again with the defaults, one replica after another on one GPU |
+| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Defaults from the scan by its rule (FM-D16): the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40, with 2 of 5 replicas passing the convergence check of that time. Read without a verdict since the second amendment of FM-D9: dG0 −27.4 kJ/mol, 95% interval −68.7 to 14.0, replicas −78.2 to −1.7 (experiment −26.8 to −30.5, not used). The six settings of the scan give −2.9 to −28.0 kJ/mol at 40 ns: the value depends on the bias setting, and two mean-force estimators over the pooled replicas did not reduce that (spread 25.1 kJ/mol against 32.8 and 42.0; FM-D16, third amendment). R2 is reworded: the value with its interval. The example runs again with the defaults, one replica after another on one GPU: in progress |
 | GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). The first run (former default bias) was stopped at 18.6 ns. It is run again from its README with the defaults of this commit (5 × 40 ns). No result yet |
 | GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. It is run again from its README with the defaults of this commit (5 × 40 ns). No result yet |
-| GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commit f2ea653) are finishing on GPUs 0 and 1; their reports go to `bench/reports/` as pilots. The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) start from this commit in fresh work directories. No report yet |
+| GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs), the A2A pilot is finishing on GPU 1; their reports go to `bench/reports/` as pilots. The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) run from 47e84f7 in fresh work directories. No report yet |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 47e84f7,
   the code with the defaults of the scan verdict (CUDA, mixed precision, 2 GPUs, in the image):
@@ -58,15 +59,17 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   (plateau −3.46) against the exact −4.95 kJ/mol, criteria 2.0 and 3.0. `replicas_sequential`
   and `replicas_parallel` ran real child processes on the GPUs (FM-D14). Its speed values were
   taken while the image check used the same two GPUs; the record of 8d1f10a has them alone.
+  Not run yet on the code after 47e84f7 (analysis without a verdict, one math-library thread
+  per replica in the scheduler): once more, on the final code.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 160 passed on
-  the defaults of the scan verdict. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+  the code of the second amendment of FM-D9. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
   them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
-  - a converged binding free energy of a real protein-ligand system (trypsin: 2 of 5 replicas
-    pass at 40 ns with the defaults);
+  - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
+    the defaults: 95% interval −68.7 to 14.0 kJ/mol, and the value depends on the bias setting);
   - reading HILLS with PLUMED itself;
   - the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
@@ -78,9 +81,10 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   gate's seed, and the scatter of that estimate over seeds at 10 ns is not measured.
 - GPUs (owner, 2026-11-16: all 8 are for this task): every GPU carries several replicas with
   NVIDIA MPS (`run.per_gpu`, FM-D14 amendment). Second wave, started at 06:41 UTC on 2026-11-16
-  from 47e84f7 with the defaults: the three examples on GPUs 2, 3 and 4 (trypsin one replica
-  after another), the TYK2 set on GPU 5, the A2A set on GPUs 6 and 7; the two pilots finish on
-  GPUs 0 and 1.
+  from 47e84f7 with the defaults and continued from its checkpoints at 07:41 UTC with one
+  math-library thread per replica: the three examples on GPUs 2, 3 and 4 (trypsin one replica
+  after another), the TYK2 set on GPUs 0 and 5, the A2A set on GPUs 6 and 7; the A2A pilot
+  finishes on GPU 1.
 - Time estimate (measured: 88k atoms 606 ns/day alone and 1283 / 1541 / 1620 ns/day per GPU with
   4 / 6 / 8 replicas under MPS; A2A set system about 1015 ns/day per GPU with 6 replicas, A2A
   example about 506 with 5): both full sets and the three examples at 5 × 40 ns are about
@@ -89,6 +93,11 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] No convergence verdict: the set of replicas is the measurement (value and interval); the checks of a replica are diagnostics
+- What: owner instruction of 2026-11-16: a replica of this length is not a simulation that converges; change the way of thinking. `result.json` and `summary.json` lose `converged` and `problems`; `fmeta analyze` prints the mean of the replicas with its 95% interval and the notes of the unchanged checks as `diagnostics`; `no_binding` stays for a replica and for the value of the set. Benchmark reports have one set of statistics over every ligand with a value. Three estimators for the set were compared by a rule written first (toy: all within 0.80 kJ/mol at 4 × 10 ns; spread between the six bias settings on trypsin at 40 ns: 25.1 kJ/mol for the mean of per-replica estimates, 32.8 and 42.0 for two mean-force estimators): the estimate does not change. The defaults stay. The scheduler starts each replica with one math-library thread (load average 1250 to 46; 3 to 30% faster). `ruff` passes, `pytest` 160 passed. Not run: GPU gates on this code (once, on the final code).
+- Why: the owner's instruction, and the scan: 0 to 17 rebinding events per replica in 40 ns, replicas of one setting between −1.7 and −78 kJ/mol, no setting with five replicas free of notes. A verdict that every run fails says nothing; the interval says how much is open. No estimator removed the dependence on the bias setting: it is a limit of the sampling at 40 ns.
+- Refs: FM-D9 (second amendment), FM-D16 (third amendment), FM-D17 and FM-D14 amendments (`docs/design/engine.md`); `src/fmeta/analysis/__init__.py`, `src/fmeta/workflow.py`, `src/fmeta/benchmark.py`, `src/fmeta/scheduler.py`; `.claude/rules/numerics-invariants.md`; supersedes the NOT CONVERGED wording of the entry "Verdict of the bias scan".
 
 ### 2026-11-16 — [progress] GPU gates pass on the code with the defaults of the scan verdict; the image runs without the source; second wave started
 - What: `scripts/gpu_gates.py` on clean 47e84f7 (2 GPUs, in the image): all 18 passed. `toy_free_energy` with the estimate of the FM-D9 amendment: −3.95 (plateau −3.46) against the exact −4.95 kJ/mol; forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 1.3e-06 nm, wall energy 8.2e-06 kJ/mol. This closes "GPU gates on this code: not run yet" for the presets (R9), the real inputs (R8) and `fmeta benchmark`. The image built from 47e84f7 passed `fmeta check --quick` on CUDA without the mounted source, and all 232 files and directories it wrote belong to the calling user (a check, not evidence). The second wave runs from 47e84f7 with the defaults (5 × 40 ns): the three examples by their README steps, trypsin with `--mode sequential` on one GPU, and both whole benchmark sets. Not verified here: the result of CI.

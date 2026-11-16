@@ -31,7 +31,7 @@ from typing import NamedTuple, Optional, Sequence
 import numpy as np
 import yaml
 
-from .analysis import KCAL, MIN_BINDING_EXCESS, analyze_replicas, analyze_run, walker_directories
+from .analysis import KCAL, analyze_replicas, analyze_run, walker_directories
 from .config import Config
 from .engine.platform import resolve_devices
 from .funnel.geometry import KB, STANDARD_VOLUME
@@ -1031,21 +1031,16 @@ def ligand_result(item: Prepared, reference: Reference) -> dict:
     """What the replicas of one ligand give, beside its reference values.
 
     ``dg`` is the mean of the dG0 of the replicas that were analysed, ``ci95`` its
-    Student-t interval (None for one replica). ``converged`` says that each of them passed
-    every check of the analysis; ``no_binding`` counts those within 1 kT of what the empty
-    funnel gives, whose value is not a binding free energy. A ligand without a value keeps its
-    place in the list, with ``error``."""
+    Student-t interval (None for one replica). The replicas together are the measurement: none
+    of them is judged on its own, and ``diagnostics`` holds the notes of the analysis on them.
+    ``no_binding`` says that the value is within 1 kT of what the empty funnel gives: then it
+    is not a binding free energy. A ligand without a value keeps its place in the list, with
+    ``error``."""
     summary, failures = _analysed(item.directory)
-    replicas = []
-    for run in (summary["replicas"] if summary else []):
-        directory = Path(run["workdir"])
-        result = _read_json(directory / "result.json") or {}
-        excess, temperature = result.get("binding_excess"), result.get("temperature")
-        replicas.append(dict(
-            name=directory.name, simulated_ns=_rounded(run["simulated_ns"]), dg=_energy(run["dG"]),
-            rebinding_events=int(run["rebinding_events"]), converged=bool(run["converged"]),
-            no_binding=bool(excess is not None and temperature is not None
-                            and excess < MIN_BINDING_EXCESS * KB * temperature)))
+    replicas = [dict(name=Path(run["workdir"]).name, simulated_ns=_rounded(run["simulated_ns"]),
+                     dg=_energy(run["dG"]), rebinding_events=int(run["rebinding_events"]),
+                     no_binding=bool(run["no_binding"]))
+                for run in (summary["replicas"] if summary else [])]
     rows = _replica_rows(item)
     dg = _energy(summary["dG"]) if summary else None
     error = None
@@ -1057,11 +1052,11 @@ def ligand_result(item: Prepared, reference: Reference) -> dict:
         sem=_energy(summary["sem"]) if summary else None, ci95=_interval(summary["ci95"]) if summary else None,
         n_replicas=len(replicas), replicas_planned=int(item.config.run.replicas),
         replicas_finished=sum(all(row["state"] == "done" for row in group) for group in rows.values()),
-        converged=bool(replicas) and all(replica["converged"] for replica in replicas),
-        no_binding_replicas=sum(replica["no_binding"] for replica in replicas),
+        no_binding=bool(summary["no_binding"]) if summary else False,
         rebinding_events=sum(replica["rebinding_events"] for replica in replicas),
         replicas=replicas,
-        problems={Path(replica).name: found for replica, found in (summary or {}).get("problems", {}).items()},
+        diagnostics={Path(replica).name: notes
+                     for replica, notes in (summary or {}).get("diagnostics", {}).items()},
         not_analysed=failures, error=error,
         experiment=dict(dg=_energy(reference.exp_dg), temperature_k=reference.exp_temperature, doi=reference.exp_doi),
         fep=None if reference.fep_dg is None else dict(
@@ -1103,14 +1098,12 @@ def _comparison(ligands: Sequence[dict], what: str) -> Optional[dict]:
 
 
 def set_statistics(ligands: Sequence[dict]) -> dict:
-    """The agreement with experiment, twice: over ``all`` ligands that have a value of fmeta,
-    whatever the verdict of the analysis, and over the ``converged`` ones. In each, the FEP
-    values are compared on the same ligands. No ligand is left out silently: those without a
-    value are named in ``without_value``."""
+    """The agreement with experiment over every ligand that has a value of fmeta; the FEP
+    values are compared on the same ligands. No ligand is chosen by what the analysis says
+    about it, and none is left out silently: those without a value are named in
+    ``without_value``."""
     valued = [ligand for ligand in ligands if ligand["dg"] is not None]
-    subsets = dict(all=valued, converged=[ligand for ligand in valued if ligand["converged"]])
-    result: dict = {name: {key: _comparison(chosen, what) for key, what in COMPARISONS}
-                    for name, chosen in subsets.items()}
+    result: dict = {key: _comparison(valued, what) for key, what in COMPARISONS}
     result["without_value"] = [ligand["name"] for ligand in ligands if ligand["dg"] is None]
     result["bootstrap"] = dict(resamples=BOOTSTRAP_RESAMPLES, seed=BOOTSTRAP_SEED,
                                interval="2.5 - 97.5 percentile over ligands drawn with replacement")
@@ -1182,18 +1175,16 @@ _LABELS = dict(mue="MUE", rmse="RMSE", mean_signed_error="Mean signed error", mu
 _KINDS = dict(fmeta_vs_experiment="fmeta", fep_vs_experiment="FEP", afe_vs_experiment="absolute FEP")
 
 
-def _verdict(ligand: dict) -> str:
+def _note(ligand: dict) -> str:
+    """Why a ligand has no value, or that its value is not a binding free energy."""
     if ligand["error"]:
         return ligand["error"]
-    text = "converged" if ligand["converged"] else "NOT CONVERGED"
-    if ligand["no_binding_replicas"]:
-        text += f"; no binding in {ligand['no_binding_replicas']} of {ligand['n_replicas']} replica(s)"
-    return text
+    return "no binding" if ligand["no_binding"] else ""
 
 
 def _ligand_table(ligands: Sequence[dict], unit: str) -> list:
-    lines = ["| Ligand | Replicas analysed (finished / planned) | dG0 fmeta | 95% CI | Experiment | FEP "
-             "| fmeta - experiment | Rebinding events | Analysis |", "|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| Ligand | Replicas analysed (finished / planned) | dG0 fmeta | 95% interval | Experiment | FEP "
+             "| fmeta - experiment | Rebinding events | Note |", "|---|---|---|---|---|---|---|---|---|"]
     for ligand in ligands:
         dg, interval, fep = ligand["dg"], ligand["ci95"], ligand["fep"]
         experiment = ligand["experiment"]["dg"][unit]
@@ -1204,14 +1195,13 @@ def _ligand_table(ligands: Sequence[dict], unit: str) -> list:
                  f"{experiment:.2f}",
                  "" if fep is None else f"{fep['dg'][unit]:.2f}" + (f" ± {fep['se'][unit]:.2f}" if fep["se"] else ""),
                  "" if dg is None else f"{dg[unit] - experiment:+.2f}",
-                 str(ligand["rebinding_events"]), _verdict(ligand)]
+                 str(ligand["rebinding_events"]), _note(ligand)]
         lines.append("| " + " | ".join(cells) + " |")
     return lines
 
 
 def _statistics_table(statistics: dict, unit: str) -> list:
-    columns = [(f"{_KINDS[key]}, {subset}", statistics[subset][key]) for key, _ in COMPARISONS
-               for subset in ("all", "converged") if statistics["all"][key] is not None]
+    columns = [(_KINDS[key], statistics[key]) for key, _ in COMPARISONS if statistics[key] is not None]
 
     def cell(comparison, name) -> str:
         measure = (comparison or {}).get(name) or dict(value=None, ci95=None)
@@ -1261,30 +1251,32 @@ def format_report(report: dict) -> str:
         lines += [f"## Ligands ({label})", "",
                   "dG0 of fmeta is the mean over the analysed replicas of the dG0 of a replica (from its samples "
                   "after the first 2 ns, or of its second half when it is shorter than 4 ns); the interval is the "
-                  "95% Student-t interval of that mean (none for a single replica).", ""]
+                  "95% Student-t interval of that mean (none for a single replica). The replicas together are "
+                  "the measurement: a replica of this length does not converge on its own, and the interval "
+                  "says what their scatter leaves open.", ""]
         lines += _ligand_table(ligands, unit) + [""]
-    notes = [f"- {ligand['name']}, {replica}: {problem}" for ligand in ligands
-             for replica, problems in ligand["problems"].items() for problem in problems]
+    if any(ligand["no_binding"] for ligand in ligands):
+        lines += ["A ligand marked \"no binding\" has a value within 1 kT of what the empty funnel gives. Such a "
+                  "value is not a binding free energy. The ligand stays in the statistics below, so that no "
+                  "ligand is dropped.", ""]
+    notes = [f"- {ligand['name']}, {replica}: {note}" for ligand in ligands
+             for replica, found in ligand["diagnostics"].items() for note in found]
     notes += [f"- {ligand['name']}, {replica}: not analysed ({reason})" for ligand in ligands
               for replica, reason in ligand["not_analysed"].items()]
     if notes:
-        lines += ["## What the analysis found", ""] + notes + [""]
-    if any(ligand["no_binding_replicas"] for ligand in ligands):
-        lines += ["A replica marked \"no binding\" gave a value within 1 kT of what the empty funnel gives. Such a "
-                  "value is not a binding free energy. Its ligand stays in the \"all\" columns below, so that no "
-                  "ligand is dropped, and is not in the \"converged\" columns.", ""]
+        lines += ["## Diagnostics of the replicas", "",
+                  "Notes of the analysis on single replicas. They tell where the scatter comes from; they do "
+                  "not decide which values count.", ""] + notes + [""]
     bootstrap = statistics["bootstrap"]
     lines += ["## Agreement with experiment", "",
-              "The error of a ligand is the calculated value minus the experimental one. \"all\": every ligand "
-              "with a value of fmeta, whatever the analysis says about it; \"converged\": the ligands whose "
-              "analysed replicas all passed every check. The other methods are compared on the same ligands. "
+              "The error of a ligand is the calculated value minus the experimental one. Every ligand with a "
+              "value of fmeta counts, and the other methods are compared on the same ligands. "
               "\"offset removed\": after the mean error on these ligands is taken out, so that only differences "
               f"between the ligands count. In brackets: {bootstrap['interval']} ({bootstrap['resamples']} "
               f"resamples, seed {bootstrap['seed']}); it tells how much a measure depends on the choice of "
               "ligands. Below three ligands there is no interval and no correlation.", ""]
-    for subset in ("all", "converged"):
-        chosen = (statistics[subset]["fmeta_vs_experiment"] or {}).get("ligands", [])
-        lines.append(f"- {subset}: {', '.join(chosen) or 'no ligand'}")
+    compared = (statistics["fmeta_vs_experiment"] or {}).get("ligands", [])
+    lines.append(f"- compared: {', '.join(compared) or 'no ligand'}")
     for title, names in (("without a value", statistics["without_value"]), ("not prepared", report["not_prepared"])):
         if names:
             lines.append(f"- {title}: {', '.join(names)}")

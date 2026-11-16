@@ -393,15 +393,21 @@ def format_summary(summary: dict) -> str:
              f"  from {summary['n_replicas']} replica(s)"]
     if summary["ci95"] is not None:
         low, high = summary["ci95"]
-        lines.append(f"95% CI: [{low:.2f}, {high:.2f}] kJ/mol   (SEM {summary['sem']:.2f})")
+        lines.append(f"95% interval: [{low:.2f}, {high:.2f}] kJ/mol   (standard error {summary['sem']:.2f})")
+    else:
+        lines.append("one replica: no interval. The scatter between replicas is the uncertainty of the value")
+    if summary["no_binding"]:
+        lines.append(f"NO BINDING: the value is within 1 kT of what the empty funnel gives "
+                     f"({summary['dG_empty_funnel']:.2f} kJ/mol); it is not a binding free energy")
     for replica in summary["replicas"]:
         lines.append(f"  {Path(replica['workdir']).name}: {replica['dG']:8.2f} kJ/mol (from the bias "
                      f"{replica['dG_plateau']:.2f} +/- {replica['dG_plateau_std']:.2f}) "
                      f"over {replica['simulated_ns']:.1f} ns, {replica['rebinding_events']} rebinding event(s)")
-    if not summary["converged"]:
-        lines.append("NOT CONVERGED:")
-        for directory, problems in summary["problems"].items():
-            lines += [f"  {Path(directory).name}: {problem}" for problem in problems]
+    if summary["diagnostics"]:
+        # a replica of the default length does not converge on its own: notes, not a verdict
+        lines.append("Diagnostics of the replicas:")
+        for directory, notes in summary["diagnostics"].items():
+            lines += [f"  {Path(directory).name}: {note}" for note in notes]
     return "\n".join(lines)
 
 

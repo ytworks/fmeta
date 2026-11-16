@@ -141,7 +141,8 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     # One 20 ns replica scatters by roughly 0.5-1 kJ/mol around the exact value
     # (the well is 14 kJ/mol deep); the replica test below checks the mean tightly.
     assert result["dG_plateau"] == pytest.approx(exact, abs=2.0)
-    assert not [p for p in result["problems"] if "rebinding" in p or "flat" in p]
+    assert not result["no_binding"]
+    assert not [note for note in result["diagnostics"] if "rebinding" in note or "flat" in note]
     # the headline is the estimate from the samples after the first 2 ns, the more precise of the two
     assert result["dG_reweighted"] == pytest.approx(exact, abs=1.0)
     assert (result["dG"], result["dG_source"], result["discard_ns"]) == (result["dG_reweighted"], "samples", 2.0)
@@ -196,7 +197,7 @@ def test_run_without_binding_is_flagged(tmp_path):
     assert result["dG_source"] == "samples"
     assert result["dG"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
     assert result["binding_excess"] < 1.0 * KT
-    assert any("empty funnel" in p for p in result["problems"]) and not result["converged"]
+    assert result["no_binding"] and any("empty funnel" in note for note in result["diagnostics"])
 
 
 def test_figures_are_written(tmp_path):

@@ -52,7 +52,13 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   time slice, and the slices are combined by solving for their free energies; reweighting with
   the final bias was wrong by several kJ/mol on the toy system. The same estimate from the
   second half alone and the plateau mean of dG0(t) from the bias are cross-checks: a difference
-  above 4 kJ/mol is a convergence problem, never a reason to pick one of them.
+  above 4 kJ/mol is written as a diagnostic, never a reason to pick one of them.
+- The measurement is the set of independent replicas: the mean of their dG0 with its standard
+  error and 95% interval. A replica of the default length does not converge on its own, so the
+  analysis gives no converged / not converged verdict (owner, 2026-11-16; FM-D9, second
+  amendment). The checks of a replica (rebinding events, drift, cross-checks, walls, grid) keep
+  their thresholds and are reported as diagnostics; they never decide which replicas count.
+  On trypsin the replicas of one setting lay between −1.7 and −78 kJ/mol after 40 ns.
 - A result within 1 kT of the empty-funnel value (`empty_funnel_free_energy`) is reported as
   "no binding", never as a binding free energy.
 - HILLS is the record of the bias (heights stored times `gamma / (gamma - 1)`, as PLUMED does).

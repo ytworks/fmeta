@@ -113,10 +113,10 @@ def plot_run(workdir, path=None, theme: str = "light"):
             detail += f" · from the samples after the first {result['discard_ns']:.1f} ns"
         figure.text(0.07, 0.918, detail, fontsize=9, color=colours["secondary"], ha="left",
                     va="center")
-        if not result["converged"]:
-            figure.text(0.97, 0.955, "Not converged", fontsize=11, fontweight="bold",
+        if result["no_binding"]:
+            figure.text(0.97, 0.955, "No binding", fontsize=11, fontweight="bold",
                         color=colours["ink"], ha="right", va="center")
-            figure.text(0.97, 0.918, result["problems"][0][:95], fontsize=8,
+            figure.text(0.97, 0.918, "within 1 kT of the empty funnel", fontsize=8,
                         color=colours["secondary"], ha="right", va="center")
 
         # -- W(s) -----------------------------------------------------------
@@ -232,9 +232,9 @@ def plot_summary(workdir, path=None, theme: str = "light"):
         detail = (f"mean of {summary['n_replicas']} replica"
                   + ("s" if summary["n_replicas"] > 1 else ""))
         if summary["ci95"] is not None:
-            detail += f" · 95% confidence interval {summary['ci95'][0]:.1f} to {summary['ci95'][1]:.1f} kJ/mol"
-        if not summary["converged"]:
-            detail += " · not converged (see summary.json)"
+            detail += f" · 95% interval {summary['ci95'][0]:.1f} to {summary['ci95'][1]:.1f} kJ/mol"
+        if summary["no_binding"]:
+            detail += " · no binding (within 1 kT of the empty funnel)"
         figure.text(0.1, 0.875, detail, fontsize=9, color=colours["secondary"], ha="left", va="center")
 
         # the replicas are interchangeable: draw them as context, their mean as the subject

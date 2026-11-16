@@ -7,7 +7,7 @@ the S1 pocket of bovine beta-trypsin. No membrane.
 |---|---|---|
 | Experimental binding free energy | −6.4 to −7.3 kcal/mol | the measurements quoted by Limongelli et al. (their references 40 and 41) |
 | Funnel metadynamics, published | −8.5 ± 0.7 kcal/mol | Limongelli, Bonomi, Parrinello, PNAS 110, 6358 (2013), doi:10.1073/pnas.1303186110 |
-| fmeta, official defaults (5 replicas of 40 ns) | NOT CONVERGED: −6.5 kcal/mol, 95% interval −16.4 to 3.3, 2 of 5 replicas pass | see "Result" below |
+| fmeta, official defaults (5 replicas of 40 ns) | −6.5 kcal/mol, 95% interval −16.4 to 3.3 | see "Result" below |
 
 ## Inputs
 
@@ -56,8 +56,10 @@ checkpoints. With one GPU use `--gpus 0` and `--mode sequential`.
 
 ## Result
 
-NOT CONVERGED at the default length. The numbers are reported as measured; they are not a
-binding free energy to quote.
+With the defaults the five replicas give a value with a wide interval. A replica of 40 ns does
+not converge on its own: the five together are the measurement, and the interval is what they
+say (FM-D9, second amendment, `docs/design/engine.md`). The numbers are reported as measured;
+the mean without its interval is not a binding free energy to quote.
 
 Two runs have the values of the defaults. The first is the scan run `sig2` of the section
 below (commit f2ea653): five replicas at the same time on one GPU with NVIDIA MPS, from the
@@ -72,9 +74,9 @@ ends.
 | 95% interval of the five replicas | −68.67 to 13.98 kJ/mol (standard error 14.88) |
 | Each replica | −78.17, −1.73, −44.29, −3.42, −9.13 kJ/mol |
 | Rebinding events per replica | 0, 3, 5, 5, 5 |
-| Replicas without a convergence problem | 2 of 5 |
+| Replicas with a note in the diagnostics | 3 of 5 |
 
-What `fmeta analyze` says about the three replicas that fail:
+What the diagnostics of `fmeta analyze` say about those three:
 
 - Replica 0 never left the site in 40 ns. There is no estimate from its samples, and its value
   is the mean of dG(t) from the bias, which still drifts (+98.8 kJ/mol over the plateau window).
@@ -133,7 +135,9 @@ All 25 replicas ran to 40 ns and were analysed as they stood at 10, 15, 20, 30 a
 | `bf20_h3_sig2` | 20 | 3.0 | 0.05 / 0.10 |
 
 The rule, written before a scan run started (FM-D16, second amendment,
-`docs/design/engine.md`):
+`docs/design/engine.md`). It counts replicas that passed the convergence check the analysis had
+at that time. The analysis has no such verdict any more (see "How the result is read" below);
+the rule and its counts stay here as the record of how the defaults were chosen:
 
 - The lengths are taken in the order 10, 15, 20, 30, 40 ns. The first length at which a setting
   has all five replicas without a convergence problem becomes `run.length_ns`, and that setting
@@ -165,13 +169,36 @@ What the count does not say:
 
 - `sig2` has the widest scatter between replicas of all settings, and one of its replicas never
   left the site. The rule counts replicas that pass and was applied as written.
-- With the defaults this system is not converged in 40 ns, and the roadmap item that asked for
-  five converged replicas on it (R2) is not met. A run can be extended exactly
-  (`fmeta run runs/tb --length-ns 80`); how long this system needs was not measured, because
-  nothing runs longer than 40 ns by the owner's decision.
+- A run can be extended exactly (`fmeta run runs/tb --length-ns 80`); how long this system
+  needs for a narrow interval was not measured, because nothing runs longer than 40 ns by the
+  owner's decision.
 - The faster settings (`bf20_h3`, `bf20_h3_sig2`) push the ligand out early. Their samples then
   rarely visit the site and the estimate is shallow: at 40 ns 3 and 4 of their five replicas are
   within 1 kT of the empty funnel (2, 2 and 1 for `bf20`, `h3` and `sig2`).
+
+## How the result is read (since 2026-11-16)
+
+The owner's instruction of 2026-11-16: a replica of this length is not a simulation that
+converges. The analysis therefore gives no verdict. The set of replicas is the measurement, a
+value with an interval, and the checks of a replica are diagnostics (FM-D9, second amendment).
+Read that way, the scan says:
+
+- The value depends on the bias setting. At 40 ns the six settings give −2.9 to −28.0 kJ/mol
+  (the last column of values in the table above), a spread of 25.1 kJ/mol.
+- Another estimator does not remove that. Two estimators that use only local equilibrium under
+  the bias of the moment (mean-force integration, per replica and pooled over the replicas)
+  were compared with the present one by a rule written first. All three are within 0.80 kJ/mol
+  of the exact value on the toy system. On this scan their spread between the settings is 32.8
+  and 42.0 kJ/mol, more than the 25.1 of the present estimator, which therefore stays
+  (FM-D16, third amendment, with the table).
+- The reason is in the data. The replicas fall in two groups, about 0 to −9 and −30 to
+  −78 kJ/mol, with 0 to 17 rebinding events each in 40 ns: too few crossings to average the
+  two. That is a limit of the sampling at this length.
+- The defaults stay. No criterion that leaves experiment out makes another setting better:
+  the smallest interval belongs to `bf20_h3_sig2`, whose value is within 1 kT of the empty
+  funnel and would report this system as no binding.
+- The roadmap item R2 now asks for the value with its interval over the replicas, compared
+  with experiment and the published value. For the defaults that is the table under "Result".
 
 Not scanned: the deposition interval, the time step, the wall force constants, the force fields
 and the shape of the funnel. They are listed with their sources in `docs/configuration.md`.

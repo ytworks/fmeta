@@ -364,7 +364,7 @@ def main(argv=None) -> None:
     sub.add_argument("workdir")
     sub.set_defaults(func=cmd_status)
 
-    sub = commands.add_parser("analyze", help="binding free energy and convergence")
+    sub = commands.add_parser("analyze", help="binding free energy with its interval, diagnostics")
     sub.add_argument("workdir")
     sub.add_argument("--plot", action="store_true", help="also write figures (needs matplotlib)")
     sub.add_argument("--discard-ns", type=float, default=2.0,

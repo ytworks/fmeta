@@ -9,7 +9,10 @@ and the scheduler); FM-D15 added in two parts (2026-11-16: real inputs, the memb
 the protein part); FM-D16 added (2026-11-16: official defaults as presets) and amended the same
 day (owner: the run length of 500 ns withdrawn; then: 20 ns pilots first and a shorter
 equilibration); FM-D17 added (2026-11-16: benchmark sets); FM-D14 amended (2026-11-16: several
-replicas on one GPU with NVIDIA MPS, `run.per_gpu`).
+replicas on one GPU with NVIDIA MPS, `run.per_gpu`; one math-library thread per replica); FM-D9
+amended twice (2026-11-16, owner: the first 2 ns are not used; then: a replica does not
+converge on its own, the set of replicas is the measurement and there is no verdict), with
+FM-D16 and FM-D17 amended to follow.
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -192,6 +195,37 @@ the default bias at 40 ns the new headline and the plateau mean agree (−28.0 a
 the estimate from the second half alone is 11 to 45 kJ/mol higher in every replica.
 Why: the owner's instruction. At the start the ligand sits in the site while the bias fills it,
 which is not a sample of the equilibrium the estimate assumes.
+Second amendment (2026-11-16, owner): a funnel metadynamics replica of the default length is
+not a simulation that converges, so the analysis no longer says that one did or did not. What
+holds now:
+- The measurement is the set of independent replicas (FM-D10). Its value is the mean of their
+  dG0; its uncertainty is the standard error and the 95% Student-t interval of that mean. One
+  replica gives a value without an interval.
+- There is no verdict. `converged` and `problems` are gone from `result.json` and
+  `summary.json`, and `fmeta analyze` no longer prints NOT CONVERGED. The checks of a replica
+  (rebinding events, drift and scatter of the plateau, the two cross-checks, the upper wall,
+  the bias grid) keep their thresholds and are written as `diagnostics`: notes that tell where
+  the scatter comes from. A difference between two estimates is still never a reason to pick
+  one of them.
+- One statement stays a decision: `no_binding`, a value within 1 kT of the empty funnel, for a
+  replica and for the value of the set.
+- The estimate of a replica does not change (the amendment above). Three ways to the value of
+  the set were compared first, by a rule written before the comparison: (C) the mean of the
+  per-replica estimates, as it is; (R) the mean of per-replica mean-force estimates; (P) one
+  mean-force estimate from the samples of all replicas, with a jackknife over the replicas. A
+  mean-force estimate assumes only local equilibrium under the bias of the moment:
+  `grad F = −kT grad ln n − ⟨grad V_t⟩` in bins of half a hill width, integrated to the
+  weights of the samples. Rule: on the toy, 4 replicas of 10 ns within 2.0 kJ/mol of the exact
+  value for a shallow and a deep well in two sets of seeds, and no binding without a well; of
+  the candidates that meet this, the smallest spread of the value between the six bias
+  settings of the trypsin scan at 40 ns (FM-D16); experiment decides nothing. All three meet
+  the toy part (errors of at most 0.80 kJ/mol; below 5 ns R and P give no value). The spread
+  on trypsin is 25.1 kJ/mol for C, 32.8 for R and 42.0 for P: C stays, and no mean-force
+  estimator is in the package. The numbers are in FM-D16, third amendment.
+Why: the owner's instruction, and what the scan showed (FM-D16). After 40 ns a replica has had
+0 to 17 rebinding events, the replicas of one setting lie between −1.7 and −78 kJ/mol, and no
+setting had five replicas without a note. A verdict that every run fails says nothing; the
+interval over the replicas says how much is open.
 
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
@@ -345,6 +379,15 @@ to start); starting the daemon from fmeta, or a check for it in the client (with
 replicas still run, time-sliced); a gate item, since the scheduler's rules for places are
 tested on the CPU and MPS is NVIDIA's. An MPS server that fails ends every client on it; the
 runs continue from their checkpoints.
+Amendment (2026-11-16): the scheduler starts every replica process with one math-library
+thread (`OMP_NUM_THREADS`, `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS` set to 1 unless the caller
+has set them). The default of the libraries is a thread per CPU core in every process: 41
+replicas on a machine with 128 cores had a load average above 1200. Measured on the running
+production, total ns/day before and after the limit: TYK2 set, 12 replicas on 2 GPUs, 2749 and
+3164; TYK2 example, 5 on one GPU, 1375 and 1512; trypsin, one replica, 544 to 593 and 708; the
+three A2A runs 3 to 4% more. The load average fell to 46.
+Why: the work of a replica is on the GPU; its CPU part (fitting hills, writing files) does not
+gain from threads, and the spinning threads of the other replicas took the cores from it.
 
 ### FM-D15 — Real inputs. Membrane part: parts dropped first, kept components are receptor
 Accepted 2026-11-16.
@@ -596,6 +639,40 @@ What the count does not say:
 - Experiment is −26.8 to −30.5 kJ/mol (`examples/trypsin_benzamidine/README.md`). It decided
   nothing.
 
+Third amendment (2026-11-16, owner; FM-D9, second amendment): the scan read without a verdict.
+"Replicas that pass" above is the count the rule used. It stays as the record of how the
+defaults were chosen; the analysis no longer reports such a count.
+- The defaults stay: `sig2` and 40 ns. No criterion that leaves experiment out makes another
+  setting better. The smallest interval does not: `bf20_h3_sig2` has it (SEM 1.42) with a
+  value of −2.89 kJ/mol, within 1 kT of the empty funnel (−0.78 kJ/mol), which would report
+  trypsin-benzamidine as no binding.
+- A run with the defaults gives on this system a value with a wide interval: −27.35 kJ/mol,
+  95% interval −68.67 to 13.98.
+- The value depends on the bias setting, with every estimator that was tried (FM-D9, second
+  amendment). dG0 of the set at 40 ns in kJ/mol, with the standard error of the mean (C, R) or
+  of the jackknife (P):
+
+| Setting | C: mean of the per-replica estimates | R: mean of per-replica mean-force estimates | P: pooled mean-force estimate |
+|---|---|---|---|
+| default until 47e84f7 | −27.95 (5.94) | −36.89 (9.39) | −41.67 (6.79) |
+| `bf20` | −8.07 (5.14) | −13.94 (7.68) | −5.24 (10.06) |
+| `h3` | −12.68 (6.96) | −16.88 (9.31) | −12.73 (13.00) |
+| `sig2` | −27.35 (14.88) | −4.06 (2.31), 3 replicas with a value | −30.61 (16.16) |
+| `bf20_h3` | −15.67 (11.05) | −11.39 (7.99) | −1.62 (7.26) |
+| `bf20_h3_sig2` | −2.89 (1.42) | −4.50 (2.32) | 0.37 (0.85) |
+| Spread (max − min) | 25.1 | 32.8 | 42.0 |
+
+  The bias of the mean-force estimates was rebuilt from HILLS and agrees with the COLVAR column
+  within 0.56 kJ/mol. Without the fallback to the bias sum for the replica of `sig2` that never
+  left the site, C is −14.64 (10.01) there, and the spread is the same.
+- Where the dependence comes from: the replicas fall in two groups, about 0 to −9 kJ/mol and
+  −30 to −78 kJ/mol. A replica whose ligand left early over an overfilled site reads shallow,
+  one whose ligand stayed reads deep, and 40 ns hold too few crossings to average the two.
+  That is a limit of the sampling at this length. It is not removed by the estimator, and it
+  is what the interval shows.
+- Roadmap R2 is reworded: the result of a real system is its value with the interval over the
+  replicas, not "five replicas to convergence".
+
 ### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
 Status: **Accepted** (2026-11-16).
 A benchmark set is a directory, `examples/benchmarks/<set>/`, with `set.yaml`, `reference.csv`
@@ -665,3 +742,10 @@ ligand that failed; with replica 0 first the first full comparison comes after o
 ligand, not after the first ligand has all of its replicas. The FEP values of the source are
 shifted so that their mean is the experimental mean, so the offset-free measures are the ones
 in which the two methods can be compared.
+Amendment (2026-11-16; FM-D9, second amendment): the report follows the analysis without a
+verdict. There is one set of statistics, over every ligand with a value of fmeta, with FEP on
+the same ligands; the columns for the ligands "whose replicas all passed" are gone. A ligand
+is marked "no binding" when its value (the mean of its replicas) is within 1 kT of the empty
+funnel; it stays in the statistics. The notes on single replicas are listed as diagnostics.
+Why: choosing ligands by a check that almost no replica of 40 ns passes would describe a
+subset picked by noise.

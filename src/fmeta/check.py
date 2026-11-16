@@ -546,8 +546,9 @@ class Checker:
         if not np.isfinite(summary["dG"]) or not (work / "summary.json").exists():
             raise AssertionError("analysis did not produce a finite result")
         figures = "; figures written" if plot else "; matplotlib not installed, no figures"
-        return (f"analysis of {summary['n_replicas']} replicas ran (far too short to converge, as "
-                f"expected: converged = {summary['converged']}){figures}")
+        noted = len(summary["diagnostics"])
+        return (f"analysis of {summary['n_replicas']} replicas ran (far too short for a value that "
+                f"means something: diagnostics on {noted} of them){figures}")
 
     def check_benchmark(self) -> str:
         work = self.workdir / "soluble"
@@ -597,13 +598,13 @@ class Checker:
             speeds[label] = steps * dt / 1000.0 / elapsed * 86400.0
         overhead = 100.0 * (speeds["plain"] / speeds["biased"] - 1.0)
         length = RunConfig().length_ns                 # the default, not the short run of the check
-        days = length / speeds["biased"]
+        hours = 24.0 * length / speeds["biased"]
         grid = bias.grid.values.size
         return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, "
                 f"{hills} ps each: {speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day "
                 f"with funnel metadynamics (overhead {overhead:.1f}%, {grid} grid points, 1 hill/ps, "
                 f"checkpoints excluded: {1e3 * checkpoint:.0f} ms each); "
-                f"a replica of the default {length:.0f} ns takes about {days:.1f} days")
+                f"a replica of the default {length:.0f} ns takes about {hours:.1f} hours")
 
     def check_membrane_build(self) -> str:
         directory = self.workdir / "inputs"

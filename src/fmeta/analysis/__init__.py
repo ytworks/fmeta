@@ -1,4 +1,4 @@
-"""Analysis of funnel metadynamics runs: free-energy surfaces, dG0, convergence."""
+"""Analysis of funnel metadynamics runs: free-energy surfaces, dG0 of a set of replicas, diagnostics."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import numpy as np
 from ..engine.grid import BiasGrid, BiasSettings
 from ..engine.hills import Hills, merge_hills, read_colvar, read_hills
 from ..engine.runner import load_run_metadata
-from ..funnel.geometry import Funnel
+from ..funnel.geometry import KB, Funnel
 from .binding import BindingEstimate, binding_free_energy, default_unbound_window, empty_funnel_free_energy
 from .convergence import count_transitions, dg_time_series, plateau_statistics, summarize_replicas
 from .fes import free_energy_surface, projection_profile, reweighted_profile, sliced_log_weights
@@ -22,7 +22,8 @@ __all__ = ["analyze_run", "analyze_replicas", "walker_directories", "binding_fre
            "free_energy_surface", "projection_profile", "reweighted_profile", "sliced_log_weights",
            "dg_time_series", "count_transitions", "summarize_replicas"]
 
-# Heuristic thresholds for calling a run converged; see ``analyze_run``.
+# Thresholds of the diagnostics of a replica: notes beside its value, never a verdict (see
+# ``analyze_run``). Only MIN_BINDING_EXCESS decides something: what is reported as no binding.
 MIN_REBINDING = 3
 MAX_DRIFT = 4.184        # kJ/mol (1 kcal/mol): linear trend of dG(t) across the plateau window
 MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
@@ -100,7 +101,12 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     samples. Two cross-checks stand beside it: ``dG_second_half``, the same estimate from the
     second half of the run alone, and ``dG_plateau``, the mean over the last
     ``plateau_fraction`` of the run of dG0(t) from the bias accumulated since the start.
-    Where the samples give no estimate, ``dG`` is ``dG_plateau`` and the run is not converged.
+    Where the samples give no estimate, ``dG`` is ``dG_plateau``.
+
+    ``diagnostics`` are notes on what the replica did (rebinding events, drift, the two
+    cross-checks): a replica of the default length does not converge on its own, so they say
+    how far it is from that and decide nothing. ``no_binding`` says that the value is within
+    1 kT of what the empty funnel gives, and then it is not a binding free energy.
     """
     workdir = Path(workdir)
     # With multiple walkers the bias is the sum over all of them, ordered in time.
@@ -149,26 +155,27 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     dg_empty = empty_funnel_free_energy(final_grid.s, funnel, kT, estimate.site_max)
     binding_excess = dg_empty - headline
 
-    problems = []
-    if binding_excess < MIN_BINDING_EXCESS * kT:
-        problems.append(f"dG is within {MIN_BINDING_EXCESS:.0f} kT of what an empty funnel gives "
+    no_binding = bool(binding_excess < MIN_BINDING_EXCESS * kT)
+    notes = []
+    if no_binding:
+        notes.append(f"dG is within {MIN_BINDING_EXCESS:.0f} kT of what an empty funnel gives "
                         f"({dg_empty:.2f} kJ/mol): no binding beyond the funnel volume, and the "
                         "value depends on where the bound region is said to end")
     if rebinding < MIN_REBINDING:
-        problems.append(f"only {rebinding} rebinding event(s); need >= {MIN_REBINDING}")
+        notes.append(f"{rebinding} rebinding event(s), fewer than {MIN_REBINDING}")
     if abs(plateau["drift"]) > MAX_DRIFT:
-        problems.append(f"dG still drifting ({plateau['drift']:+.2f} kJ/mol over the plateau window)")
+        notes.append(f"dG still drifting ({plateau['drift']:+.2f} kJ/mol over the plateau window)")
     if estimate.unbound_roughness > MAX_ROUGHNESS:
-        problems.append(f"unbound region not flat (std {estimate.unbound_roughness:.2f} kJ/mol)")
+        notes.append(f"unbound region not flat (std {estimate.unbound_roughness:.2f} kJ/mol)")
     if dg_reweighted is None:
-        problems.append(f"no estimate from the samples after the first {start / 1000.0:.1f} ns (they do "
+        notes.append(f"no estimate from the samples after the first {start / 1000.0:.1f} ns (they do "
                         "not cover the unbound region): dG is the mean of dG(t) from the bias")
     else:
         if abs(dg_reweighted - plateau["mean"]) > MAX_REWEIGHT_GAP:
-            problems.append(f"reweighted estimate differs by {dg_reweighted - plateau['mean']:+.2f} kJ/mol "
+            notes.append(f"reweighted estimate differs by {dg_reweighted - plateau['mean']:+.2f} kJ/mol "
                             "from the mean of dG(t) from the bias")
         if dg_second_half is not None and abs(dg_second_half - dg_reweighted) > MAX_REWEIGHT_GAP:
-            problems.append(f"dG changes by {dg_second_half - dg_reweighted:+.2f} kJ/mol when only the "
+            notes.append(f"dG changes by {dg_second_half - dg_reweighted:+.2f} kJ/mol when only the "
                             "second half of the run is used")
 
     result = dict(
@@ -188,7 +195,7 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
         dG_empty_funnel=dg_empty, binding_excess=float(binding_excess),
         unbinding_events=unbinding, rebinding_events=rebinding,
         last_hill_height=float(hills.height[-1]),
-        converged=not problems, problems=problems,
+        no_binding=no_binding, diagnostics=notes,
         dG_time_ns=(times / 1000.0).tolist(), dG_series=dg.tolist(),
     )
     if write:
@@ -201,17 +208,27 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
 
 
 def analyze_replicas(workdirs: Sequence, write_to=None, **kwargs) -> dict:
-    """Analyse independent replicas and combine their estimates."""
+    """Analyse independent replicas as one measurement: its value ``dG`` is the mean of their
+    dG0, its uncertainty the standard error ``sem`` and the 95% Student-t interval ``ci95`` of
+    that mean (None for one replica).
+
+    A replica of the default length does not converge on its own (owner, 2026-11-16; FM-D9,
+    second amendment), so nothing here passes or fails. The scatter between the replicas is
+    the measure of what the run length leaves open, and ``diagnostics`` holds the notes on
+    each replica. ``no_binding`` says that the value of the set is within 1 kT of what the
+    empty funnel gives: then it is not a binding free energy."""
     runs = [analyze_run(w, **kwargs) for w in workdirs]
     summary = summarize_replicas([r["dG"] for r in runs])
+    dg_empty = float(np.mean([r["dG_empty_funnel"] for r in runs]))
+    kT = KB * runs[0]["temperature"]
     result = dict(
         n_replicas=summary.n, dG=summary.mean, dG_kcal=summary.mean / KCAL,
         sem=summary.sem, ci95=None if summary.ci95 is None else list(summary.ci95),
-        converged=all(r["converged"] for r in runs),
-        problems={r["workdir"]: r["problems"] for r in runs if r["problems"]},
+        dG_empty_funnel=dg_empty, no_binding=bool(dg_empty - summary.mean < MIN_BINDING_EXCESS * kT),
+        diagnostics={r["workdir"]: r["diagnostics"] for r in runs if r["diagnostics"]},
         replicas=[{k: r[k] for k in ("workdir", "simulated_ns", "dG", "dG_source", "dG_reweighted",
                                       "dG_plateau", "dG_plateau_std", "dG_final", "rebinding_events",
-                                      "converged")}
+                                      "no_binding")}
                   for r in runs],
     )
     if write_to is not None:

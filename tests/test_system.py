@@ -283,8 +283,9 @@ def test_full_pipeline_with_restart(inputs, tmp_path):
     assert second.startswith(first) and len(second.splitlines()) == 3 + 20
 
     result = analyze_stage(work)
-    assert result["n_replicas"] == 1 and not result["converged"]
-    assert "NOT CONVERGED" in format_summary(result)
+    assert result["n_replicas"] == 1 and result["ci95"] is None     # one replica: a value without an interval
+    text = format_summary(result)
+    assert "no interval" in text and "Diagnostics of the replicas:" in text and "rep0: " in text
     assert json.loads((work / "summary.json").read_text())["dG"] == result["dG"]
 
     # the same equilibrated system with two walkers sharing one bias (two subprocesses)

@@ -133,6 +133,25 @@ difference is reported:
 - Roadmap R5 (ligand charge states) and R6 (mixed bilayers) are outside this plan, which covers
   R2, R3 and R7–R10.
 
+## Third amendment (2026-11-16, owner): no convergence verdict
+
+The owner: a simulation of this length is not one that converges; the way of thinking changes.
+Design: FM-D9 (second amendment), FM-D16 (third amendment) and the amendments of FM-D14 and
+FM-D17 in `docs/design/engine.md`. For this plan:
+
+- The analysis and the reports give the value of the set of replicas with its interval, and
+  the checks of a replica as diagnostics. "Reported as NOT CONVERGED" in the first amendment,
+  in the second amendment (run length) and under Invariants no longer applies: there is no
+  verdict to report. The thresholds of the checks are unchanged, and no value is dropped.
+- R2 reads: five replicas with the official defaults, the value with its interval, compared
+  with experiment and the published funnel-metadynamics value.
+- The defaults of the scan stay. The rule of the scan and its counts stay as the record of the
+  choice.
+- The runs of the second wave are not repeated: their data do not depend on the analysis. They
+  continue from their checkpoints with one math-library thread per replica.
+- The code of this amendment changes the analysis and the scheduler, so the GPU gates run once
+  more on the final code.
+
 ## Invariants
 
 - No criterion in `.claude/rules/numerics-invariants.md` is relaxed. New gate items

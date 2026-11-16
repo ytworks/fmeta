@@ -63,12 +63,12 @@ after another.
 
 ## Result
 
-Not available yet. The run with the official defaults was started on 2026-11-15 (UTC) on commit
-8d1f10a in the official image, at first on one GPU (replica 0 only, about 570 ns/day with the
-bias on an RTX PRO 6000 Blackwell). This section will hold the standard binding free energy
-with its confidence interval, the rebinding counts and the convergence verdict, whatever they
-turn out to be.
+Not available yet. The run with the official defaults (5 replicas of 40 ns) was started on
+2026-11-16 (UTC) on commit 47e84f7 in the official image, the five replicas on one GPU with
+NVIDIA MPS. This section will hold the standard binding free energy with its 95% interval over
+the replicas, the rebinding counts and the diagnostics, whatever they turn out to be.
 
-What to expect: the convergence verdict needs at least three rebinding events per replica. For
-a ligand that binds this tightly, the default 40 ns may not give them; the run is then reported as not
-converged, and the criterion is not changed.
+What to expect: a replica of 40 ns does not converge on its own; the five together are the
+measurement (FM-D9, second amendment, `docs/design/engine.md`). For a ligand that binds this
+tightly the replicas may have few rebinding events and differ widely, and the interval then
+says so.

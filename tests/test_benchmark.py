@@ -457,7 +457,7 @@ def test_a_report_keeps_every_ligand_gives_both_units_and_compares_the_values_it
     assert [call["time"] for call in report["runs"]] == ["2026-11-14T00:00:00+00:00"]    # one code, its first call
 
     statistics = report["statistics"]
-    fmeta, fep = (statistics["all"][key] for key in ("fmeta_vs_experiment", "fep_vs_experiment"))
+    fmeta, fep = (statistics[key] for key in ("fmeta_vs_experiment", "fep_vs_experiment"))
     errors = [ligand["dg"]["kj_mol"] - ligand["experiment"]["dg"]["kj_mol"] for ligand in (a, b)]
     assert fmeta["ligands"] == fep["ligands"] == ["a", "b D"] and statistics["without_value"] == ["c"]
     assert fmeta["mean_signed_error"]["value"]["kj_mol"] == pytest.approx(np.mean(errors), abs=1e-4)
@@ -470,28 +470,23 @@ def test_a_report_keeps_every_ligand_gives_both_units_and_compares_the_values_it
     assert index == dict(entries=[dict(file=path.name, date="2026-11-16", commit=VERSION[0], dirty=False, set="toy")])
 
 
-def listed(name, dg, experiment, fep, converged=True) -> dict:
+def listed(name, dg, experiment, fep) -> dict:
     """A ligand as a report lists it, with what the statistics read; values in kJ/mol."""
     def energy(value):
         return None if value is None else dict(kj_mol=value, kcal_mol=value / 4.184)
-    return dict(name=name, converged=converged, dg=energy(dg), experiment=dict(dg=energy(experiment)),
-                fep=dict(dg=energy(fep)), afe=None)
+    return dict(name=name, dg=energy(dg), experiment=dict(dg=energy(experiment)), fep=dict(dg=energy(fep)), afe=None)
 
 
-def test_the_statistics_stand_side_by_side_for_all_ligands_and_for_the_converged_ones():
+def test_the_statistics_compare_every_method_on_the_ligands_that_have_a_value_of_fmeta():
     statistics = set_statistics([listed("a", -30.0, -31.0, -31.5), listed("b", -36.0, -35.0, -35.5),
-                                 listed("c", -20.0, -40.0, -40.5, converged=False),
-                                 listed("d", None, -38.0, -38.5)])
-    everything, converged = statistics["all"], statistics["converged"]
-    assert everything["fmeta_vs_experiment"]["ligands"] == everything["fep_vs_experiment"]["ligands"] == ["a", "b", "c"]
-    assert converged["fmeta_vs_experiment"]["ligands"] == converged["fep_vs_experiment"]["ligands"] == ["a", "b"]
-    assert statistics["without_value"] == ["d"]
-    assert everything["fmeta_vs_experiment"]["mue"]["value"]["kj_mol"] == pytest.approx(22.0 / 3.0, abs=1e-4)
-    assert converged["fmeta_vs_experiment"]["mue"]["value"] == dict(kj_mol=1.0, kcal_mol=0.239)
-    assert converged["fmeta_vs_experiment"]["mean_signed_error"]["value"]["kj_mol"] == 0.0
-    assert everything["fep_vs_experiment"]["mue"]["value"]["kj_mol"] == 0.5          # a constant offset only
-    assert everything["fep_vs_experiment"]["mue_offset_removed"]["value"]["kj_mol"] == 0.0
-    assert everything["afe_vs_experiment"] is None and converged["afe_vs_experiment"] is None
+                                 listed("c", -20.0, -40.0, -40.5), listed("d", None, -38.0, -38.5)])
+    fmeta, fep = statistics["fmeta_vs_experiment"], statistics["fep_vs_experiment"]
+    assert fmeta["ligands"] == fep["ligands"] == ["a", "b", "c"] and statistics["without_value"] == ["d"]
+    assert fmeta["mue"]["value"]["kj_mol"] == pytest.approx(22.0 / 3.0, abs=1e-4)
+    assert fmeta["mean_signed_error"]["value"]["kj_mol"] == pytest.approx(20.0 / 3.0, abs=1e-4)
+    assert fep["mue"]["value"] == dict(kj_mol=0.5, kcal_mol=0.1195)             # a constant offset only
+    assert fep["mue_offset_removed"]["value"]["kj_mol"] == 0.0
+    assert statistics["afe_vs_experiment"] is None
 
 
 def test_the_check_accepts_a_report_and_catches_one_that_was_changed(reported, tmp_path):
