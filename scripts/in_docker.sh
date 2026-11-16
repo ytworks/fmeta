@@ -68,6 +68,14 @@ esac
 ARGS=(--user "$(id -u):$(id -g)" -v "$ROOT":/work -w "$WORKDIR"
       -e PYTHONPATH=/work/src
       -e FMETA_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE")")
+# The commit of this checkout and whether anything in it differs from that commit. Read here
+# because git cannot answer inside the container when the checkout is a git worktree: its
+# .git points to a directory that is not mounted. `fmeta benchmark` records both.
+if CODE_COMMIT="$(git -C "$ROOT" rev-parse HEAD 2> /dev/null)"; then
+    CODE_DIRTY=0
+    if [[ -n "$(git -C "$ROOT" status --porcelain 2> /dev/null)" ]]; then CODE_DIRTY=1; fi
+    ARGS+=(-e FMETA_CODE_COMMIT="$CODE_COMMIT" -e FMETA_CODE_DIRTY="$CODE_DIRTY")
+fi
 if [[ "$GPUS" == all ]]; then
     ARGS+=(--gpus all)
 elif [[ -n "$GPUS" ]]; then

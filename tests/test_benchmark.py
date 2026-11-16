@@ -515,12 +515,21 @@ def test_the_check_accepts_a_report_and_catches_one_that_was_changed(reported, t
     assert "not listed" in changed(lambda report, directory: shutil.copy(directory / path.name, directory / "x.json"))
 
 
-def test_the_commit_of_a_report_is_given_where_git_cannot_tell(tmp_path):
+def test_the_commit_of_a_report_is_given_where_git_cannot_tell(tmp_path, monkeypatch):
+    monkeypatch.delenv("FMETA_CODE_COMMIT", raising=False)
     assert code_version(VERSION[0], root=tmp_path) == (VERSION[0], None)      # dirty: not known
     with pytest.raises(ValueError, match="give it with --commit"):
         code_version(root=tmp_path)
     with pytest.raises(ValueError, match="full hash"):
         code_version("0123456", root=tmp_path)
+
+    # scripts/in_docker.sh passes what git said on the host: a worktree has no git in the container
+    monkeypatch.setenv("FMETA_CODE_COMMIT", VERSION[0])
+    monkeypatch.setenv("FMETA_CODE_DIRTY", "1")
+    assert code_version(root=tmp_path) == (VERSION[0], True)
+    assert code_version(VERSION[0], root=tmp_path) == (VERSION[0], True)
+    with pytest.raises(ValueError, match="is not the commit of this code"):
+        code_version("f" * 40, root=tmp_path)
 
 
 # ---- the commands -----------------------------------------------------------

@@ -935,23 +935,30 @@ def code_version(commit: Optional[str] = None, root: Optional[Path] = None) -> t
     """``(commit, dirty)`` of the code that writes a report.
 
     Both come from git when this package is the source tree of a repository; ``dirty`` says
-    that the code differs from the commit. Where git cannot answer (the work tree of a
-    repository mounted into a container, an installed package) the commit has to be given,
-    and ``dirty`` is None: not known."""
+    that the code differs from the commit. Where git cannot answer (a git worktree mounted
+    into a container: its ``.git`` points to a directory that is not mounted) they are what
+    ``scripts/in_docker.sh`` read from git on the host; ``dirty`` then says that anything in
+    the checkout differs from the commit. Without both (an installed package) the commit has
+    to be given, and ``dirty`` is None: not known."""
     root = Path(__file__).resolve().parents[2] if root is None else Path(root)
     if commit is not None and not _COMMIT.fullmatch(commit):
         raise ValueError("--commit takes the full hash of a commit (40 hexadecimal digits)")
     head = _git(root, "rev-parse", "HEAD") if (root / ".git").exists() else None
-    if head is None:
-        if commit is None:
-            raise ValueError("git does not tell the commit of this code here: give it with --commit "
-                             "(the output of 'git rev-parse HEAD' on the host)")
+    if head is not None:
+        head = head.strip()
+        status = _git(root, "status", "--porcelain", "--", *CODE)
+        dirty = None if status is None else bool(status.strip())
+    elif _COMMIT.fullmatch(os.environ.get("FMETA_CODE_COMMIT", "")):
+        head = os.environ["FMETA_CODE_COMMIT"]
+        dirty = {"0": False, "1": True}.get(os.environ.get("FMETA_CODE_DIRTY", ""))
+    elif commit is None:
+        raise ValueError("git does not tell the commit of this code here: give it with --commit "
+                         "(the output of 'git rev-parse HEAD' on the host)")
+    else:
         return commit, None
-    head = head.strip()
     if commit is not None and commit != head:
         raise ValueError(f"--commit {commit} is not the commit of this code ({head})")
-    status = _git(root, "status", "--porcelain", "--", *CODE)
-    return head, None if status is None else bool(status.strip())
+    return head, dirty
 
 
 def image_environment() -> dict:

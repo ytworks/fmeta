@@ -291,8 +291,8 @@ def _add_benchmark_commands(commands) -> None:
     sub = add("report", cmd_benchmark_report,
               "analyse the ligands and write the comparison with experiment and FEP")
     sub.add_argument("--reports", default="bench/reports", help="directory of the reports (default: bench/reports)")
-    sub.add_argument("--commit", help="full hash of the commit of this code, where git cannot tell it "
-                                      "(in a container: the output of 'git rev-parse HEAD' on the host)")
+    sub.add_argument("--commit", help="full hash of the commit of this code, where neither git nor "
+                                      "scripts/in_docker.sh tells it (an installed package)")
 
     sub = stages.add_parser("build")         # what 'benchmark run' starts for the prepare stage of one ligand
     sub.add_argument("workdir")
