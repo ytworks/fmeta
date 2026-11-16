@@ -36,7 +36,7 @@ import openmm.app as app
 import openmm.unit as unit
 
 from .analysis import analyze_run
-from .config import Config
+from .config import Config, RunConfig
 from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
@@ -593,13 +593,14 @@ class Checker:
                 run.close()
             speeds[label] = steps * dt / 1000.0 / elapsed * 86400.0
         overhead = 100.0 * (speeds["plain"] / speeds["biased"] - 1.0)
-        days = 500.0 / speeds["biased"]
+        length = RunConfig().length_ns                 # the default, not the short run of the check
+        days = length / speeds["biased"]
         grid = bias.grid.values.size
         return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, "
                 f"{hills} ps each: {speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day "
                 f"with funnel metadynamics (overhead {overhead:.1f}%, {grid} grid points, 1 hill/ps, "
                 f"checkpoints excluded: {1e3 * checkpoint:.0f} ms each); "
-                f"a 500 ns replica of this system takes about {days:.1f} days")
+                f"a replica of the default {length:.0f} ns takes about {days:.1f} days")
 
     def check_membrane_build(self) -> str:
         directory = self.workdir / "inputs"

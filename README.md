@@ -76,7 +76,7 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 | `walkers` | 2 ウォーカーでのバイアス共有 |
 | `replicas_sequential`, `replicas_parallel` | 実行モード: 子プロセスとして起動したレプリカが、1 枚の GPU で順に、2 枚の GPU で同時に走ること。割り当ての記録 `schedule.jsonl`、各レプリカの `device.json`、割り当てた GPU でのメモリ使用の増加を確認（GPU がなければ SKIP、`replicas_parallel` は GPU 2 枚が必要） |
 | `analysis` | 解析と図の出力 |
-| `benchmark` | バイアスあり／なしの ns/day、チェックポイント 1 回の時間、500 ns のレプリカにかかる日数の見積もり（参考値で、合否には使わない） |
+| `benchmark` | バイアスあり／なしの ns/day、チェックポイント 1 回の時間、既定の長さ（`run.length_ns`）のレプリカにかかる日数の見積もり（参考値で、合否には使わない） |
 | `membrane_build`, `membrane_run` | `Modeller.addMembrane` による POPC 膜の構築と、半等方バロスタットでの平衡化・本計算 |
 
 所要時間は、RTX PRO 6000 Blackwell 2 枚のマシンで約 4 分でした（17 項目の合計 234 秒）。`fmeta check --quick` は同じ手順を最短の長さで流す動作確認です。追加で `pytest -m gpu` も用意してあります。
