@@ -87,9 +87,10 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     kT, scale = settings.kT, settings.fes_scale
     kwargs = dict(site_max=site_max, unbound=unbound)
 
-    # One pass over the hills: dG(t) at n_points times, c(t) ten times as often.
+    # One pass over the hills: c(t) at about 10 * n_points times and dG(t) at n_points of them.
+    # The stride of dG(t) is a multiple of the stride of c(t), whatever the number of hills.
     fine = max(1, len(hills) // (10 * n_points))
-    coarse = max(1, len(hills) // n_points)
+    coarse = fine * max(1, round(len(hills) / (n_points * fine)))
     times, dg, offset_times, offsets = [], [], [0.0], [0.0]
     for n, time_ps, work in scan_hills(hills, grid, fine):
         offset_times.append(time_ps)

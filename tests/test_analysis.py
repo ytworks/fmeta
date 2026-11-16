@@ -211,3 +211,11 @@ def test_figures_are_written(tmp_path):
     for path in written:
         data = path.read_bytes()
         assert data[:4] == bytes([0x89]) + b"PNG" and len(data) > 30000
+
+
+def test_dg_series_of_a_run_with_any_number_of_hills(tmp_path):
+    """A run analysed before its end has any number of hills, and dG(t) keeps its 20 points:
+    with 650 hills it had 7, so the plateau was the mean of 3 values."""
+    run_toy(tmp_path, seed=5, n_hills=650)
+    result = analyze_run(tmp_path, write=False)
+    assert 20 <= len(result["dG_series"]) <= 21

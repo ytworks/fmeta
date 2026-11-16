@@ -53,8 +53,8 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   (CUDA, mixed precision, 2 GPUs, in the image):
   `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
   (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 109 passed on
-  the code of FM-D16. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 110 passed on
+  the code of FM-D16 with the fix of dG(t). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
@@ -74,6 +74,11 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] Fixed: dG(t) of a run with an uneven number of hills had only a few points
+- What: `analyze_run` took dG(t) where a multiple of `len(hills) // 20` met a multiple of `len(hills) // 200`. With a hill count that is a multiple of 200 that is 20 points (unchanged by the fix). With any other count, as in a run analysed before its end, it was 1 to 7 points, so the plateau mean and its drift came from 1 to 3 values. The stride of dG(t) is now a multiple of the stride of c(t). Found on the trypsin run at 20 ns (plateau std 0.00 on four of five replicas; after the fix every replica reports its drift, 1 to 4 rebinding events each, not converged, as expected at 4% of the length). The regression test fails on the code before (7 points at 650 hills). `ruff` passes, `pytest` 110 passed.
+- Why: the headline is the plateau mean of dG(t), and the benchmark reports are made while runs are in progress.
+- Refs: `src/fmeta/analysis/__init__.py`, `tests/test_analysis.py`.
 
 ### 2026-11-16 — [design] FM-D16: official defaults as packaged presets, one reference of the keys
 - What: presets `soluble` / `membrane` in the package, written by `fmeta init --preset`; a configuration may hold only its difference (`preset:`), and the one saved in a work directory is resolved and names the ligand force field. Examples reduced to that. `docs/configuration.md`: every key with unit, default and origin. Ligand pins kept (openff-2.2.1 / gaff-2.11, AM1-BCC by `sqm`; charges identical to pre-assigned `am1bcc` for benzamidinium and theophylline). No default changed. `ruff` passes, `pytest` 109 passed. GPU gates not run on this code yet.

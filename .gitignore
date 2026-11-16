@@ -14,3 +14,6 @@ gates_work/
 
 # work directories of production runs
 runs/
+
+# Working copies of parallel sessions
+.claude/worktrees/
