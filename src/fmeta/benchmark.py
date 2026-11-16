@@ -1249,8 +1249,8 @@ def format_report(report: dict) -> str:
         "This report states what was measured. It holds no verdict.", ""]
     for unit, label in UNITS:
         lines += [f"## Ligands ({label})", "",
-                  "dG0 of fmeta is the mean over the analysed replicas of the dG0 of a replica (from its samples "
-                  "after the first 2 ns, or of its second half when it is shorter than 4 ns); the interval is the "
+                  "dG0 of fmeta is the mean over the analysed replicas of the dG0 of a replica (the mean over "
+                  "the second half of the run of dG0(t) from the accumulated bias); the interval is the "
                   "95% Student-t interval of that mean (none for a single replica). The replicas together are "
                   "the measurement: a replica of this length does not converge on its own, and the interval "
                   "says what their scatter leaves open.", ""]

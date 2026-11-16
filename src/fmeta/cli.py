@@ -368,7 +368,8 @@ def main(argv=None) -> None:
     sub.add_argument("workdir")
     sub.add_argument("--plot", action="store_true", help="also write figures (needs matplotlib)")
     sub.add_argument("--discard-ns", type=float, default=2.0,
-                     help="dG0 uses the samples after this much of every replica (default 2)")
+                     help="the cross-check from the samples uses those after this much of every "
+                          "replica (default 2)")
     sub.set_defaults(func=cmd_analyze)
 
     sub = commands.add_parser("auto", help="prepare, equilibrate, run and analyse")

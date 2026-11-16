@@ -88,10 +88,19 @@ def summarize_replicas(values: Sequence[float]) -> ReplicaSummary:
     return ReplicaSummary(int(values.size), mean, sem, (mean - half, mean + half))
 
 
-def plateau_statistics(times: np.ndarray, dg: np.ndarray, fraction: float = 0.3) -> dict:
-    """Mean and drift of dG(t) over the last ``fraction`` of the run."""
+def plateau_statistics(times: np.ndarray, dg: np.ndarray, fraction: float = 0.3,
+                       n_blocks: int = 5) -> dict:
+    """Mean, block error and drift of dG(t) over the last ``fraction`` of the run.
+
+    ``error`` is the standard error of the mean from ``n_blocks`` consecutive blocks of that
+    part. dG(t) comes from the bias accumulated since the start, so the blocks are not
+    independent: the error says how far the value moved within the kept part of this run. What
+    a run of this length leaves open is the scatter between replicas (``summarize_replicas``).
+    """
     n = max(2, int(round(len(dg) * fraction)))
     tail_t, tail = np.asarray(times[-n:], dtype=float), np.asarray(dg[-n:], dtype=float)
     slope = np.polyfit(tail_t, tail, 1)[0] if np.ptp(tail_t) > 0 else 0.0
+    blocks = np.array([block.mean() for block in np.array_split(tail, min(n_blocks, n))])
     return dict(mean=float(tail.mean()), std=float(tail.std()),
+                error=float(blocks.std(ddof=1) / np.sqrt(blocks.size)),
                 drift=float(slope * (tail_t[-1] - tail_t[0])))

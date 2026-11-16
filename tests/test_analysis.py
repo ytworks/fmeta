@@ -116,6 +116,9 @@ def test_replica_summary_and_plateau():
     assert summarize_replicas([-3.0]).ci95 is None
     stats = plateau_statistics(np.arange(10.0), np.array([0, 0, 0, 0, 0, 1, 2, 3, 4, 5.0]), 0.5)
     assert stats["mean"] == pytest.approx(3.0) and stats["drift"] == pytest.approx(4.0)
+    # the error: standard error of the mean of 5 blocks of the kept half (here 2 points each)
+    series = np.r_[np.full(10, 50.0), 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
+    assert plateau_statistics(np.arange(20.0), series, 0.5)["error"] == pytest.approx(np.sqrt(2.5 / 5))
 
 
 def run_toy(workdir, seed, n_hills, reflect=True):
@@ -143,9 +146,10 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     assert result["dG_plateau"] == pytest.approx(exact, abs=2.0)
     assert not result["no_binding"]
     assert not [note for note in result["diagnostics"] if "rebinding" in note or "flat" in note]
-    # the headline is the estimate from the samples after the first 2 ns, the more precise of the two
+    # the headline is that mean of dG(t) from the bias; the estimate from the samples after the
+    # first 2 ns is its cross-check
     assert result["dG_reweighted"] == pytest.approx(exact, abs=1.0)
-    assert (result["dG"], result["dG_source"], result["discard_ns"]) == (result["dG_reweighted"], "samples", 2.0)
+    assert (result["dG"], result["discard_ns"]) == (result["dG_plateau"], 2.0)
     assert (tmp_path / "result.json").exists() and (tmp_path / "fes.npz").exists()
 
 
@@ -192,9 +196,8 @@ def test_run_without_binding_is_flagged(tmp_path):
     run.run(10000)
     run.close()
     result = analyze_run(tmp_path, write=False)
-    # 20 ns: dG0 scatters by 0.43 kJ/mol between eight seeds, around a mean 0.2 kJ/mol below the
-    # empty funnel, so both bounds below are four or more standard deviations wide
-    assert result["dG_source"] == "samples"
+    # 20 ns: dG0 scatters by 0.35 kJ/mol between eight seeds around the value of the empty
+    # funnel, so both bounds below are five or more standard deviations wide
     assert result["dG"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
     assert result["binding_excess"] < 1.0 * KT
     assert result["no_binding"] and any("empty funnel" in note for note in result["diagnostics"])

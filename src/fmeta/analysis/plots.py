@@ -108,9 +108,8 @@ def plot_run(workdir, path=None, theme: str = "light"):
                     fontweight="bold", color=colours["ink"], ha="left", va="center")
         detail = (f"{workdir.name} · {result['simulated_ns']:.1f} ns simulated"
                   + (f" over {result['n_walkers']} walkers" if result["n_walkers"] > 1 else "")
-                  + f" · {result['rebinding_events']} rebinding events")
-        if result["dG_source"] == "samples":
-            detail += f" · from the samples after the first {result['discard_ns']:.1f} ns"
+                  + f" · {result['rebinding_events']} rebinding events"
+                  + f" · block error {result['dG_error']:.1f} kJ/mol")
         figure.text(0.07, 0.918, detail, fontsize=9, color=colours["secondary"], ha="left",
                     va="center")
         if result["no_binding"]:

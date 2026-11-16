@@ -14,9 +14,10 @@ that runs on GPUs, end to end, from two files.
   `Modeller.addMembrane`, with the funnel pointing into water.
 - Engine: well-tempered metadynamics on the funnel CVs (projection `s`, extent `rho`) with
   OpenMM custom forces; replicas for error bars, shared-bias walkers for speed; exact restart.
-- Result: standard binding free energy from the samples after the first 2 ns. The replicas
-  together are the measurement: mean and 95 % interval, diagnostics per replica, a "no binding"
-  statement, no convergence verdict.
+- Result: standard binding free energy by the published procedure: from the accumulated bias
+  over the second half of a run, with a block error. The replicas together are the measurement:
+  mean and 95 % interval, diagnostics per replica, a "no binding" statement, no convergence
+  verdict.
 - OpenMM only: no input from other MD programs.
 - Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
   after another on one GPU (R7); official presets (R9). Planned: real inputs (R8); a kinase and
@@ -36,7 +37,7 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | M0 Scaffold | Complete |
 | M1 CVs and funnel walls | Complete; equal to numpy references and finite differences |
 | M2 Bias engine, HILLS / COLVAR, restart | Complete; table equal to `openmm.app.Metadynamics`, restart byte-identical |
-| M3 Analysis and the solvable toy system | Complete; toy dG0 within 0.5 kJ/mol of exact (4 × 40 ns, plateau mean). Headline since 2026-11-16 (FM-D9 amendment): from the samples after the first 2 ns; on the toy mean error −0.03 ± 0.15 and −0.11 ± 0.08 kJ/mol (wells of 20 and 40 kJ/mol, 8 × 20 ns each), no well: 8 of 8 reported as no binding |
+| M3 Analysis and the solvable toy system | Complete; toy dG0 within 0.5 kJ/mol of exact (4 × 40 ns, plateau mean). Headline since 2026-11-16 (FM-D9, third amendment): the mean over the second half of the run of dG0(t) from the bias, with a block error; on the toy mean error +0.32 ± 0.15 and +0.41 ± 0.15 kJ/mol (wells of 20 and 40 kJ/mol, 8 × 20 ns each; cross-check from the samples after the first 2 ns: −0.03 ± 0.15 and −0.11 ± 0.08), no well: 8 of 8 reported as no binding |
 | M4 Automatic funnel, validation | Complete on synthetic pockets (direction ≤ 10°) |
 | M5 System building, equilibration, workflow, CLI | Complete; PDB + SDF alone, with automatic clean-up |
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
@@ -48,29 +49,31 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
 | GPU plan M2: real inputs (R8, FM-D15) | Merged, both parts. Membrane part: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule. Protein part: chain gaps capped (NME / ACE), caps and protonation states of the input kept, kept hetero in their own chain, `info.protein_input` in `prepared/report.json`. `pytest` 128 passed. GPU gates passed on 47e84f7; the real `addMembrane` test (`-m slow`) not rerun. On real files (GPU, 200 ps of free equilibration, zero wall energy): 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set; protein model alone on both A2A files |
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). The pilot runs are under M7. GPU gates passed on 47e84f7. Not done: a finished run of a set |
-| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Defaults from the scan by its rule (FM-D16): the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40, with 2 of 5 replicas passing the convergence check of that time. Read without a verdict since the second amendment of FM-D9: dG0 −27.4 kJ/mol, 95% interval −68.7 to 14.0, replicas −78.2 to −1.7 (experiment −26.8 to −30.5, not used). The six settings of the scan give −2.9 to −28.0 kJ/mol at 40 ns: the value depends on the bias setting, and two mean-force estimators over the pooled replicas did not reduce that (spread 25.1 kJ/mol against 32.8 and 42.0; FM-D16, third amendment). R2 is reworded: the value with its interval. The example runs again with the defaults, one replica after another on one GPU: in progress |
-| GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). Run from its README with the defaults (5 × 40 ns, 47e84f7, the five replicas on one GPU with MPS): dG0 −10.05 kJ/mol (−2.40 kcal/mol), 95% interval −24.57 to 4.47, replicas −29.89 to 0.58, rebinding events 5, 0, 1, 1, 1; experiment −47.3 kJ/mol, outside the interval. Reported as measured in the README |
+| GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Defaults from the scan by its rule (FM-D16): the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40, with 2 of 5 replicas passing the convergence check of that time. Read without a verdict, with the headline of the third amendment of FM-D9: dG0 −28.3 kJ/mol, 95% interval −66.9 to 10.4, replicas −78.2 to −4.6 (experiment −26.8 to −30.5, not used). The six settings of the scan give −14.9 to −29.1 kJ/mol at 40 ns with this headline; with the estimate from the samples, the headline when the scan was read, −2.9 to −28.0: the value depends on the bias setting, and two mean-force estimators over the pooled replicas did not reduce that (spread 25.1 kJ/mol against 32.8 and 42.0; FM-D16, third amendment). R2 is reworded: the value with its interval. The example runs again with the defaults, one replica after another on one GPU: in progress |
+| GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). Run from its README with the defaults (5 × 40 ns, 47e84f7, the five replicas on one GPU with MPS), headline of the third amendment of FM-D9: dG0 −14.85 kJ/mol (−3.55 kcal/mol), 95% interval −26.60 to −3.11, replicas −29.00 to −3.97, rebinding events 5, 0, 1, 1, 1; experiment −47.3 kJ/mol, outside the interval. Reported as measured in the README |
 | GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. It is run again from its README with the defaults of this commit (5 × 40 ns). No result yet |
-| GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) run from 47e84f7 in fresh work directories. No report of a whole set yet |
+| GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) run from 47e84f7 in fresh work directories. No report of a whole set yet |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 47e84f7,
   the code with the defaults of the scan verdict (CUDA, mixed precision, 2 GPUs, in the image):
-  `bench/results/2026-11-16-47e84f72b-gpu-gates.json` (dated in UTC). `toy_free_energy`: −3.95
-  (plateau −3.46) against the exact −4.95 kJ/mol, criteria 2.0 and 3.0. `replicas_sequential`
+  `bench/results/2026-11-16-47e84f72b-gpu-gates.json` (dated in UTC). `toy_free_energy`: from the
+  samples −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0. `replicas_sequential`
   and `replicas_parallel` ran real child processes on the GPUs (FM-D14). Its speed values were
   taken while the image check used the same two GPUs; the record of 8d1f10a has them alone.
   Not run yet on the code after 47e84f7 (analysis without a verdict, one math-library thread
-  per replica in the scheduler): once more, on the final code.
+  per replica in the scheduler, headline from the bias): once more, on the final code.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 160 passed on
-  the code with the reworded diagnostic of dG(t). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+  the code with the headline of the third amendment of FM-D9. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
   them, with the first run of the job `docker`, is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
-    the defaults: 95% interval −68.7 to 14.0 kJ/mol, and the value depends on the bias setting;
-    TYK2 with ejm_46: −24.6 to 4.5 kJ/mol, 37 kJ/mol above experiment);
+    the defaults: 95% interval −66.9 to 10.4 kJ/mol, and the value depends on the bias setting;
+    TYK2 with ejm_46: −26.6 to −3.1 kJ/mol, 32 kJ/mol above experiment);
+  - shared-bias walkers on a real system, and settings chosen for accuracy (walkers in the
+    defaults, run length, bias): deferred by the owner until everything is shown to work;
   - reading HILLS with PLUMED itself;
   - the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
@@ -78,8 +81,9 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
   must be prepared again; the gate `toy_free_energy` had 0.04 kJ/mol to spare with
   the former reweighting, where about 1 run in 30 of its 10 ns missed the criterion on every
-  platform (FM-D12); with the estimate of the FM-D9 amendment its error is 1.00 kJ/mol for the
-  gate's seed, and the scatter of that estimate over seeds at 10 ns is not measured.
+  platform (FM-D12); with the estimate from the samples (FM-D9, first amendment) its error is
+  1.00 kJ/mol for the gate's seed, and the scatter of that estimate over seeds at 10 ns is not
+  measured.
 - GPUs (owner, 2026-11-16: all 8 are for this task): every GPU carries several replicas with
   NVIDIA MPS (`run.per_gpu`, FM-D14 amendment). Second wave, started at 06:41 UTC on 2026-11-16
   from 47e84f7 with the defaults and continued from its checkpoints at 07:41 UTC with one
@@ -95,6 +99,11 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] The measurement follows the published procedure: dG0 of a replica from the bias, with a block error (FM-D9, third amendment)
+- What: owner instruction of 2026-11-16: measure by the formal method; that everything works comes before settings for accuracy. The headline `dG` of a replica is the mean over the second half of the run of dG0(t) from the accumulated bias (the first half is rejected); new key `dG_error`, its standard error from 5 blocks. The two estimates from the samples are cross-checks at the unchanged 4 kJ/mol; `dG_source` is gone. No threshold and no test or gate criterion changed. Toy, 8 × 20 ns: error +0.32 ± 0.15 (RMSE 0.52) and +0.41 ± 0.15 kJ/mol (RMSE 0.58) for wells of 20 and 40 kJ/mol, `dG_error` 0.34 and 0.35 against a scatter between seeds of 0.43; no well: 8 of 8 no binding. Same runs, new headline: trypsin −28.28 kJ/mol (95% −66.93 to 10.37; was −27.35), TYK2 with ejm_46 −14.85 (95% −26.60 to −3.11; was −10.05). `ruff` passes, `pytest` 160 passed. Not run: GPU gates on this code (once, on the final code), `pytest -m slow`. Correction: replica 0 of the trypsin run with the default bias left the site once, at 27.5 ns, and did not come back; "one never left the site" in the entry "Verdict of the bias scan" was wrong.
+- Why: the owner's instruction. The published method (Limongelli, Bonomi, Parrinello 2013) reads the value from the surface that the bias builds, after a rejected first part, with a block error; the estimate from the samples is not part of it and had no value where the samples do not reach the unbound region (9 of 15 A2A pilot replicas), so one set held headlines of two kinds. Deferred until operation is shown: walkers in the defaults, run length, bias settings; no walkers test was started.
+- Refs: FM-D9 (third amendment, `docs/design/engine.md`), `.claude/rules/numerics-invariants.md`, `src/fmeta/analysis/`, `src/fmeta/workflow.py`, `tests/test_analysis.py`, `README.md`, the trypsin and TYK2 example READMEs; supersedes the headline of the entry "dG0 from the samples after the first 2 ns".
 
 ### 2026-11-16 — [progress] Report of the A2A pilot committed (3 ligands, 5 × 20 ns, former hill widths)
 - What: the A2A pilot finished (15 runs of 20 ns, membrane systems of 116–117k atoms, commits c41c08b and f2ea653) and `fmeta benchmark report` wrote `bench/reports/2026-11-16-80bf2209b-a2a` with the analysis of 80bf220: dG0 −52.81, −65.99 and −90.40 kJ/mol (−12.62, −15.77, −21.61 kcal/mol) for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; rebinding events 0, 1 and 0. In 20 ns 9 of the 15 replicas left the site once (4q 5, 4d 3, 4e D 1), 1 of them came back and 6 never left: each surface holds one passage out at most. Named as a pilot in `bench/reports/README.md`: not a result of the official defaults, nothing selected from it. `scripts/verify_bench_results.py` passes.

@@ -10,9 +10,10 @@ the protein part); FM-D16 added (2026-11-16: official defaults as presets) and a
 day (owner: the run length of 500 ns withdrawn; then: 20 ns pilots first and a shorter
 equilibration); FM-D17 added (2026-11-16: benchmark sets); FM-D14 amended (2026-11-16: several
 replicas on one GPU with NVIDIA MPS, `run.per_gpu`; one math-library thread per replica); FM-D9
-amended twice (2026-11-16, owner: the first 2 ns are not used; then: a replica does not
-converge on its own, the set of replicas is the measurement and there is no verdict), with
-FM-D16 and FM-D17 amended to follow.
+amended three times (2026-11-16, owner: the first 2 ns are not used; then: a replica does not
+converge on its own, the set of replicas is the measurement and there is no verdict; then: the
+value of a replica is measured by the published procedure, from the bias), with FM-D16 and
+FM-D17 amended to follow.
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -226,6 +227,44 @@ Why: the owner's instruction, and what the scan showed (FM-D16). After 40 ns a r
 0 to 17 rebinding events, the replicas of one setting lie between −1.7 and −78 kJ/mol, and no
 setting had five replicas without a note. A verdict that every run fails says nothing; the
 interval over the replicas says how much is open.
+Third amendment (2026-11-16, owner): the measurement follows the published procedure of funnel
+metadynamics; settings for accuracy come after everything is shown to work. What holds now:
+- The headline of a replica is the estimate from the bias (Limongelli, Bonomi and Parrinello,
+  PNAS 110, 6358, 2013): the free-energy surface is the accumulated bias times `−γ/(γ−1)`, its
+  profile along the axis gives dG0(t) by the formula above, the first half of the run is
+  rejected and dG0(t) is averaged over the second half (`plateau_fraction` 0.5, 20 points).
+  `dG` is `dG_plateau`.
+- `dG_error` (new) is the standard error of that mean from 5 consecutive blocks of the kept
+  half. dG0(t) comes from the bias accumulated since the start, so the blocks are not
+  independent: the error says how far the value moved within the kept part of this run. What a
+  run of this length leaves open is the scatter between the replicas (second amendment,
+  unchanged: mean, standard error and 95% interval of the set, no verdict).
+- The estimates from the samples (first amendment) are the cross-checks: after the first 2 ns
+  (`dG_reweighted`) and of the second half (`dG_second_half`), each a diagnostic above
+  4 kJ/mol from the headline (`MAX_REWEIGHT_GAP`, unchanged). When the samples do not cover
+  the unbound region the note says that the value has no cross-check. `dG_source` is gone from
+  `result.json`; `no_binding` is decided with the headline.
+- No threshold and no criterion of a test or a gate changed: the toy gate checks the estimate
+  from the samples (2.0 kJ/mol) and the one from the bias (3.0 kJ/mol) as before.
+Measured on the toy runs of the first amendment (8 seeds of 20 ns, kJ/mol): well of 20 kJ/mol,
+error of the headline +0.32 ± 0.15, RMSE 0.52, scatter between the seeds 0.43, `dG_error` 0.34
+on average (0.19 to 0.55); well of 40 kJ/mol, +0.41 ± 0.15, RMSE 0.58, scatter 0.43, `dG_error`
+0.35 (0.14 to 0.60); without a well −0.69 ± 0.12 (empty funnel −0.69, scatter 0.35, `dG_error`
+0.28) and 8 of 8 runs reported as no binding. The block error is about 0.8 of the scatter
+between seeds there. On real systems it is far below the scatter between replicas: trypsin with
+the default bias at 40 ns, `dG_error` 1.1 to 16.2 with replicas between −4.6 and −78.2 (value
+of the set −28.28, 95% interval −66.93 to 10.37; with the former headline −27.35); TYK2 with
+ejm_46, 2.0 to 7.1 with replicas between −4.0 and −29.0 (−14.85, 95% interval −26.60 to −3.11;
+former headline −10.05). The six bias settings of the trypsin scan at 40 ns give −14.9 to
+−29.1 kJ/mol with this headline (the column "analysis before the amendment" of the table in
+FM-D16), against −2.9 to −28.0 with the former one.
+Why: the owner's instruction. The published method reads the value from the surface that the
+bias builds, after a rejected first part, and gives its error from block averages; an estimate
+from the samples is not part of it. The estimate from the samples also had no value for a
+replica whose samples do not reach the unbound region (9 of the 15 replicas of the A2A pilot),
+so the headline was of two kinds within one set. Deferred by the same instruction, until
+operation is shown: shared-bias walkers in the defaults, the run length and the bias settings
+(the published runs are 250 ns or longer on one surface).
 
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
@@ -606,7 +645,7 @@ replicas is hours on 8 GPUs, where 100 ns per replica without sharing was days.
 Result of the scan (2026-11-16; all 25 replicas at 40 ns, analysed at the cut lengths). No
 setting has five replicas without a convergence problem at 10, 15, 20, 30 or 40 ns: 0 of 5
 for every setting up to 30 ns, and at 40 ns the table below. This holds with the analysis of
-the FM-D9 amendment (first 2 ns not used; the product analysis) and with the analysis before
+the first amendment of FM-D9 (first 2 ns not used; the product analysis when the scan was read) and with the analysis before
 it. By the second point of the rule the default bias is `sig2` (`sigma_s` 0.05 nm,
 `sigma_rho` 0.1 nm; `bias_factor` 10 and `height` 1.5 kJ/mol stay) and `run.length_ns` is 40:
 2 of 5 replicas pass at 40 ns.
@@ -622,7 +661,8 @@ it. By the second point of the rule the default bias is `sig2` (`sigma_s` 0.05 n
 
 What the count does not say:
 - `sig2` has the widest scatter of the six. Its replicas give −78.2, −1.7, −44.3, −3.4 and
-  −9.1 kJ/mol; the first never left the site in 40 ns, and the two that pass are the last two.
+  −9.1 kJ/mol; the first left the site once, at 27.5 ns, and did not come back (corrected on
+  2026-11-16: this line said that it never left), and the two that pass are the last two.
   The rule counts passing replicas and that is what was applied; the scatter is reported here.
 - The defaults do not give a converged binding free energy of trypsin-benzamidine in 40 ns: a
   run with them is expected to end as NOT CONVERGED, which is what the diagnostics are for.
@@ -711,7 +751,7 @@ names it. Every call that starts jobs appends the commit, the image and the lock
 `fmeta benchmark report` analyses every prepared ligand with `analyze_replicas` and writes
 `bench/reports/<UTC date>-<commit>-<set>.json`, the same as text (`.md`) and an entry in
 `bench/reports/index.json`. Per ligand: dG0 as the mean of the dG0 of the analysed replicas
-(FM-D9, amendment) with its 95% Student-t interval, the experimental and the FEP value, the rebinding
+(FM-D9, as amended) with its 95% Student-t interval, the experimental and the FEP value, the rebinding
 events, what the analysis found, and how many replicas within 1 kT of the empty funnel ("no
 binding", not a binding free energy). Over the set: MUE, RMSE, mean signed error, MUE and RMSE
 after the mean error on the same ligands is removed, Pearson r and Kendall tau, each with a

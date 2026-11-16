@@ -95,13 +95,16 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
                 unbound: Optional[tuple[float, float]] = None, write: bool = True) -> dict:
     """Analyse one run directory and return (and by default write) the results.
 
-    The headline number ``dG`` uses only the samples after the first ``discard_ns``, the part
-    of a run in which the bias changes most (of a run shorter than twice that: its second
-    half). It is ``dG_reweighted``, the estimate from the reweighted histogram of those
-    samples. Two cross-checks stand beside it: ``dG_second_half``, the same estimate from the
-    second half of the run alone, and ``dG_plateau``, the mean over the last
-    ``plateau_fraction`` of the run of dG0(t) from the bias accumulated since the start.
-    Where the samples give no estimate, ``dG`` is ``dG_plateau``.
+    The headline number ``dG`` is measured as funnel metadynamics is published (Limongelli,
+    Bonomi and Parrinello, PNAS 110, 6358, 2013): the free-energy surface is the accumulated
+    bias times ``-gamma / (gamma - 1)``, its profile along the axis gives dG0(t), the first part
+    of the run is rejected and dG0(t) is averaged over the last ``plateau_fraction``. It is
+    ``dG_plateau``; ``dG_error`` is the standard error of that mean from block averages and
+    ``dG_plateau_std`` the standard deviation of dG0(t) over the same part.
+
+    Two cross-checks from the samples stand beside it: ``dG_reweighted``, from the reweighted
+    histogram of the samples after the first ``discard_ns`` (of a run shorter than twice that:
+    its second half), and ``dG_second_half``, the same from the second half of the run alone.
 
     ``diagnostics`` are notes on what the replica did (rebinding events, the change of dG(t)
     from the bias, the two cross-checks). The bias fills the free-energy surface for as long as
@@ -144,7 +147,7 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     dg_reweighted = _sample_estimate(colvars, hills, grid, funnel, kT, start, **kwargs)
     dg_second_half = (dg_reweighted if start == half
                       else _sample_estimate(colvars, hills, grid, funnel, kT, half, **kwargs))
-    headline = plateau["mean"] if dg_reweighted is None else dg_reweighted
+    headline = plateau["mean"]
 
     # Does the answer depend on where the bound region is said to end? For a real
     # binder the basin dominates the integral and it does not.
@@ -172,14 +175,14 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
         notes.append(f"unbound region not flat (std {estimate.unbound_roughness:.2f} kJ/mol)")
     if dg_reweighted is None:
         notes.append(f"no estimate from the samples after the first {start / 1000.0:.1f} ns (they do "
-                        "not cover the unbound region): dG is the mean of dG(t) from the bias")
-    else:
-        if abs(dg_reweighted - plateau["mean"]) > MAX_REWEIGHT_GAP:
-            notes.append(f"reweighted estimate differs by {dg_reweighted - plateau['mean']:+.2f} kJ/mol "
-                            "from the mean of dG(t) from the bias")
-        if dg_second_half is not None and abs(dg_second_half - dg_reweighted) > MAX_REWEIGHT_GAP:
-            notes.append(f"dG changes by {dg_second_half - dg_reweighted:+.2f} kJ/mol when only the "
-                            "second half of the run is used")
+                     "not cover the unbound region): dG has no cross-check from the samples")
+    checks = [(f"after the first {start / 1000.0:.1f} ns", dg_reweighted)]
+    if start < half:
+        checks.append(("of the second half of the run", dg_second_half))
+    for label, value in checks:
+        if value is not None and abs(value - headline) > MAX_REWEIGHT_GAP:
+            notes.append(f"the estimate from the samples {label} differs by {value - headline:+.2f} "
+                         "kJ/mol from dG")
 
     result = dict(
         workdir=str(workdir),
@@ -187,10 +190,9 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
         n_walkers=len(sources),
         n_hills=len(hills),
         temperature=settings.temperature,
-        dG=float(headline), dG_kcal=float(headline) / KCAL,
-        dG_source="bias" if dg_reweighted is None else "samples", discard_ns=start / 1000.0,
-        dG_reweighted=dg_reweighted, dG_second_half=dg_second_half,
+        dG=float(headline), dG_kcal=float(headline) / KCAL, dG_error=plateau["error"],
         dG_plateau=plateau["mean"], dG_plateau_std=plateau["std"],
+        discard_ns=start / 1000.0, dG_reweighted=dg_reweighted, dG_second_half=dg_second_half,
         dG_final=estimate.dG, dG_simple=estimate.dG_simple,
         drift=plateau["drift"], k_bind_nm3=estimate.k_bind, well_depth=estimate.well_depth,
         s_bound=s_bound, site_max=estimate.site_max, unbound=list(estimate.unbound),
@@ -229,9 +231,9 @@ def analyze_replicas(workdirs: Sequence, write_to=None, **kwargs) -> dict:
         sem=summary.sem, ci95=None if summary.ci95 is None else list(summary.ci95),
         dG_empty_funnel=dg_empty, no_binding=bool(dg_empty - summary.mean < MIN_BINDING_EXCESS * kT),
         diagnostics={r["workdir"]: r["diagnostics"] for r in runs if r["diagnostics"]},
-        replicas=[{k: r[k] for k in ("workdir", "simulated_ns", "dG", "dG_source", "dG_reweighted",
-                                      "dG_plateau", "dG_plateau_std", "dG_final", "rebinding_events",
-                                      "no_binding")}
+        replicas=[{k: r[k] for k in ("workdir", "simulated_ns", "dG", "dG_error", "dG_plateau_std",
+                                      "dG_reweighted", "dG_second_half", "dG_final",
+                                      "rebinding_events", "no_binding")}
                   for r in runs],
     )
     if write_to is not None:

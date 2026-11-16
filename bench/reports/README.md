@@ -34,4 +34,6 @@ defects. Nothing was selected from them, and they are not results of the officia
 The set definition of a pilot report is that of `examples/benchmarks/<set>/` with one
 difference, `config: {metad: {sigma_s: 0.025, sigma_rho: 0.05}}`: the `set.yaml` hash in the
 report is therefore not that of the repository. The analysis is that of the commit the report
-names.
+names: both were written before the third amendment of FM-D9, so the dG0 of a replica in them is
+the estimate from the samples after the first 2 ns, or the mean of dG(t) from the bias where
+the samples gave none (1 of the 15 TYK2 replicas, 9 of the 15 A2A replicas).

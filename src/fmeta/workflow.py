@@ -400,8 +400,9 @@ def format_summary(summary: dict) -> str:
         lines.append(f"NO BINDING: the value is within 1 kT of what the empty funnel gives "
                      f"({summary['dG_empty_funnel']:.2f} kJ/mol); it is not a binding free energy")
     for replica in summary["replicas"]:
-        lines.append(f"  {Path(replica['workdir']).name}: {replica['dG']:8.2f} kJ/mol (from the bias "
-                     f"{replica['dG_plateau']:.2f} +/- {replica['dG_plateau_std']:.2f}) "
+        samples = replica["dG_reweighted"]
+        lines.append(f"  {Path(replica['workdir']).name}: {replica['dG']:8.2f} +/- {replica['dG_error']:.2f} kJ/mol "
+                     f"(from the samples {'none' if samples is None else format(samples, '.2f')}) "
                      f"over {replica['simulated_ns']:.1f} ns, {replica['rebinding_events']} rebinding event(s)")
     if summary["diagnostics"]:
         # a replica of the default length does not converge on its own: notes, not a verdict
