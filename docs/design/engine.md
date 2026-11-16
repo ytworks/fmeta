@@ -275,3 +275,48 @@ launcher); a key for several replicas on one GPU (its effect is not measured, an
 configuration with a key that is later withdrawn no longer loads).
 Why: owner request of 2026-11-15 for both modes. A stopped container must leave nothing on a
 GPU, and what was run where has to be checkable afterwards from a record, on the GPU machine.
+
+### FM-D15 (membrane and kept components) — Parts dropped first, kept components are receptor
+Status: Accepted (2026-11-16).
+Dropping. `fmeta split --drop CHAIN[:FIRST-LAST]` (repeatable) removes a chain or a residue
+range of it before the ligand is searched and the two input files are written, so no later step
+sees it: not the orientation estimate, not the funnel placement. The case is a fusion partner,
+the BRIL of A2A-StaR2-bRIL (residues 1001-1106 in place of 209-218 in the RCSB entries 5MZJ and
+5OLZ): a soluble domain in the hydrophobic-belt fit, and an obstacle that is not in the
+receptor. Residue numbers are compared as integers and the insertion code breaks ties; a bound
+without a code stands for every residue of that number; a selection takes every residue in its
+range, protein or not; one that matches nothing is an error that lists the chains of the file.
+Kept components. A non-protein residue kept by `system.keep_hetero` (the Na+ of A2A, the Ca2+
+of trypsin) is part of the receptor. It is found on the dry complex by its residue name,
+followed through solvation and `addMembrane` by its position, recorded in `prepared/meta.json`
+(`kept_atoms`) and given the class `other`, not `ion`. The rest follows from the class, without
+a second mechanism: it is an obstacle for the automatic placement and the validation of the
+funnel, it counts for the size of the box, it is restrained in equilibration and released with
+the protein's heavy atoms, and it is in the solute trajectory. An ion of the same name that the
+builder adds stays solvent. Until now a kept ion was a solvent ion: free from the first step of
+heating, and invisible to the funnel.
+Orientation check. `membrane.orient: check` says "ok" only when the input was compared with a
+confident fit of the hydrophobic belt. When the fit is not confident the report is now a warning
+that the orientation could not be checked; it used to read "ok". The build goes on: a file from
+OPM is right whatever the estimate finds, and `orient: input` states that without a check.
+Box height. A membrane box is built 8% taller than the rule of FM-D6 asks
+(`MEMBRANE_NPT_ALLOWANCE`); a water box keeps its 3%. The rule itself is unchanged. One
+measurement stands behind the number: A2A with theophylline from the OPM file of 5MZJ in 484
+POPC, 210 892 atoms, built at 12.74 x 13.38 x 12.63 nm with 3%. After 1 ns (100 ps heating,
+400 ps release, 500 ps free, GPU) x and y had changed by 0.2% and z by 3.5% (to 12.18 nm): the
+solvent is placed less dense than it becomes, and with the bilayer holding the area the whole
+change goes into the height. In the same time the height the rule asks for rose from 12.26 to
+12.41 nm, because the funnel axis had turned towards z with the protein. The stage stopped on
+`box_cv`, as it must. The two effects are 4.9%; 8% leaves room for a longer equilibration and
+another bilayer and costs 5% more atoms. Built with 8% (221 143 atoms, 13.24 nm high) the same
+system lost 3.7% in the same protocol and passed: 12.76 nm against 12.28 nm asked. Two runs of
+1 ns on one system: the 10 ns equilibration of the A2A example is to confirm the number.
+Not done: restraining a kept water (it stays mobile water and is no obstacle); a configuration
+key for dropping (the `input.complex` route cannot drop yet); a finer orientation estimate. On
+the OPM-oriented A2A the estimate is 14 deg and 0.2 nm from the OPM plane, so the 25 deg limit
+of the check stays, a model that is 9.5 deg off (the prepared A2A structure of the Schrödinger
+benchmark set) passes as "ok", and `auto` would not improve it: such a model is superposed onto
+its OPM entry instead.
+Why: the three were found on the way to the first real membrane target. What the receptor is
+made of has to be decided once, before the funnel and the box are derived from it; and a check
+that checked nothing must not read as a pass.
