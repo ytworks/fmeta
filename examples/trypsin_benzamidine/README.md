@@ -63,3 +63,43 @@ the rebinding counts and the convergence verdict, whatever they turn out to be.
 
 The calcium ion is removed by default. Keeping it (`system.keep_hetero`) is a variation that
 has not been run.
+
+## Scan of the defaults
+
+Three official defaults differ from the literature in a way that a run can test
+(`docs/configuration.md`, "Where the defaults differ from the literature that was read"). Each
+is run here with that one value changed, three replicas of 200 ns, and compared with the first
+200 ns of the five replicas of the run above.
+
+| Variant | Changed | Official default |
+|---|---|---|
+| `pace2` | `run.pace_ps: 2.0` | 1.0 ps |
+| `srho03` | `metad.sigma_rho: 0.03` | 0.05 nm |
+| `dt2` | `run.timestep_fs: 2.0` with `system.hydrogen_mass: null` | 4 fs with hydrogens of 1.5 amu |
+
+`pace2` and `srho03` start from the prepared and equilibrated system of the run above; `dt2` is
+prepared and equilibrated again, because the masses are part of the system.
+
+The rule, written on 2026-11-16 before any of these runs had started:
+
+- Compared per variant: rebinding events per replica, drift and roughness of dG(t), the gap to
+  the reweighted estimate, the convergence verdict, the plateau mean of each replica, their mean
+  and their spread.
+- Three replicas of 200 ns show a gross difference and nothing finer. A default changes only if
+  1. for `dt2`: its mean lies outside the 95% confidence interval of the five replicas and
+     their mean outside the interval of `dt2`. The time step would then change the free energy,
+     and the default would become 2 fs with real masses;
+  2. for `pace2` and `srho03`: every replica of the variant passes the convergence criteria at
+     200 ns while fewer than half of the five replicas do. The two bias settings have the same
+     free energy as their limit, so a difference of the means at 200 ns says only that one of
+     them has not converged: it is reported and changes nothing.
+  Otherwise the defaults stay and the numbers are reported as measured.
+- Agreement with experiment is not a criterion, here or on any benchmark.
+
+The length of 500 ns is not a variant: dG(t) and the convergence verdict of the run above say
+whether it is enough on this system.
+
+Not scanned: the wall force constants, the force fields and the shape of the funnel. Each would
+be a scan of its own; they are listed with their sources in `docs/configuration.md`.
+
+Result: not available yet.

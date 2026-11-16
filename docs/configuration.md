@@ -226,7 +226,9 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 ## Where the defaults differ from the literature that was read
 
 None of these was changed for this file (FM-D16): a default changes by measurement in M4, with
-a design amendment. They are listed so that M4 looks at them first.
+a design amendment. They are listed so that M4 looks at them first. The first three are run on
+trypsin-benzamidine; the variants and the rule that decides, written before the runs, are in
+`examples/trypsin_benzamidine/README.md` ("Scan of the defaults").
 
 - **Deposition rate.** Hills of 1.5 kJ/mol every 1 ps; [E20] and the BioSimSpace protocol
   default [BSS-P] deposit every 2 ps (1000 steps of 2 fs). At the same height the bias starts
