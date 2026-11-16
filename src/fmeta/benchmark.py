@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import copy
 import csv
+import hashlib
+import json
 import math
+import os
 import re
+import urllib.request
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import numpy as np
 import yaml
@@ -26,6 +30,7 @@ import yaml
 from .analysis import KCAL
 from .config import Config
 from .funnel.geometry import KB
+from .scheduler import directory_lock
 
 SET_KEYS = ("name", "title", "source", "files", "superpose_on", "ligands", "pilot", "config")
 SOURCE_KEYS = ("repository", "commit", "raw", "licence")
@@ -290,18 +295,369 @@ def load_set(directory) -> BenchmarkSet:
     return benchmark
 
 
-def set_config(benchmark: BenchmarkSet, protein=None, ligand=None, length_ns: Optional[float] = None,
+def set_config(benchmark: BenchmarkSet, length_ns: Optional[float] = None,
                replicas: Optional[int] = None) -> Config:
-    """The configuration of the set, for one ligand when ``protein`` and ``ligand`` are given.
-    Relative paths in it are relative to the set directory. ``length_ns`` and ``replicas``
-    stand in for ``run.length_ns`` and ``run.replicas``."""
+    """The configuration of the set, without inputs. Relative paths in it are relative to the
+    set directory. ``length_ns`` and ``replicas`` stand in for ``run.length_ns`` and
+    ``run.replicas``."""
     data = copy.deepcopy(benchmark.config)
-    if protein is not None:
-        data["input"] = dict(protein=str(protein), ligand=str(ligand))
     plan = dict(length_ns=length_ns, replicas=replicas)
     if any(value is not None for value in plan.values()):
         data["run"] = dict(data.get("run") or {}, **{key: value for key, value in plan.items() if value is not None})
     return Config.from_dict(data, base_dir=benchmark.directory)
+
+
+# ---- the inputs: fetched, verified, read as text ----------------------------
+
+def download(url: str) -> bytes:
+    """The content at ``url``. What is downloaded is data: it is hashed, read as text and
+    written to files, never imported or executed."""
+    request = urllib.request.Request(url, headers={"User-Agent": "fmeta-benchmark"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.read()
+    except OSError as error:
+        raise RuntimeError(f"could not download {url}: {error}") from error
+
+
+def _sha256(path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _replace(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` so that the file is never seen half written."""
+    part = path.with_name(path.name + ".part")
+    part.write_text(text)
+    os.replace(part, path)
+
+
+def fetch_inputs(benchmark: BenchmarkSet, workdir, download=download) -> dict:
+    """The files of the set in ``workdir/inputs``, each with the sha256 the set names: key ->
+    path. A file that is there with that hash is not fetched again; content with another
+    hash is refused and not written."""
+    directory = Path(workdir) / "inputs"
+    directory.mkdir(parents=True, exist_ok=True)
+    sources = list(benchmark.files.values())
+    if benchmark.superpose_on is not None:
+        sources.append(benchmark.superpose_on.source)
+    paths = {}
+    for source in sources:
+        target = directory / f"{source.key}{source.suffix}"
+        if not (target.exists() and _sha256(target) == source.sha256):
+            content = source.file.read_bytes() if source.file is not None else download(source.url)
+            found = hashlib.sha256(content).hexdigest()
+            if found != source.sha256:
+                raise ValueError(f"{source.url or source.file} has sha256 {found}, the set names "
+                                 f"{source.sha256}: it is not the file the set was written for")
+            part = target.with_name(target.name + ".part")
+            part.write_bytes(content)
+            os.replace(part, target)
+        paths[source.key] = target
+    return paths
+
+
+_SDF_CHARGES = {1: 3, 2: 2, 3: 1, 5: -1, 6: -2, 7: -3}       # the charge field of a V2000 atom line
+
+
+def sdf_records(path) -> dict:
+    """The records of an SDF file: the name in the first line -> the records of that name,
+    each a list of lines without the closing ``$$$$``."""
+    records: dict = {}
+    lines: list = []
+    for line in Path(path).read_text().splitlines() + ["$$$$"]:
+        if line.strip() != "$$$$":
+            lines.append(line)
+            continue
+        if any(text.strip() for text in lines):
+            records.setdefault(lines[0].strip(), []).append(lines)
+        lines = []
+    return records
+
+
+def _atom_lines(record: list, name: str) -> range:
+    """Where the atom block of a V2000 record is."""
+    try:
+        if "V2000" not in record[3]:
+            raise ValueError
+        atoms = range(4, 4 + int(record[3][0:3]))
+        if not atoms or len(record) < atoms.stop:
+            raise ValueError
+    except (ValueError, IndexError):
+        raise ValueError(f"ligand {name!r}: its record is not a V2000 molfile") from None
+    return atoms
+
+
+def sdf_charge(record: list, name: str) -> int:
+    """The formal charge of a V2000 record: its ``M  CHG`` lines or, without any, the charge
+    fields of the atom lines."""
+    atoms = _atom_lines(record, name)
+    try:
+        properties = [line.split() for line in record[atoms.stop:] if line.startswith("M  CHG")]
+        if properties:
+            return sum(int(value) for tokens in properties for value in tokens[4:3 + 2 * int(tokens[2]):2])
+        return sum(_SDF_CHARGES.get(int(record[index][36:39].strip() or 0), 0) for index in atoms)
+    except (ValueError, IndexError):
+        raise ValueError(f"ligand {name!r}: the charges of its record cannot be read") from None
+
+
+def sdf_coordinates(record: list, name: str) -> np.ndarray:
+    """The coordinates of a V2000 record in Å."""
+    try:
+        return np.array([[float(record[index][start:start + 10]) for start in (0, 10, 20)]
+                         for index in _atom_lines(record, name)])
+    except ValueError:
+        raise ValueError(f"ligand {name!r}: the coordinates of its record cannot be read") from None
+
+
+def _moved_record(record: list, name: str, rotation: np.ndarray, translation: np.ndarray) -> list:
+    """The record with its atoms at ``rotation @ x + translation``."""
+    atoms = _atom_lines(record, name)
+    moved = sdf_coordinates(record, name) @ rotation.T + translation
+    lines = list(record)
+    for index, (x, y, z) in zip(atoms, moved):
+        lines[index] = f"{x:10.4f}{y:10.4f}{z:10.4f}{record[index][30:]}"
+    return lines
+
+
+def pdb_ca(path, chain: Optional[str] = None, option: str = "chain") -> dict:
+    """The CA atoms of the ``ATOM`` records of the first model of a PDB file: (residue number,
+    insertion code) -> coordinates in Å. Of alternate locations the first one counts.
+    ``option`` is the key of the set definition that selects the chain."""
+    found: dict = {}
+    for line in Path(path).read_text().splitlines():
+        if line.startswith("ENDMDL"):
+            break
+        if not line.startswith("ATOM") or line[12:16].strip() != "CA" or chain not in (None, line[21]):
+            continue
+        key = (int(line[22:26]), line[26].strip())
+        if key not in found:
+            found[key] = (line[21], [float(line[30:38]), float(line[38:46]), float(line[46:54])])
+        elif found[key][0] != line[21]:
+            raise ValueError(f"{path}: residue {key[0]}{key[1]} is in chains {found[key][0]!r} and "
+                             f"{line[21]!r}; name the chain with superpose_on.{option}")
+    return {key: xyz for key, (_, xyz) in found.items()}
+
+
+def superposition(mobile, target) -> tuple:
+    """The rotation and the translation that put the points ``mobile`` on ``target`` with the
+    least RMSD (Kabsch), and that RMSD: a point x goes to ``rotation @ x + translation``."""
+    mobile, target = np.asarray(mobile, dtype=float), np.asarray(target, dtype=float)
+    centre_mobile, centre_target = mobile.mean(axis=0), target.mean(axis=0)
+    u, _, vt = np.linalg.svd((mobile - centre_mobile).T @ (target - centre_target))
+    proper = 1.0 if np.linalg.det(vt.T @ u.T) >= 0 else -1.0             # a rotation, never a mirror image
+    rotation = vt.T @ np.diag([1.0, 1.0, proper]) @ u.T
+    translation = centre_target - rotation @ centre_mobile
+    deviation = mobile @ rotation.T + translation - target
+    return rotation, translation, float(np.sqrt((deviation ** 2).sum(axis=1).mean()))
+
+
+def _moved_pdb(text: str, rotation: np.ndarray, translation: np.ndarray) -> str:
+    """A PDB file with its atoms at ``rotation @ x + translation``. Records that describe the
+    old frame (the unit cell, its transformations, anisotropic temperature factors) are left out."""
+    lines = []
+    for line in text.splitlines():
+        if line.startswith(("ANISOU", "CRYST1", "SCALE", "ORIGX", "MTRIX")):
+            continue
+        if line.startswith(("ATOM", "HETATM")):
+            x, y, z = rotation @ [float(line[30:38]), float(line[38:46]), float(line[46:54])] + translation
+            line = f"{line[:30]}{x:8.3f}{y:8.3f}{z:8.3f}{line[54:]}"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
+def superpose_protein(benchmark: BenchmarkSet, paths: dict) -> tuple:
+    """The protein file the work directories use, and the motion that the ligands have to
+    follow. With ``superpose_on`` the protein is put on that structure, CA atoms of the same
+    residue number and insertion code on each other, and written beside the fetched file
+    with a record of the fit; without it the fetched file is used as it is."""
+    on = benchmark.superpose_on
+    if on is None:
+        return paths["protein"], np.eye(3), np.zeros(3)
+    mobile = pdb_ca(paths["protein"], on.protein_chain, "protein_chain")
+    target = pdb_ca(paths["superpose_on"], on.reference_chain, "reference_chain")
+    common = sorted(set(mobile) & set(target))
+    if len(common) < 3:
+        raise ValueError(f"superpose_on: {len(common)} CA atom(s) with the same residue number in the two "
+                         "structures; three are needed")
+    rotation, translation, rmsd = superposition([mobile[key] for key in common], [target[key] for key in common])
+    rmsd /= 10.0                                                        # nm
+    if rmsd > on.max_rmsd:
+        raise ValueError(f"superpose_on: {len(common)} CA atoms fit with an RMSD of {rmsd:.3f} nm, above "
+                         f"max_rmsd = {on.max_rmsd} nm: the two structures are not the same protein state, "
+                         "or their residue numbers differ")
+    directory = paths["protein"].parent
+    path = directory / "protein_superposed.pdb"
+    _replace(path, _moved_pdb(paths["protein"].read_text(), rotation, translation))
+    record = dict(reference_sha256=on.source.sha256, matched_ca=len(common), rmsd_nm=round(rmsd, 4),
+                  rotation=rotation.tolist(), translation_angstrom=translation.tolist())
+    _replace(directory / "superposition.json", json.dumps(record, indent=1) + "\n")
+    return path, rotation, translation
+
+
+# ---- the work directory: one ordinary fmeta work directory per ligand -------
+
+MARKER = "benchmark.json"                    # written last: a ligand directory with it is complete
+
+
+class Prepared(NamedTuple):
+    ligand: Ligand
+    directory: Path
+    config: Config
+
+
+def configuration_hash(benchmark: BenchmarkSet, config: Config) -> str:
+    """Everything that decides the free energy of a ligand, as one hash: the configuration,
+    files it names by their content, the files of the set and the superposition by their
+    sha256. Left out: the inputs (they are these files), the devices, and the sampling plan
+    (``run.length_ns``, ``run.replicas``), which may grow while the results stay comparable."""
+    data = config.to_dict()
+    del data["input"]
+    for option in ("mode", "gpus", "length_ns", "replicas"):
+        del data["run"][option]
+    data["system"]["ligand_xml"] = [_sha256(path) for path in data["system"]["ligand_xml"]]
+    if data["membrane"] is not None and data["membrane"].get("patch"):
+        data["membrane"]["patch"] = _sha256(data["membrane"]["patch"])
+    on = benchmark.superpose_on
+    payload = dict(set=benchmark.name, config=data,
+                   files={key: benchmark.files[key].sha256 for key in ("protein", "ligands")},
+                   superpose_on=None if on is None else [on.source.sha256, on.reference_chain,
+                                                         on.protein_chain, on.max_rmsd])
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _plan(config: Config) -> tuple:
+    return float(config.run.length_ns), int(config.run.replicas)
+
+
+def _stored(benchmark: BenchmarkSet, workdir: Path) -> list:
+    """The ligands of the set that have a work directory, in the order of the set. A work
+    directory of another configuration or set definition is an error: one work directory,
+    one configuration."""
+    expected = configuration_hash(benchmark, set_config(benchmark))
+    stored = []
+    for ligand in benchmark.ligands:
+        directory = workdir / ligand.directory
+        if not (directory / MARKER).exists():
+            continue
+        marker = json.loads((directory / MARKER).read_text())
+        if marker.get("configuration_sha256") != expected or marker.get("ligand") != ligand.name:
+            raise ValueError(f"{directory} was prepared with another configuration or set definition. Results "
+                             "of two configurations do not go into one report: use a new work directory")
+        config = Config.load(directory / "config.yaml")
+        if configuration_hash(benchmark, config) != expected:
+            raise ValueError(f"{directory}/config.yaml was changed after 'fmeta benchmark prepare'. The ligands "
+                             "of a set run with one configuration: change set.yaml and use a new work directory")
+        stored.append(Prepared(ligand, directory, config))
+    return stored
+
+
+def prepared_ligands(benchmark: BenchmarkSet, workdir) -> list:
+    """The prepared ligands of ``workdir`` as ``Prepared(ligand, directory, config)``, checked:
+    one configuration (that of the set as it is now) and one sampling plan for all."""
+    workdir = Path(workdir).resolve()
+    stored = _stored(benchmark, workdir) if workdir.is_dir() else []
+    if not stored:
+        raise ValueError(f"no ligand of the set {benchmark.name} is prepared in {workdir}: "
+                         "run 'fmeta benchmark prepare' first")
+    if len({_plan(item.config) for item in stored}) > 1:
+        raise ValueError(f"the ligands in {workdir} have different lengths or numbers of replicas: set one plan "
+                         "with 'fmeta benchmark prepare ... --length-ns X --replicas N'")
+    return stored
+
+
+def _selection(benchmark: BenchmarkSet, ligands) -> list:
+    names = [ligand.name for ligand in benchmark.ligands]
+    if ligands == "pilot":
+        chosen = list(benchmark.pilot)
+    elif ligands == "all":
+        chosen = names
+    else:
+        chosen = [name.strip() for name in ligands.split(",")] if isinstance(ligands, str) else list(ligands)
+    unknown = [name for name in chosen if name not in names]
+    if unknown or not chosen:
+        raise ValueError(f"not in the set {benchmark.name}: {', '.join(unknown) or 'no ligand given'} "
+                         f"(its ligands: {', '.join(names)}; or 'pilot', 'all')")
+    return [ligand for ligand in benchmark.ligands if ligand.name in chosen]
+
+
+def _write_config(benchmark: BenchmarkSet, directory: Path, protein: Path, plan: tuple) -> None:
+    config = set_config(benchmark, *plan)
+    config.input.protein = os.path.relpath(protein, directory)       # relative: the work directory can move
+    config.input.ligand = "ligand.sdf"
+    part = directory / "config.yaml.part"
+    config.save(part)
+    os.replace(part, directory / "config.yaml")
+
+
+def prepare_set(benchmark: BenchmarkSet, workdir, ligands="pilot", length_ns: Optional[float] = None,
+                replicas: Optional[int] = None, download=download) -> list:
+    """Fetch and verify the files of the set and write one fmeta work directory per ligand
+    (``config.yaml``, ``ligand.sdf``) under ``workdir``. Returns one line per ligand.
+
+    ``ligands`` is ``pilot``, ``all`` or names; ligands that are already there stay as they
+    are, so a later call adds ligands. ``length_ns`` and ``replicas`` set the sampling plan
+    of every ligand in the work directory, also of those prepared before: without them a new
+    ligand gets the plan of the ones that are there, and the first ones that of the set.
+    Nothing is simulated here: building the systems is the first stage of ``run_set``."""
+    workdir = Path(workdir).resolve()
+    selected = _selection(benchmark, ligands)
+    if (length_ns is not None and not length_ns > 0) or (replicas is not None and replicas < 1):
+        raise ValueError("--length-ns must be positive and --replicas at least 1")
+    with directory_lock(workdir):
+        stored = {item.ligand.name: item for item in _stored(benchmark, workdir)}
+        plans = {_plan(item.config) for item in stored.values()}
+        if len(plans) > 1 and (length_ns is None or replicas is None):
+            raise ValueError(f"the ligands in {workdir} have different lengths or numbers of replicas: "
+                             "give --length-ns and --replicas")
+        base = set_config(benchmark)
+        current = plans.pop() if len(plans) == 1 else _plan(base)
+        plan = (current[0] if length_ns is None else float(length_ns),
+                current[1] if replicas is None else int(replicas))
+        paths = fetch_inputs(benchmark, workdir, download)
+        records = sdf_records(paths["ligands"])
+        chosen = {}
+        for ligand in selected:
+            found = records.get(ligand.name, [])
+            if len(found) != 1:
+                raise ValueError(f"{len(found)} records named {ligand.name!r} in the ligand file of the set "
+                                 f"(it has: {', '.join(sorted(records))})")
+            charge = sdf_charge(found[0], ligand.name)
+            if charge != ligand.charge:
+                raise ValueError(f"ligand {ligand.name!r}: formal charge {charge:+d} in the ligand file, "
+                                 f"{ligand.charge:+d} in set.yaml")
+            sdf_coordinates(found[0], ligand.name)
+            chosen[ligand.name] = found[0]
+        protein, rotation, translation = superpose_protein(benchmark, paths)
+        expected = configuration_hash(benchmark, base)
+        lines = []
+        for ligand in benchmark.ligands:
+            directory = workdir / ligand.directory
+            if ligand.name in stored:
+                if _plan(stored[ligand.name].config) != plan:
+                    beyond = sorted(path.name for path in directory.glob("rep*") if path.name[3:].isdigit()
+                                    and int(path.name[3:]) >= plan[1] and any(path.rglob("HILLS")))
+                    if beyond:
+                        raise ValueError(f"{directory} has {', '.join(beyond)}: the number of replicas cannot "
+                                         "go below those that have run")
+                    _write_config(benchmark, directory, protein, plan)
+                    lines.append(f"{ligand.name}: {directory} (plan changed)")
+                elif ligand.name in chosen:
+                    lines.append(f"{ligand.name}: {directory} (was there)")
+                continue
+            if ligand.name not in chosen:
+                continue
+            directory.mkdir(exist_ok=True)
+            record = chosen[ligand.name]
+            if benchmark.superpose_on is not None:
+                record = _moved_record(record, ligand.name, rotation, translation)
+            _replace(directory / "ligand.sdf", "\n".join(record) + "\n$$$$\n")
+            _write_config(benchmark, directory, protein, plan)
+            marker = dict(set=benchmark.name, ligand=ligand.name, charge=ligand.charge,
+                          configuration_sha256=expected)
+            _replace(directory / MARKER, json.dumps(marker, indent=1) + "\n")
+            lines.append(f"{ligand.name}: {directory}")
+        lines.append(f"plan: {plan[1]} replica(s) of {plan[0]:g} ns per ligand")
+    return lines
 
 
 # ---- statistics -------------------------------------------------------------

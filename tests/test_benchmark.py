@@ -2,6 +2,7 @@
 jobs and the restart, the report and its check."""
 
 import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -10,8 +11,20 @@ import pytest
 import yaml
 from fixtures import BENZENE_XML
 from scipy import stats
+from scipy.spatial.transform import Rotation
 
-from fmeta.benchmark import REFERENCE_COLUMNS, agreement, load_set
+from fmeta.benchmark import (
+    REFERENCE_COLUMNS,
+    agreement,
+    fetch_inputs,
+    load_set,
+    prepare_set,
+    prepared_ligands,
+    sdf_charge,
+    sdf_coordinates,
+    sdf_records,
+)
+from fmeta.config import Config
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples" / "benchmarks"
 NAMES = ("a", "b D", "c")                                 # "b D": a name that is not a directory name
@@ -104,6 +117,119 @@ def test_a_measured_ki_becomes_a_free_energy_at_the_temperature_of_the_measureme
     assert reference["b D"].exp_temperature == 310.0
     with pytest.raises(ValueError, match="needs exp_temperature_k"):
         load_set(write_set(tmp_path / "other", inputs, rows=("a,,1.0,,10.1000/exp,,,,,,,",) + ROWS[1:]))
+
+
+# ---- the inputs and the work directories ------------------------------------
+
+
+def test_a_file_is_fetched_once_and_content_with_another_hash_is_refused(tmp_path, inputs):
+    def remote(data):
+        for entry in data["files"].values():
+            entry["url"] = f"https://example.org/{entry.pop('file')}"
+
+    benchmark = load_set(write_set(tmp_path / "set", inputs, remote))
+    fetched = []
+
+    def download(url):
+        fetched.append(url)
+        return (benchmark.directory / url.rsplit("/", 1)[1]).read_bytes()
+
+    paths = fetch_inputs(benchmark, tmp_path / "work", download)
+    assert {key: sha256(path) for key, path in paths.items()} == {
+        key: source.sha256 for key, source in benchmark.files.items()}
+    fetch_inputs(benchmark, tmp_path / "work", download)
+    assert len(fetched) == 2                                          # what is verified is not fetched again
+    with pytest.raises(ValueError, match="not the file the set was written for"):
+        fetch_inputs(benchmark, tmp_path / "other", lambda url: b"something else")
+    assert list((tmp_path / "other" / "inputs").iterdir()) == []      # and nothing of it was written
+
+
+def test_a_charge_that_is_not_that_of_the_record_is_refused(tmp_path, inputs):
+    benchmark = load_set(write_set(tmp_path / "set", inputs, lambda data: data["ligands"][0].update(charge=1)))
+    with pytest.raises(ValueError, match=r"formal charge \+0 in the ligand file, \+1 in set.yaml"):
+        prepare_set(benchmark, tmp_path / "work")
+    assert not (tmp_path / "work" / "a").exists()
+    record = sdf_records(benchmark.files["ligands"].file)["a"][0]
+    assert sdf_charge(record + ["M  CHG  2   1  -1   2  -1"], "a") == -2          # the property line
+    anion = [line[:36] + "  5" + line[39:] if index == 4 else line for index, line in enumerate(record)]
+    assert sdf_charge(anion, "a") == -1                                          # the field of an atom line
+
+
+def ca_atoms(path) -> dict:
+    """Residue number -> the coordinates of its CA atom (Å)."""
+    return {int(line[22:26]): np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])])
+            for line in Path(path).read_text().splitlines()
+            if line.startswith("ATOM") and line[12:16].strip() == "CA"}
+
+
+def write_reference(path, protein, rotation, translation, shift=0.0) -> None:
+    """Another structure of the protein in another frame: the CA atom of every second residue
+    at ``rotation @ x + translation``. ``shift`` (Å) displaces half of them."""
+    lines = []
+    for count, (number, xyz) in enumerate(sorted(ca_atoms(protein).items())[::2]):
+        x, y, z = rotation @ xyz + translation + (shift if count % 2 else 0.0)
+        lines.append(f"ATOM  {count + 1:5d}  CA  GLY A{number:4d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           C")
+    Path(path).write_text("\n".join(lines) + "\nEND\n")
+
+
+def superposed_set(directory, inputs, rotation, translation, shift=0.0):
+    def edit(data):
+        write_reference(directory / "reference.pdb", inputs[0], rotation, translation, shift)
+        data["superpose_on"] = dict(file="reference.pdb", sha256=sha256(directory / "reference.pdb"), max_rmsd=0.1)
+
+    return load_set(write_set(directory, inputs, edit))
+
+
+def test_the_protein_is_put_on_the_reference_structure_and_the_ligands_move_with_it(tmp_path, inputs):
+    """A known rotation and translation, recovered from the CA atoms that the two structures
+    share by residue number."""
+    rotation = Rotation.from_rotvec(np.deg2rad(100.0) * np.array([1.0, 2.0, 3.0]) / np.sqrt(14.0)).as_matrix()
+    translation = np.array([12.0, -7.0, 30.0])
+    benchmark = superposed_set(tmp_path / "set", inputs, rotation, translation)
+    work = tmp_path / "work"
+    prepare_set(benchmark, work)
+    target = ca_atoms(benchmark.directory / "reference.pdb")
+    moved = ca_atoms(work / "inputs" / "protein_superposed.pdb")
+    assert len(moved) == 35 and len(target) == 18
+    assert max(np.abs(moved[number] - xyz).max() for number, xyz in target.items()) < 0.005     # Å
+    before = sdf_coordinates(sdf_records(benchmark.files["ligands"].file)["b D"][0], "b D")
+    after = sdf_coordinates(sdf_records(work / "b_D" / "ligand.sdf")["b D"][0], "b D")
+    assert np.abs(after - (before @ rotation.T + translation)).max() < 0.005
+    assert Path(Config.load(work / "b_D" / "config.yaml").input.protein) == work / "inputs" / "protein_superposed.pdb"
+    assert json.loads((work / "inputs" / "superposition.json").read_text())["matched_ca"] == 18
+
+
+def test_a_reference_structure_of_another_shape_is_refused(tmp_path, inputs):
+    benchmark = superposed_set(tmp_path / "set", inputs, np.eye(3), np.zeros(3), shift=5.0)
+    with pytest.raises(ValueError, match="above max_rmsd = 0.1 nm"):
+        prepare_set(benchmark, tmp_path / "work")
+    assert not (tmp_path / "work" / "a").exists()
+
+
+def test_prepare_writes_a_work_directory_per_ligand_and_one_configuration_only(tmp_path, inputs):
+    benchmark = load_set(write_set(tmp_path / "set", inputs))
+    work = tmp_path / "work"
+    prepare_set(benchmark, work)                                      # the pilot ligands
+    assert sorted(path.name for path in work.iterdir() if path.is_dir()) == ["a", "b_D", "inputs"]
+    config = Config.load(work / "b_D" / "config.yaml")
+    assert Path(config.input.protein) == work / "inputs" / "protein.pdb"
+    assert Path(config.input.ligand) == work / "b_D" / "ligand.sdf"
+    assert list(sdf_records(config.input.ligand)) == ["b D"]          # its own record, nothing else
+    assert (config.run.length_ns, config.run.replicas) == (0.004, 2)
+
+    prepare_set(benchmark, work, "all", length_ns=0.008)              # more ligands and a longer plan: allowed
+    assert [(item.ligand.name, item.config.run.length_ns) for item in prepared_ligands(benchmark, work)] == [
+        ("a", 0.008), ("b D", 0.008), ("c", 0.008)]
+
+    other = load_set(write_set(tmp_path / "other", inputs, lambda data: data["config"].update(metad=dict(height=2.0))))
+    for call in (lambda: prepare_set(other, work), lambda: prepared_ligands(other, work)):
+        with pytest.raises(ValueError, match="another configuration or set definition"):
+            call()
+    text = (work / "a" / "config.yaml").read_text()
+    (work / "a" / "config.yaml").write_text(text.replace("temperature: 300.0", "temperature: 310.0"))
+    assert "temperature: 310.0" in (work / "a" / "config.yaml").read_text()
+    with pytest.raises(ValueError, match="config.yaml was changed"):
+        prepared_ligands(benchmark, work)
 
 
 # ---- statistics -------------------------------------------------------------
