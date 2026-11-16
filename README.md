@@ -176,6 +176,40 @@ workflow.run_replicas(config, "run1")
 print(workflow.format_summary(workflow.analyze_stage("run1", plot=True)))
 ```
 
+## 実在の系の例
+
+`examples/` に、PDB エントリから始めて ΔG° まで進む例を 3 つ置いています。どれも設定ファイルにはプリセットとの差分だけを書いてあり、手順、実験値の出典、実測した結果は各ディレクトリの `README.md` にあります。構造ファイルはリポジトリに入れず、各例の取得手順でダウンロードします。
+
+| 例 | 系 | 入力 | 実験値 |
+|---|---|---|---|
+| `examples/trypsin_benzamidine` | トリプシンとベンザミジン（水中）。funnel metadynamics の文献値と比べられる | PDB 3PTB | −6.4〜−7.3 kcal/mol |
+| `examples/tyk2_ejm46` | キナーゼ TYK2 と阻害剤 ejm_46（水中、膜なし） | PDB 4GIH | Ki 4.8 nM、−11.3 kcal/mol |
+| `examples/a2a_theophylline` | GPCR のアデノシン A2A 受容体とテオフィリン（POPC 膜） | OPM が膜に配向した 5MZJ | Kd 1.64 µM、−7.9 kcal/mol |
+
+## ベンチマーク
+
+実験値と FEP の計算値がそろったリガンド系列を、1 つのコマンド群で準備、実行、集計できます。セットの定義は `examples/benchmarks/<セット>/` にあります。
+
+| セット | 系 | リガンド | 実験 ΔG の範囲 (kcal/mol) | 比較する計算値 |
+|---|---|---|---|---|
+| `examples/benchmarks/tyk2` | キナーゼ TYK2（水中） | 10 | −7.42〜−11.70 | FEP+（Ross et al. 2023） |
+| `examples/benchmarks/a2a` | アデノシン A2A 受容体（POPC 膜） | 8 | −8.89〜−12.07 | FEP+（Ross et al. 2023） |
+
+```bash
+scripts/in_docker.sh fmeta benchmark prepare examples/benchmarks/tyk2 -o runs/bench-tyk2      # パイロットの 3 リガンド。--ligands all で全部
+scripts/in_docker.sh --gpus 0,1,2,3 --detach --name bench-tyk2 \
+    fmeta benchmark run examples/benchmarks/tyk2 -o runs/bench-tyk2 --gpus 0,1,2,3
+scripts/in_docker.sh fmeta benchmark status examples/benchmarks/tyk2 -o runs/bench-tyk2
+scripts/in_docker.sh fmeta benchmark report examples/benchmarks/tyk2 -o runs/bench-tyk2
+```
+
+- `prepare` は、構造と参照値を Schrödinger の公開ベンチマーク（MIT ライセンス）の固定したコミットからダウンロードし、sha256 で検証します。構造ファイルはリポジトリに入れていません。
+- `run` は、全リガンドの構築、平衡化、全レプリカを 1 つのスケジューラで GPU に割り振ります。全リガンドのレプリカ 0 を先に流すので、途中でもセット全体のレポートが出せます。止めても、同じコマンドで続きから再開します。
+- `report` は、リガンドごとの ΔG°（レプリカ平均と 95% 信頼区間）、実験値、FEP 値、再結合の回数、収束の判定を表にします。指標は MUE、RMSE、平均符号つき誤差、Pearson r、Kendall τ で、ブートストラップの信頼区間が付きます。
+- FEP+ の値は、相対計算の結果を実験値の平均に合わせたものです。絶対値を直接求める fmeta と公平に比べるため、平均のずれを除いた MUE と RMSE も同じリガンドで出します。
+- レポートは `bench/reports/` に書きます。実行したコミット、イメージ、ロックを記録し、合否の欄はありません。収束しなかったリガンドも落とさず、判定つきで載せます。
+- 実行条件は公式の既定値で、ベンチマークに合わせた調整はしていません。
+
 ## 仕組み
 
 ### ファネル
