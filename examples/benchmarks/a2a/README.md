@@ -91,8 +91,18 @@ every value is 1 mol/L.
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- The doubly protonated HIS 278 and the kept sodium ion have to survive fmeta's reading of
-  the protein file: check `prepare.log` and `prepared/report.json` of a ligand before a long
-  run.
+- **Do not run this set for results yet.** Measured on 2026-11-16 with the input handling of
+  the commit that added this set (build of `4q`, 110352 atoms, 228 POPC): the protein is not
+  simulated as the file gives it, and `prepare.log` reports it as `[ok ] protein_input`.
+  - The file ends the chain at the gap with hydrogens (`HXT` on LEU 208, `H1`/`H2` on
+    GLU 219) and has no `TER` there. LEU 208 and GLU 219 become neighbours of one chain and
+    get a peptide bond: 1.57 nm long in the prepared system (r0 0.1335 nm, 4.2e5 kJ/mol).
+  - Because those hydrogens fit no residue template, all 2354 hydrogens of the file are
+    removed and 2349 are built at pH 7: HIS 264 and HIS 278 (both doubly protonated in the
+    file) become neutral, and HIS 75, 155 and 250 change from the epsilon to the delta form.
+  - SER 305 (`HXT`, no `OXT` in the file) gets a charged carboxylate.
+  - The sodium ion is kept.
+  The set needs an input handling that keeps the ends of a chain at a gap and the hydrogens
+  of the file; then check `prepare.log` and `prepared/report.json` of a ligand again.
 - The hydrophobic thickness of OPM (2 x 15.7 Å) is not used: the bilayer is built with the
   default `membrane.half_thickness`.
