@@ -38,6 +38,11 @@ Verified on CPU only (see `PROGRESS.md`).
   `docs/configuration.md` gives the origin of every value. Tests hold the three together. The
   defaults that differ from the literature are listed there and are the questions of the scan
   on trypsin-benzamidine (R2). GPU gates on this code: not run yet.
+- **R8 — Real inputs, membrane part** (2026-11-16, FM-D15). `fmeta split --drop` removes a fusion
+  partner before anything is derived; a component kept with `system.keep_hetero` is part of the
+  receptor (restrained, an obstacle for the funnel, in the box rule); an orientation that could
+  not be checked is a warning; a membrane box is built 8% above the box rule. GPU gates on this
+  code: not run yet. Open: the protein part below.
 
 ## Next
 
@@ -47,13 +52,15 @@ Plan for R2, R3 and R7–R10: `docs/plans/2026-11-15-gpu-validation-modes-benchm
   replicas to convergence, compared with experiment and published funnel-metadynamics values.
   Reported, not gated.
 - **R3 — Membrane validation.** A GPCR with a weak ligand (adenosine A2A with theophylline,
-  5MZJ): funnel placement and membrane-plane estimate on a real structure against its OPM
-  orientation; then a production run.
+  5MZJ, `examples/a2a_theophylline`). Done on the OPM file: the build (221143 atoms), the funnel
+  into the extracellular water, 1 ns of equilibration, and the membrane-plane estimate against
+  the OPM orientation (14° and 0.2 nm off). Open: the input as `fmeta split` writes it (R8),
+  10 ns of equilibration, the production run.
 - **R5 — Ligand charge states.** Choose the protonation state from pKa rather than taking the
   SDF as drawn.
 - **R6 — More membrane compositions.** Mixed bilayers and cholesterol through custom patches.
-- **R8 — Real inputs.** Chain breaks capped; caps and protonation states of a prepared
-  structure kept; kept non-protein components restrained and seen by the funnel placement.
+- **R8 — Real inputs, protein part.** Chain breaks capped; caps and protonation states of a
+  prepared structure kept; a kept component that follows the chain without `TER`.
 - **R10 — Examples and benchmarks.** A kinase (TYK2, 4GIH) and a GPCR (A2A, 5MZJ) example with
   experimental values; `fmeta benchmark` on a TYK2 and an A2A set that have experimental and
   FEP values; reports in `bench/reports/`.

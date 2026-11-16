@@ -59,6 +59,46 @@ def test_split_complex_adds_hydrogens_from_smiles(inputs, tmp_path):
         split_complex(tmp_path / "complex.pdb", "XXX", tmp_path / "bad", smiles="C")
 
 
+def test_split_drops_chains_and_residue_ranges_before_the_ligand_search(tmp_path, capsys):
+    """`fmeta split --drop` on a receptor with a fusion partner numbered 1001-1106 in the same
+    chain and a second copy of the complex in chain B."""
+    from fmeta.cli import main as cli
+    topology = app.Topology()
+    carbon, hydrogen = app.Element.getBySymbol("C"), app.Element.getBySymbol("H")
+    labels = {"A": ["11", "208", "1001", "1050", "1050A", "1106", "1106A", "1107", "219"], "B": ["5"]}
+    for chain_id, residues in labels.items():
+        chain = topology.addChain(chain_id)
+        for label in residues:
+            residue = topology.addResidue("GLY", chain, label.rstrip("A"), label[4:])
+            topology.addAtom("CA", carbon, residue)
+        methane = topology.addResidue("LIG", chain, "2401")
+        atoms = [topology.addAtom(name, element, methane) for name, element in
+                 [("C1", carbon)] + [(f"H{k}", hydrogen) for k in range(1, 5)]]
+        for atom in atoms[1:]:
+            topology.addBond(atoms[0], atom)
+    positions = np.random.default_rng(0).uniform(0.0, 3.0, size=(topology.getNumAtoms(), 3))
+    with open(tmp_path / "fusion.pdb", "w") as handle:
+        app.PDBFile.writeFile(topology, positions * unit.nanometer, handle, keepIds=True)
+
+    def kept(*drop):
+        out = tmp_path / f"out{len(list(tmp_path.iterdir()))}"
+        cli(["split", str(tmp_path / "fusion.pdb"), "--resname", "LIG", "-o", str(out)]
+            + [word for selection in drop for word in ("--drop", selection)])
+        return [f"{r.chain.id}{r.id}{r.insertionCode.strip()}"
+                for r in read_structure(out / "protein.pdb")[0].residues()]
+
+    # numbers, not strings ("11" and "208" sort between "1001" and "1106"); insertion codes go
+    # with their number; chain B and its ligand copy are gone before the ligand is looked for
+    assert kept("A:1001-1106", "B") == ["A11", "A208", "A1107", "A219"]
+    assert "dropped A:1001-1106: 5 residues (GLY1001 to GLY1106A)" in capsys.readouterr().out
+    assert kept("A:1050A", "B:2401") == ["A11", "A208", "A1001", "A1050", "A1106", "A1106A",
+                                         "A1107", "A219", "B5"]
+    for drop, message in (([], "exactly one"), (["A:3000-3010", "B"], "matches no residue"),
+                          (["A:1106-1001", "B"], "ends before"), (["A:1001..1106", "B"], "cannot read")):
+        with pytest.raises(ValueError, match=message):
+            split_complex(tmp_path / "fusion.pdb", "LIG", tmp_path / "bad", drop=drop)
+
+
 def test_complex_input_through_prepare_stage(inputs, tmp_path):
     """A PDB-style complex and a SMILES are enough to get a solvated system with a funnel."""
     pytest.importorskip("rdkit")

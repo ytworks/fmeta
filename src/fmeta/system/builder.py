@@ -36,7 +36,7 @@ from .imaging import make_whole
 from .inputs import complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein
 from .ligand import register_ligand
 from .orientation import fit_membrane, orient
-from .selection import Selection, classify
+from .selection import PROTEIN_RESIDUES, WATER_RESIDUES, Selection, classify
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +134,14 @@ def box_vectors(distance: float, shape: str):
     return [mm.Vec3(*row) * unit.nanometer for row in rows]
 
 
+# The height a freshly built bilayer system needs on top of the rule, for NPT. The solvent is
+# placed less dense than it becomes, and with the bilayer holding x and y the whole change goes
+# into z: the first real build (A2A in 484 POPC, 210 892 atoms) lost 3.5% of its height in 1 ns
+# while x and y changed by 0.2%, and the height the funnel needs grew by 1.2% as its axis moved
+# with the protein. With the 3% of a water box that system failed the box rule (FM-D15).
+MEMBRANE_NPT_ALLOWANCE = 1.08
+
+
 def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
                    cutoff: float, padding: float) -> float:
     """Box height for a membrane system.
@@ -142,7 +150,7 @@ def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
     a cutoff (plus 0.5 nm) from the periodic image above or below, the ligand
     must stay nearer to its own protein than to the copy above or below (the
     z component of the ligand-anchor vector under half the box), and the solute
-    needs ordinary solvent padding. 3% is added for NPT.
+    needs ordinary solvent padding. ``MEMBRANE_NPT_ALLOWANCE`` is added for NPT.
     """
     coords = positions[solute]
     z_min, z_max = float(coords[:, 2].min()), float(coords[:, 2].max())
@@ -154,18 +162,31 @@ def membrane_box_z(funnel: Funnel, positions: np.ndarray, solute: np.ndarray,
     images = span + cutoff + 0.5
     _, axis, _ = funnel_frame(funnel, positions)
     reach_z = abs(axis[2]) * (funnel.upper + 0.3) + funnel.max_radius
-    return 1.03 * max(images, 2.0 * (reach_z + 0.3), (z_max - z_min) + 2.0 * padding)
+    return MEMBRANE_NPT_ALLOWANCE * max(images, 2.0 * (reach_z + 0.3), (z_max - z_min) + 2.0 * padding)
 
 
 def remap_atoms(old_positions: np.ndarray, new_positions: np.ndarray,
                 atoms: Sequence[int]) -> list[int]:
     """Find, in a rebuilt structure, the atoms that sit where ``atoms`` were.
     Solvation and membrane building keep the solute coordinates but may reorder atoms."""
+    if len(atoms) == 0:
+        return []
     tree = cKDTree(new_positions)
     distance, index = tree.query(old_positions[list(atoms)])
     if distance.max() > 1.0e-3:
         raise RuntimeError("solute atoms moved during system building; cannot map the funnel")
     return [int(i) for i in index]
+
+
+def kept_atoms(topology: app.Topology, names: Sequence[str], ligand_atoms: Sequence[int]) -> list[int]:
+    """Atoms of the non-protein residues of the dry complex that ``system.keep_hetero`` kept
+    (a structural ion, a cofactor). The dry complex holds no solvent yet, so a residue of one
+    of these names is one that came with the input structure. Amino acids stay protein and
+    water stays water (mobile) even when they are named there."""
+    wanted = {name.strip().upper() for name in names} - PROTEIN_RESIDUES - WATER_RESIDUES
+    ligand = set(int(i) for i in ligand_atoms)
+    return [atom.index for residue in topology.residues() if residue.name.strip().upper() in wanted
+            for atom in residue.atoms() if atom.index not in ligand]
 
 
 def remap_funnel(funnel: Funnel, old_positions: np.ndarray, new_positions: np.ndarray) -> Funnel:
@@ -229,8 +250,12 @@ def _membrane_orientation(topology: app.Topology, positions: np.ndarray,
                 "could not find a hydrophobic belt to orient the protein by (" + detail + "); "
                 "supply a structure that is already oriented (e.g. from the OPM database) "
                 "and set membrane.orient to 'input'")
-        return positions, ("ok", "no clear hydrophobic belt found (" + detail + "); "
-                           "taking the input orientation as given", {"confident": False})
+        # Not "ok": nothing was checked, and a wrong orientation puts the bilayer through the
+        # protein without any later step noticing (FM-D15).
+        return positions, ("warning", "the orientation of the input could not be checked: no "
+                           "clear hydrophobic belt found (" + detail + "). The input is taken "
+                           "as given; use an OPM-oriented structure, and set membrane.orient: "
+                           "input once the orientation is known to be right", {"confident": False})
     info = dict(confident=True, score=fit.score, contrast=fit.contrast)
     if membrane.orient == "auto":
         new, rotation, translation = orient(positions, fit, membrane.center_z)
@@ -335,7 +360,10 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     if membrane is not None:
         dry_positions, orientation = _membrane_orientation(dry_topology, dry_positions, membrane)
         modeller.positions = dry_positions * unit.nanometer
-    dry_selection = classify(dry_topology, ligand_atoms)
+    # The components kept from the input structure are part of the receptor: obstacles for the
+    # funnel, inside the box, held with the protein in equilibration (FM-D15).
+    kept = kept_atoms(dry_topology, settings.keep_hetero, ligand_atoms)
+    dry_selection = classify(dry_topology, ligand_atoms, kept)
     # before anything else: is the ligand where a bound ligand would be?
     contact = pose_contact(dry_positions, dry_selection)
     if contact[0] == "error":
@@ -386,7 +414,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     topology = modeller.topology
     positions = np.array(modeller.positions.value_in_unit(unit.nanometer))
     funnel = remap_funnel(funnel, dry_positions, positions)
-    selection = classify(topology, remap_atoms(dry_positions, positions, ligand_atoms))
+    selection = classify(topology, remap_atoms(dry_positions, positions, ligand_atoms),
+                         remap_atoms(dry_positions, positions, kept))
     system = create_system(forcefield, topology, settings)
     restraint = add_funnel_restraint(system, funnel)
 
@@ -403,14 +432,16 @@ def prepare_from_system(topology: app.Topology, system: mm.System, positions,
                         ligand=None, settings: Optional[SystemSettings] = None,
                         funnel_settings: Optional[AutoFunnelSettings] = None,
                         funnel_overrides: Optional[dict] = None,
-                        funnel: Optional[Funnel] = None) -> Prepared:
+                        funnel: Optional[Funnel] = None, kept: Sequence[int] = ()) -> Prepared:
     """Attach a funnel to an OpenMM system that is already parameterised and
-    solvated (for use from Python). Lipids in the topology make it a membrane system."""
+    solvated (for use from Python). Lipids in the topology make it a membrane system.
+    ``kept`` names atoms of ions or other components that belong to the receptor
+    (see ``classify``); without it an ion is taken for one of the solvent."""
     settings = settings or SystemSettings()
     if unit.is_quantity(positions):
         positions = positions.value_in_unit(unit.nanometer)
     positions = np.asarray(positions, dtype=float)
-    selection = classify(topology, ligand)
+    selection = classify(topology, ligand, kept)
     is_membrane = selection.lipid.size > 0
     vectors = topology.getPeriodicBoxVectors()
     if vectors is None:

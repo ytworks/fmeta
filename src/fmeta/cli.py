@@ -95,8 +95,11 @@ def cmd_init(args) -> None:
 
 def cmd_split(args) -> None:
     from .system.inputs import split_complex
+    notes: list[str] = []
     protein, ligand = split_complex(args.complex, args.resname, args.out, args.smiles,
-                                    args.chain, args.resid)
+                                    args.chain, args.resid, drop=args.drop, notes=notes)
+    for note in notes:
+        print(note)
     print(f"wrote {protein} and {ligand}")
 
 
@@ -222,6 +225,9 @@ def main(argv=None) -> None:
     sub.add_argument("--smiles", help="ligand SMILES in the protonation state to simulate")
     sub.add_argument("--chain")
     sub.add_argument("--resid")
+    sub.add_argument("--drop", action="append", default=[], metavar="CHAIN[:FIRST-LAST]",
+                     help="remove a chain or a residue range of it first, e.g. the fusion partner "
+                          "A:1001-1106 (repeatable; insertion codes go with their number)")
     sub.add_argument("-o", "--out", default="inputs")
     sub.set_defaults(func=cmd_split)
 

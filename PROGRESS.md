@@ -25,8 +25,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D14 and D16 Accepted;
-FM-D2, D4, D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D16 Accepted, of FM-D15 the
+membrane part; FM-D2, D4, D5, D6, D7, D11 and D12 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -43,11 +43,13 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine; the CI job `docker` and the publish workflow have never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
-| GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`; `pytest` 109 passed. GPU gates not run on this code yet. The scan of the defaults (M4) is not started |
-| GPU plan M2, M5 infrastructure: real inputs, benchmark commands (R8, R10) | In progress on separate branches; not merged, not gated |
-| GPU plan M4: trypsin-benzamidine (R2) | Running: 5 replicas × 500 ns from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, about 18 h at 685 ns/day. No result yet |
-| GPU plan M5: kinase example (R10) | Running: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms), replica 0 on GPU 5 (container `fmeta-tyk2`, commit 8d1f10a) since 2026-11-15 23:30 UTC; the other replicas follow when GPUs 0–4 are free. No result yet |
-| GPU plan M6, M7: GPCR example, benchmark runs (R3, R9, R10) | Not started |
+| GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates not run on this code yet |
+| GPU plan M2: real inputs (R8, FM-D15) | Membrane part merged: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule; `pytest` 113 passed. GPU gates not run on this code yet, and the real `addMembrane` test (`-m slow`) not rerun. Protein part (chain gaps, caps, protonation states) in progress on a branch |
+| GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | In progress on a branch; not merged, not gated |
+| GPU plan M4: trypsin-benzamidine (R2) and the scan of the defaults | Running: 5 replicas × 500 ns from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, 33 ns each at 2026-11-16 00:29 UTC (660 ns/day). Scan (protocol and decision rule in `examples/trypsin_benzamidine/README.md`, written before the runs): `dt2` running, 3 × 200 ns at 2 fs on GPUs 5–7 (container `fmeta-scan-dt2`) since 00:22 UTC; `pace2` and `srho03` prepared, not started. No result yet |
+| GPU plan M5: kinase example (R10) | Paused: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms, commit 8d1f10a). Replica 0 ran on GPU 5 from 2026-11-15 23:30 UTC and was stopped at 2026-11-16 00:22 UTC for the scan; all replicas continue from the checkpoints when GPUs are free. No result yet |
+| GPU plan M6: GPCR example (R3) | Draft: `examples/a2a_theophylline` (OPM file of 5MZJ, 221143 atoms, 484 POPC). Builds, places the funnel into the extracellular water and passes 1 ns of equilibration with a placeholder input (`TER` records added by hand); as `fmeta split` writes it, `prepare` stops (kept ion read into the protein chain). No metadynamics yet |
+| GPU plan M7: benchmark runs (R10) | Not started |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 8d1f10a
   (CUDA, mixed precision, 2 GPUs, in the image):
@@ -70,10 +72,28 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   must be prepared again; the gate `toy_free_energy` passes with 0.04 kJ/mol to spare, and
   about 1 run in 30 of its 10 ns misses the criterion on every platform (FM-D12), so a change
   of the toy trajectory (another GPU, another OpenMM) can fail it without a defect.
-- Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
-  machine as the git credential; the owner added the `workflow` scope).
+- GPUs (plan decision changed 2026-11-16, see the Change Log): 0–4 trypsin, 5–7 the scan. Gates
+  run on 6–7 with the scan container stopped for the run and restarted with the same command.
+- Time estimate from the measured speeds (72k atoms 660, 88k atoms 570 ns/day at 4 fs; the A2A
+  box, 221k atoms, 167 ns/day at 2 fs in equilibration, 4 fs not measured): the TYK2 pilot
+  (3 ligands × 5 × 500 ns) is about 13 GPU-days. Everything planned is about 115 GPU-days, two
+  weeks on 8 GPUs: TYK2 44, A2A 67 if 4 fs gives twice the speed of 2 fs, trypsin with the scan 7.
+- Blockers: the A2A example waits for the protein part of FM-D15 (a kept ion that follows the
+  chain without `TER`, caps at the loop gap). Nothing else. Pushes from the GPU machine work
+  since 2026-11-16 (the `gh` login of the machine as the git credential; the owner added the
+  `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] Plan decision on the GPUs changed: the scan also runs on GPUs 6–7, TYK2 paused
+- What: the plan kept GPUs 0–5 for production and 6–7 for gates and development. Now GPUs 5–7 run the three 2 fs replicas of the scan (`fmeta-scan-dt2`, started 00:22 UTC, 3 × 200 ns, 360–390 ns/day on an unshared GPU); for a gate run that container is stopped and afterwards started again with the same command. The TYK2 run on GPU 5 was stopped at 00:22 UTC (replica 0 near 25 ns) and continues from its checkpoints later. The scan protocol and its decision rule were committed (2cf99bd) before any scan run started; `pace2` and `srho03` follow when GPUs are free.
+- Why: three facts. A full gate run takes 234 s, so GPUs 6–7 stood idle nearly all the time. `docker stop` and the exact continuation of a run are verified (trypsin, 2026-11-16). The scan decides the defaults before a benchmark may start, so it sets the date of everything after it, and the owner asked for the shortest time.
+- Refs: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md` (GPU allocation), `examples/trypsin_benzamidine/README.md` ("Scan of the defaults"), FM-D14, FM-D16.
+
+### 2026-11-16 — [design] FM-D15, membrane part: parts dropped first, kept components are receptor, orientation warning, box height
+- What: `fmeta split --drop CHAIN[:FIRST-LAST]`; a component kept with `system.keep_hetero` is class `other` (restrained, funnel obstacle, in the box rule; `kept_atoms` in `meta.json`); an orientation that could not be checked is a warning, not "ok"; a membrane box is built 8% above the box rule (the rule itself unchanged). `examples/a2a_theophylline` (draft) replaces `examples/gpcr_membrane`: first real A2A build from the OPM file of 5MZJ, 221143 atoms, 484 POPC, funnel exit 16° from +z into the extracellular water, 1 ns equilibration passes (wall energy 0.000 kJ/mol), about 167 ns/day at 2 fs. Experimental values of theophylline from ChEMBL records: −7.9 to −6.5 kcal/mol, Kd on the crystal construct −7.89. `ruff` passes, `pytest` 113 passed; each regression test failed before its fix. Not run: GPU gates, `-m slow`.
+- Why: with 3% the A2A box lost 3.5% of its height under NPT and `equilibrate` stopped on `box_cv`; a kept Na+ was neither restrained nor an obstacle; a check that checked nothing read as a pass. Open: a kept ion inside the protein chain stops `prepare`, caps at chain gaps, protonation states of a prepared file (protein part of FM-D15, on a branch); 8% rests on two runs of 1 ns.
+- Refs: FM-D15 (`docs/design/engine.md`), roadmap R8 and R3, `examples/a2a_theophylline/`, `src/fmeta/system/`, c0981f7 407c7cb f06d9c1 99af428 bd08b67 2d061d9.
 
 ### 2026-11-16 — [progress] Fixed: dG(t) of a run with an uneven number of hills had only a few points
 - What: `analyze_run` took dG(t) where a multiple of `len(hills) // 20` met a multiple of `len(hills) // 200`. With a hill count that is a multiple of 200 that is 20 points (unchanged by the fix). With any other count, as in a run analysed before its end, it was 1 to 7 points, so the plateau mean and its drift came from 1 to 3 values. The stride of dG(t) is now a multiple of the stride of c(t). Found on the trypsin run at 20 ns (plateau std 0.00 on four of five replicas; after the fix every replica reports its drift, 1 to 4 rebinding events each, not converged, as expected at 4% of the length). The regression test fails on the code before (7 points at 650 hills). `ruff` passes, `pytest` 110 passed.

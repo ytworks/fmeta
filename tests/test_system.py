@@ -9,15 +9,18 @@ import openmm.app as app
 import openmm.unit as unit
 import pytest
 from fixtures import BENZENE_XML
+from scipy.spatial import cKDTree
 
 from fmeta.cli import main as cli
 from fmeta.config import Config
-from fmeta.engine.equilibration import EquilibrationResult
+from fmeta.engine.equilibration import EquilibrationResult, _add_position_restraints
 from fmeta.engine.hills import read_colvar
 from fmeta.funnel.geometry import compute_cvs, funnel_frame
 from fmeta.funnel.validate import required_image_distance
 from fmeta.system.builder import (
+    SystemSettings,
     box_vectors,
+    prepare,
     prepare_from_system,
     remap_atoms,
 )
@@ -140,6 +143,57 @@ def test_prepare_soluble(prepared, inputs):
     context.setPositions(p.positions)
     wall = context.getState(getEnergy=True, groups={p.restraint_group}).getPotentialEnergy()
     assert wall.value_in_unit(unit.kilojoule_per_mole) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_a_kept_ion_stays_part_of_the_receptor(inputs, tmp_path):
+    """A sodium ion kept from the input (``system.keep_hetero``) is still told apart from the
+    sodium ions of the solvent in the built system and after a reload, and equilibration
+    holds it in place with the protein (FM-D15)."""
+    source = app.PDBFile(inputs[0])
+    protein = np.array(source.positions.value_in_unit(unit.nanometer))
+    centre = protein.mean(axis=0)
+    away = centre - read_ligand(inputs[1], "BNZ")[1].mean(axis=0)     # the side opposite the ligand
+    away /= np.linalg.norm(away)
+    tree = cKDTree(protein)
+    point = next(centre + step * away for step in np.arange(0.0, 5.0, 0.05)
+                 if tree.query(centre + step * away)[0] >= 0.4)
+    extra = app.Topology()
+    extra.addAtom("NA", app.Element.getBySymbol("Na"), extra.addResidue("NA", extra.addChain("I")))
+    modeller = app.Modeller(source.topology, source.positions)
+    modeller.add(extra, [mm.Vec3(*point)] * unit.nanometer)
+    path = str(tmp_path / "protein_na.pdb")
+    with open(path, "w") as handle:
+        app.PDBFile.writeFile(modeller.topology, modeller.positions, handle)
+
+    p = prepare(path, inputs[1], SystemSettings(**SETTINGS, keep_hetero=["NA"]))
+    (ion,) = p.selection.other
+    atoms = list(p.topology.atoms())
+    assert atoms[ion].residue.name == "NA" and np.allclose(p.positions[ion], point, atol=1e-3)
+    bulk = [int(i) for i in p.selection.ion if atoms[i].residue.name == "NA"]
+    assert bulk and p.report.ok                              # the same name, from the solvent
+
+    work = tmp_path / "work"
+    (work / "prepared").mkdir(parents=True)
+    save_prepared(p, work / "prepared")
+    config = Config.from_dict({"input": {"protein": inputs[0], "ligand": inputs[1]}, "system": SETTINGS})
+    assert list(load_prepared(work, config).selection.other) == [ion]
+
+    # the restraint of the first equilibration stages: on the kept ion, not on a solvent ion
+    carrier = mm.System()
+    for _ in range(len(p.positions)):
+        carrier.addParticle(1.0)
+    carrier.setDefaultPeriodicBoxVectors(*[mm.Vec3(*vector) for vector in p.box_vectors])
+    _add_position_restraints(carrier, p, 1000.0)
+    context = mm.Context(carrier, mm.VerletIntegrator(0.001), mm.Platform.getPlatformByName("Reference"))
+
+    def energy(moved):
+        positions = p.positions.copy()
+        positions[moved] += [0.1, 0.0, 0.0]
+        context.setPositions(positions)
+        return context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+
+    assert energy(ion) == pytest.approx(0.5 * 1000.0 * 0.1**2)
+    assert energy(bulk[0]) == pytest.approx(0.0, abs=1e-9)
 
 
 def test_prepare_from_presolvated_system(prepared):

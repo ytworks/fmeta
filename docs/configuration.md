@@ -88,7 +88,7 @@ Either `protein` and `ligand`, or `complex` and `ligand_resname`.
 | `system.ligand_forcefield` | - | `openff-2.2.1` | The force field of the generator. `null` means the pinned one of the method: `openff-2.2.1` for `openff`, `gaff-2.11` for `gaff`. Design: FM-D11 and FM-D16: the generators have no default, and a result must not depend on the versions that happen to be installed. Both pins prescribe AM1-BCC charges; `openff-2.3.0`, which the image also offers, prescribes NAGL charges (measured, FM-D16). With `ligand_method: xml` it is not used. |
 | `system.ligand_charge_method` | - | `null` | `null`: the generator assigns the charges its force field prescribes. For both pins that is AM1-BCC, computed in the official image by `sqm` of AmberTools 26.0 (measured, FM-D16). Otherwise a charge method of the OpenFF toolkit (`am1bcc`, `gasteiger`, a NAGL model name): the charges are then assigned before the generator sees the molecule. |
 | `system.fix_protein` | - | `null` | Repair the protein with PDBFixer (missing atoms, non-standard residues). `null`: whenever PDBFixer is installed, as it is in the official image (design: FM-D11). |
-| `system.keep_hetero` | - | `[]` | Residue names of non-protein groups to keep, e.g. `[ZN]`. The files of `forcefields` must cover them. Everything else that is not an amino acid is removed. |
+| `system.keep_hetero` | - | `[]` | Residue names of non-protein groups to keep, e.g. `[ZN]`. The files of `forcefields` must cover them. A kept group is part of the receptor: restrained in equilibration, an obstacle for the funnel, counted for the box (design: FM-D15). Everything else that is not an amino acid is removed. |
 | `system.ligand_xml` | path | `[]` | ffxml file(s) with the residue template of the ligand, for `ligand_method: xml`. |
 | `system.ligand_resname` | - | `LIG` | The residue name the ligand gets in the system. |
 | `system.keep_water` | - | `false` | Keep the water molecules of the protein file. Convention. |
@@ -112,7 +112,7 @@ Absent or `null`: no bilayer. The section exists in the preset `membrane` only.
 | `membrane.center_z` | nm | `0.0` | z of the membrane midplane in the frame of the input files. Convention: the protein is given with the membrane normal along z and the midplane at z = 0. |
 | `membrane.half_thickness` | nm | `2.2` | Half the thickness of the slab that stands for the bilayer while the funnel is placed, before the lipids exist (design: FM-D8). No source: convention. |
 | `membrane.patch` | path | `null` | A pre-equilibrated bilayer patch (PDB) that is used instead of `lipid`. |
-| `membrane.orient` | - | `check` | `check`: warn when the hydrophobic belt of the protein is tilted more than 25 degrees or its midplane is more than 1.0 nm from `center_z`. `auto`: re-orient the complex onto the plane estimated from the belt (an error when no belt is found with confidence). `input`: trust the files. Design: FM-D8. |
+| `membrane.orient` | - | `check` | `check`: warn when the hydrophobic belt of the protein is tilted more than 25 degrees or its midplane is more than 1.0 nm from `center_z`, and also when no belt is found with confidence, so that nothing was checked. `auto`: re-orient the complex onto the plane estimated from the belt (an error when no belt is found with confidence). `input`: trust the files. Design: FM-D8, FM-D15. |
 
 ## funnel
 
