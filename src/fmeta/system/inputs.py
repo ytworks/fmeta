@@ -10,6 +10,8 @@ import numpy as np
 import openmm.app as app
 import openmm.unit as unit
 
+from .protein import ProteinInput, build_model, read_states, scan_pdb
+
 
 def _nm(positions) -> np.ndarray:
     return np.array(positions.value_in_unit(unit.nanometer), dtype=float)
@@ -114,7 +116,7 @@ def pdbfixer_available() -> bool:
 
 
 def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
-                 keep_hetero: Sequence[str] = ()) -> tuple[app.Topology, np.ndarray, list[str]]:
+                 keep_hetero: Sequence[str] = ()) -> ProteinInput:
     """Read a protein file and reduce it to what will be simulated.
 
     Everything that is not an amino-acid residue is removed: other ligands,
@@ -122,36 +124,37 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     residues in ``keep_hetero`` to keep them; the force-field files must then
     cover them. With ``fix`` (default: whenever PDBFixer is installed)
     non-standard amino acids are replaced by their standard parents and missing
-    heavy atoms are built; unresolved loops are not modelled.
+    heavy atoms are built. Unresolved loops are not modelled: the chain is split
+    there and its two ends are capped with NME and ACE. Caps of the input are
+    kept, and so are the protonation states its hydrogens or residue names state
+    (``system/protein.py``, FM-D15).
 
-    Returns the topology, the positions in nm and a list of notes saying what
-    was changed.
+    Returns the topology, the positions in nm, the protonation states to build
+    (``variants``, for ``complete_hydrogens``), notes saying what was changed
+    and the same facts as ``info`` for the report.
     """
     topology, positions = read_structure(path)
-    notes = []
-    keep = {name.strip().upper() for name in keep_hetero}
-    removed: dict[str, int] = {}
-    doomed = []
-    for residue in topology.residues():
-        name = residue.name.strip().upper()
-        amino_acid = _BACKBONE <= {atom.name for atom in residue.atoms()}
-        if amino_acid or name in keep or (keep_water and name in _WATER):
-            continue
-        doomed.append(residue)
-        removed[name] = removed.get(name, 0) + 1
-    modeller = app.Modeller(topology, positions * unit.nanometer)
-    if doomed:
-        modeller.delete(doomed)
-        listing = ", ".join(f"{name} x{count}" for name, count in sorted(removed.items()))
-        notes.append(f"removed from the protein file: {listing}")
-    if modeller.topology.getNumAtoms() == 0:
+    pdb = Path(path).suffix.lower() in (".pdb", ".ent")
+    altlocs, names = scan_pdb(path) if pdb else ([], {})
+    protein = build_model(topology, positions, keep_hetero, keep_water, names)
+    if not any(_BACKBONE <= {atom.name for atom in residue.atoms()}
+               for residue in protein.topology.residues()):
         raise ValueError(f"{path} contains no amino-acid residues")
+    protein.info["alternate_locations"] = altlocs
+    if altlocs:
+        protein.notes.append("alternate locations: the first listed was taken ("
+                             + ", ".join(f"{found['residue']} {found['kept']}" for found in altlocs) + ")")
 
     use_fixer = pdbfixer_available() if fix is None else fix
     if use_fixer:
+        modeller = app.Modeller(protein.topology, protein.positions * unit.nanometer)
         modeller, fixed = _fix_with_pdbfixer(modeller)
-        notes += fixed
-    return modeller.topology, _nm(modeller.positions), notes
+        if modeller.topology.getNumResidues() != len(protein.variants):
+            raise RuntimeError("PDBFixer changed the number of residues of the protein")
+        protein.topology, protein.positions = modeller.topology, _nm(modeller.positions)
+        protein.notes += fixed
+    read_states(protein)
+    return protein
 
 
 def _fix_with_pdbfixer(modeller: app.Modeller) -> tuple[app.Modeller, list[str]]:
@@ -180,20 +183,25 @@ def _fix_with_pdbfixer(modeller: app.Modeller) -> tuple[app.Modeller, list[str]]
     return app.Modeller(fixer.topology, fixer.positions), notes
 
 
-def complete_hydrogens(modeller: app.Modeller, forcefield: app.ForceField, ph: float) -> list[str]:
+def complete_hydrogens(modeller: app.Modeller, forcefield: app.ForceField, ph: float,
+                       variants: Optional[Sequence[Optional[str]]] = None) -> list[str]:
     """Add the protein's missing hydrogens in place. If the hydrogens already in
-    the file do not fit the force field's naming, they are removed and rebuilt."""
+    the file do not fit the force field's naming, they are removed and rebuilt.
+    ``variants`` (one entry per residue, ``read_protein`` gives them) are the
+    protonation states the input states: they hold against ``ph`` and through a
+    rebuild."""
     notes = []
     before = modeller.topology.getNumAtoms()
+    variants = None if variants is None else list(variants)
     try:
-        modeller.addHydrogens(forcefield, pH=ph)
+        modeller.addHydrogens(forcefield, pH=ph, variants=variants)
     except Exception:
         hydrogens = [a for a in modeller.topology.atoms()
                      if a.element is not None and a.element.symbol == "H"]
         modeller.delete(hydrogens)
         before = modeller.topology.getNumAtoms()
         try:
-            modeller.addHydrogens(forcefield, pH=ph)
+            modeller.addHydrogens(forcefield, pH=ph, variants=variants)
         except Exception as error:
             hint = "" if pdbfixer_available() else (
                 " Installing PDBFixer (conda install -c conda-forge pdbfixer) lets fmeta repair "

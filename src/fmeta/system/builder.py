@@ -36,6 +36,7 @@ from .imaging import make_whole
 from .inputs import complete_hydrogens, ensure_ligand_hydrogens, read_ligand, read_protein
 from .ligand import register_ligand
 from .orientation import fit_membrane, orient
+from .protein import model_states
 from .selection import PROTEIN_RESIDUES, WATER_RESIDUES, Selection, classify
 
 log = logging.getLogger(__name__)
@@ -288,23 +289,28 @@ def _built_report(placement: FunnelReport, built: FunnelReport) -> FunnelReport:
 # ---- the build -------------------------------------------------------------
 
 def build_complex(protein, ligand, forcefield: app.ForceField, settings: SystemSettings,
-                  scratch_dir=None) -> tuple[app.Modeller, list[int], list[str]]:
+                  scratch_dir=None) -> tuple[app.Modeller, list[int], list[str], dict]:
     """Dry protein-ligand complex from a protein file and a posed ligand file.
 
-    The protein is reduced to its amino-acid residues, repaired if PDBFixer is
-    available, and given hydrogens; a ligand SDF without hydrogens gets them
-    from RDKit. Returns the modeller, the ligand atom indices and notes on
-    everything that was changed along the way.
+    The protein is reduced to its amino-acid residues, split and capped where
+    residues are missing, repaired if PDBFixer is available, and given hydrogens
+    in the protonation states the input states; a ligand SDF without hydrogens
+    gets them from RDKit. Returns the modeller, the ligand atom indices, notes on
+    everything that was changed along the way and the facts of the protein model
+    for the report (``read_protein``, plus its histidine states and disulfides).
     """
-    topology, positions, notes = read_protein(protein, settings.fix_protein, settings.keep_water,
-                                              settings.keep_hetero)
-    modeller = app.Modeller(topology, positions * unit.nanometer)
+    model = read_protein(protein, settings.fix_protein, settings.keep_water, settings.keep_hetero)
+    modeller = app.Modeller(model.topology, model.positions * unit.nanometer)
+    notes, info = list(model.notes), dict(model.info)
     if settings.add_hydrogens:
-        notes += complete_hydrogens(modeller, forcefield, settings.ph)
+        notes += complete_hydrogens(modeller, forcefield, settings.ph, model.variants)
+    info.update(model_states(modeller.topology))
+    if info["disulfides"]:
+        notes.append(f"{len(info['disulfides'])} disulfide bonds")
     ligand_topology, ligand_positions = read_ligand(ligand, settings.ligand_resname)
     first = modeller.topology.getNumAtoms()
     modeller.add(ligand_topology, ligand_positions * unit.nanometer)
-    return modeller, list(range(first, modeller.topology.getNumAtoms())), notes
+    return modeller, list(range(first, modeller.topology.getNumAtoms())), notes, info
 
 
 def pose_contact(positions: np.ndarray, selection: Selection) -> tuple[str, str]:
@@ -351,7 +357,8 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     ligand, ligand_notes = ensure_ligand_hydrogens(ligand, scratch_dir)
     register_ligand(forcefield, ligand, settings.ligand_method, settings.ligand_forcefield,
                     settings.ligand_charge_method)
-    modeller, ligand_atoms, protein_notes = build_complex(protein, ligand, forcefield, settings)
+    modeller, ligand_atoms, protein_notes, protein_info = build_complex(protein, ligand, forcefield,
+                                                                        settings)
     for note in protein_notes + ligand_notes:
         log.info(note)
     dry_topology = modeller.topology
@@ -385,6 +392,7 @@ def prepare(protein, ligand, settings: Optional[SystemSettings] = None,
     for name, notes in (("protein_input", protein_notes), ("ligand_input", ligand_notes)):
         if notes:
             report.add(name, "warning" if name == "ligand_input" else "ok", "; ".join(notes))
+    report.info["protein_input"] = protein_info
     report.add("pose_contact", *contact)
     report.raise_for_errors()
 

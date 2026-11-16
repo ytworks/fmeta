@@ -25,8 +25,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D16 Accepted, of FM-D15 the
-membrane part; FM-D2, D4, D5, D6, D7, D11, D12 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D16 Accepted;
+FM-D2, D4, D5, D6, D7, D11, D12 and D16 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 
 | Milestone | Status |
@@ -44,19 +44,19 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates not run on this code yet |
-| GPU plan M2: real inputs (R8, FM-D15) | Membrane part merged: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule; `pytest` 113 passed. GPU gates not run on this code yet, and the real `addMembrane` test (`-m slow`) not rerun. Protein part (chain gaps, caps, protonation states) in progress on a branch |
+| GPU plan M2: real inputs (R8, FM-D15) | Merged, both parts. Membrane part: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule. Protein part: chain gaps capped (NME / ACE), caps and protonation states of the input kept, kept hetero in their own chain, `info.protein_input` in `prepared/report.json`. `pytest` 128 passed. GPU gates not run on this code yet, and the real `addMembrane` test (`-m slow`) not rerun. On real files (GPU, 200 ps of free equilibration, zero wall energy): 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set; protein model alone on both A2A files |
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | In progress on a branch; not merged, not gated |
 | GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the defaults | Running: 5 replicas from PDB entry 3PTB on GPUs 0–4 (container `fmeta-tb`, commit 8d1f10a), started 2026-11-15 23:17 UTC, 41–44 ns each at 2026-11-16 00:53 UTC (660 ns/day). Analysed at 40 ns: not converged (3–5 rebinding events per replica, drift +12 to +22 kJ/mol). The default length of 500 ns is withdrawn (owner); the run ends at the length its convergence gives: 100, 150 or 200 ns (rule in `examples/trypsin_benzamidine/README.md`, FM-D16 amendment). Scan, compared at that length: `dt2` running at 2 fs on GPUs 5–7 (container `fmeta-scan-dt2`) since 00:22 UTC; `pace2` and `srho03` prepared, run only if the rule can still change a default. No result yet |
 | GPU plan M5: kinase example (R10) | Paused: TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms, commit 8d1f10a). Replica 0 ran on GPU 5 from 2026-11-15 23:30 UTC and was stopped at 2026-11-16 00:22 UTC for the scan; all replicas continue from the checkpoints when GPUs are free. No result yet |
-| GPU plan M6: GPCR example (R3) | Draft: `examples/a2a_theophylline` (OPM file of 5MZJ, 221143 atoms, 484 POPC). Builds, places the funnel into the extracellular water and passes 1 ns of equilibration with a placeholder input (`TER` records added by hand); as `fmeta split` writes it, `prepare` stops (kept ion read into the protein chain). No metadynamics yet |
+| GPU plan M6: GPCR example (R3) | Draft: `examples/a2a_theophylline` (OPM file of 5MZJ, 221143 atoms, 484 POPC). Built, funnel into the extracellular water and 1 ns of equilibration passed with a placeholder input (`TER` records added by hand). With the protein part of FM-D15 the input of `fmeta split` should build as it is (gap LEU208–GLU219 capped): not run through `prepare` yet. No metadynamics yet |
 | GPU plan M7: benchmark runs (R10) | Not started |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 8d1f10a
   (CUDA, mixed precision, 2 GPUs, in the image):
   `bench/results/2026-11-15-8d1f10a89-gpu-gates.json` (dated in UTC). It covers the run modes
   (FM-D14): `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 113 passed on
-  4eb3483 (FM-D16, the fix of dG(t), the membrane part of FM-D15). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 128 passed on
+  the merge of FM-D15 (both parts). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
 - CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
@@ -77,12 +77,15 @@ Plan in progress: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
   box, 221k atoms, 167 ns/day at 2 fs in equilibration, 4 fs not measured), for 5 replicas per
   ligand, 10 TYK2 and 9 A2A ligands, A2A at twice its 2 fs speed: about 22 GPU-days at 100 ns
   per replica (TYK2 9, A2A 13), 45 at 200 ns. It was about 115 at 500 ns.
-- Blockers: the A2A example waits for the protein part of FM-D15 (a kept ion that follows the
-  chain without `TER`, caps at the loop gap). Nothing else. Pushes from the GPU machine work
-  since 2026-11-16 (the `gh` login of the machine as the git credential; the owner added the
-  `workflow` scope).
+- Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
+  machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [design] FM-D15, protein part: gaps capped, caps and protonation states of the input kept
+- What: `read_protein` builds the model from what the file states (`system/protein.py`): a chain gap (C-N > 0.2 nm, with or without TER) is split and capped with NME / ACE, a gap of one residue is refused, caps of the input stay, protonation states are read from hydrogens or residue names and hold through a rebuild, kept hetero go to their own chain; `prepared/report.json` (`info.protein_input`) reports gaps, caps, altlocs, states, disulfides. `build_complex` returns the facts as a fourth value. `ruff` passes, `pytest` 128 passed on the merge; each regression test failed before its fix. Real files on a GPU: 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set (UNK caps kept, states from its hydrogens). Not run: GPU gates, `-m slow`, the A2A example through `prepare`.
+- Why: OpenMM bonded LEU208 to GLU219 over 1.15 nm, caps became charged ends and HIP / HIE became HID, each without a message: each changes the charge or the shape at the pocket.
+- Refs: FM-D15 (`docs/design/engine.md`, protein part), roadmap R8, `tests/test_inputs.py`, f0db6b7 84199f2 7dd1516 c39403a.
 
 ### 2026-11-16 — [amendment] Default run length: 500 ns withdrawn (owner); the new value comes from the trypsin run by a rule written first
 - What: the plan and FM-D16 had 5 replicas × 500 ns as the default. The owner decided on 2026-11-16 that 500 ns is too long. The new `run.length_ns` is the shortest of 100, 150 and 200 ns at which all five replicas of the official trypsin-benzamidine run pass the convergence criteria; 200 ns if they pass at none, stated as not converged. Rule committed with the replicas at 41–44 ns. Five replicas stay; no criterion changes. The scan compares at that length; `pace2` and `srho03` run only if fewer than half of the baseline replicas pass there (otherwise their condition cannot be met). Code and presets hold 500 until the rule has given the value. The two chain scripts that queued the old runs were stopped.
