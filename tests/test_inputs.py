@@ -62,6 +62,20 @@ def test_split_complex_adds_hydrogens_from_smiles(inputs, tmp_path):
         split_complex(tmp_path / "complex.pdb", "XXX", tmp_path / "bad", smiles="C")
 
 
+def test_split_keeps_the_protonation_state_a_residue_name_states(inputs, tmp_path):
+    """HIS 27 called HIP in a complex without hydrogens is HIP in the protein of the split,
+    as it is when the protein file is read directly (review of PR #1: OpenMM reads the name as
+    HIS, and the split wrote that)."""
+    pytest.importorskip("rdkit")
+    crystal_like_complex(inputs, tmp_path / "full.pdb")
+    lines = [line.replace("HIS A  27", "HIP A  27") for line in (tmp_path / "full.pdb").read_text().splitlines()
+             if line[76:78].strip() != "H"]
+    assert sum("HIP A  27" in line for line in lines) == 10
+    (tmp_path / "complex.pdb").write_text("\n".join(lines) + "\n")
+    protein, _ = split_complex(tmp_path / "complex.pdb", "BNZ", tmp_path / "out", smiles="c1ccccc1")
+    assert read_protein(protein, fix=False).info["protonation_from_input"] == {"HIP": ["A:HIS27"]}
+
+
 def test_split_drops_chains_and_residue_ranges_before_the_ligand_search(tmp_path, capsys):
     """`fmeta split --drop` on a receptor with a fusion partner numbered 1001-1106 in the same
     chain and a second copy of the complex in chain B."""

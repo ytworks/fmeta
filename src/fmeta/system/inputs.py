@@ -10,7 +10,7 @@ import numpy as np
 import openmm.app as app
 import openmm.unit as unit
 
-from .protein import ProteinInput, build_model, read_states, scan_pdb
+from .protein import VARIANT_NAMES, ProteinInput, build_model, read_states, scan_pdb
 
 
 def _nm(positions) -> np.ndarray:
@@ -358,6 +358,13 @@ def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
 
     modeller = app.Modeller(topology, positions * unit.nanometer)
     modeller.delete([ligand])
+    if Path(path).suffix.lower() in (".pdb", ".ent"):
+        # OpenMM read HIP, ASH, ... as HIS, ASP, ...: protein.pdb states what the complex stated
+        stated = scan_pdb(path)[1]
+        for residue in modeller.topology.residues():
+            name = stated.get((residue.chain.id.strip(), residue.id.strip(), residue.insertionCode.strip()))
+            if residue.name == VARIANT_NAMES.get(name, (None,))[0]:
+                residue.name = name
     protein_path = out_dir / "protein.pdb"
     with open(protein_path, "w") as handle:
         app.PDBFile.writeFile(modeller.topology, modeller.positions, handle, keepIds=True)
