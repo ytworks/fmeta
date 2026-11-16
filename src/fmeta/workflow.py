@@ -31,7 +31,7 @@ from .config import Config
 from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
 from .engine.platform import GPU_PLATFORMS, device_record, resolve_devices, select_platform, visible_gpus
-from .engine.runner import MetadynamicsRun, RunSettings, rollback_to_checkpoint
+from .engine.runner import MetadynamicsRun, RunSettings, discard_run_without_checkpoint, rollback_to_checkpoint
 from .funnel.geometry import KB, Funnel
 from .funnel.validate import validate_funnel
 from .funnel.visualize import write_funnel_pdb
@@ -218,13 +218,16 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
 
 def _rollback_walkers(directories: Sequence[Path]) -> None:
     """Roll every walker of a replica back to its checkpoint, before any of them starts and
-    reads the hills of the others."""
+    reads the hills of the others. A walker without a checkpoint goes back to the start: the
+    hills it wrote before it was stopped belong to no run."""
     for directory in directories:
         if is_locked(directory):
             raise RuntimeError(f"{directory} is in use by another fmeta process")
     for directory in directories:
         if (directory / "checkpoint.zip").exists():
             rollback_to_checkpoint(directory)
+        else:
+            discard_run_without_checkpoint(directory)
 
 
 def replica_jobs(config: Config, workdir, length_ns: Optional[float] = None) -> list[Job]:

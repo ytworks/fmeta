@@ -240,6 +240,13 @@ def rollback_to_checkpoint(workdir) -> dict:
     return meta
 
 
+def discard_run_without_checkpoint(workdir) -> None:
+    """Remove the record of a run that never wrote a checkpoint. Such a run starts again from
+    nothing, and with walkers no other walker may read the hills it leaves behind."""
+    for name in ("HILLS", "COLVAR", "traj.dcd"):
+        (Path(workdir) / name).unlink(missing_ok=True)
+
+
 def load_run_metadata(workdir) -> dict:
     with open(Path(workdir) / "run.yaml") as handle:
         return yaml.safe_load(handle)

@@ -7,6 +7,7 @@ from fmeta.analysis import analyze_run
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.engine.hills import HillsFollower, merge_hills, read_hills, sum_hills
 from fmeta.testing.toy import make_simulation, make_toy
+from fmeta.workflow import _rollback_walkers
 
 SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
                 pace=100, points_per_sigma=2.0)
@@ -93,6 +94,35 @@ def test_walker_restart_rebuilds_from_all_files(tmp_path):
     again.run(40)
     again.close()
     assert len(read_hills(hills_path)) == 40
+
+
+@pytest.mark.parametrize("first_has_checkpoint", [False, True])
+def test_walkers_stopped_before_a_checkpoint_leave_no_hills_behind(tmp_path, first_has_checkpoint):
+    """A walker stopped before its first checkpoint starts again from nothing: its hills are
+    gone before another walker starts and reads them."""
+    _, a = make_walker(tmp_path, 0, 2, seed=1)
+    _, b = make_walker(tmp_path, 1, 2, seed=2)
+    a.run(20 if first_has_checkpoint else 3)
+    b.run(3)
+    a.close()
+    b.close()
+    for index in ([1] if first_has_checkpoint else [0, 1]):    # stopped before a checkpoint was written
+        (tmp_path / f"w{index}" / "checkpoint.zip").unlink()
+
+    _rollback_walkers([tmp_path / "w0", tmp_path / "w1"])
+    _, a = make_walker(tmp_path, 0, 2, seed=1)
+    _, b = make_walker(tmp_path, 1, 2, seed=2)
+    assert (a.n_hills, b.n_hills) == (20 if first_has_checkpoint else 0, 0)
+    for target in (25, 30):
+        a.run(target)
+        b.run(target)
+    for walker in (a, b):
+        walker.sync_walkers()
+    expected, hills = total_bias(tmp_path, a.bias.grid, 2)
+    assert len(hills) == 60
+    for walker in (a, b):
+        assert np.allclose(walker.bias.grid.values, expected, rtol=1e-7, atol=1e-7)
+        walker.close()
 
 
 @pytest.mark.slow
