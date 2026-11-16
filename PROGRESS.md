@@ -54,14 +54,14 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
 | GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. It is run again from its README with the defaults of this commit (5 × 40 ns). No result yet |
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns) run from 47e84f7 in fresh work directories. No report of a whole set yet |
 
-- GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 47e84f7,
-  the code with the defaults of the scan verdict (CUDA, mixed precision, 2 GPUs, in the image):
-  `bench/results/2026-11-16-47e84f72b-gpu-gates.json` (dated in UTC). `toy_free_energy`: from the
-  samples −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0. `replicas_sequential`
-  and `replicas_parallel` ran real child processes on the GPUs (FM-D14). Its speed values were
-  taken while the image check used the same two GPUs; the record of 8d1f10a has them alone.
-  Not run yet on the code after 47e84f7 (analysis without a verdict, one math-library thread
-  per replica in the scheduler, headline from the bias): once more, on the final code.
+- GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean d4bbcc6,
+  the code with the analysis of the third amendment of FM-D9, without a convergence verdict and
+  with one math-library thread per replica (CUDA, mixed precision, 2 GPUs, in the image):
+  `bench/results/2026-11-16-d4bbcc67f-gpu-gates.json` (dated in UTC). `toy_free_energy`: from the
+  samples −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0.
+  `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs (FM-D14).
+  Speed values (1255 ns/day plain, 1219 with the bias, 759 membrane) were taken while the other
+  six GPUs ran production; they decide nothing.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 160 passed on
   the code with the headline of the third amendment of FM-D9. Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
@@ -99,6 +99,11 @@ lengths, the scan and the GPU use as changed by the Change Log entries of 2026-1
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [progress] GPU gates pass on the code with the published measurement procedure (d4bbcc6)
+- What: owner clarification of 2026-11-16: "works" means every function of this development operates, not that every benchmark run ends. The function checks therefore come before the benchmark sets; the TYK2 set was stopped at 12:58 UTC (12 of 50 replicas finished, restartable from its checkpoints) and its GPUs went to the checks. First of them: `scripts/gpu_gates.py` on clean d4bbcc6 (2 GPUs, in the image): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 8.4e-07 nm, wall energy 2.5e-04 kJ/mol; `toy_free_energy` −3.95 and −3.46 against −4.95 kJ/mol. This closes "not run yet on the code after 47e84f7" (analysis without a verdict, one math-library thread per replica, headline from the bias). Not verified here: the result of CI.
+- Why: the gates are the check of the gated functions (forces, bias, restart, walkers, both run modes, analysis, membrane build and run) on the current code; the functions they do not reach are checked on real systems next.
+- Refs: `bench/results/2026-11-16-d4bbcc67f-gpu-gates.json`, `bench/results/index.json`, `README.md`.
 
 ### 2026-11-16 — [amendment] The measurement follows the published procedure: dG0 of a replica from the bias, with a block error (FM-D9, third amendment)
 - What: owner instruction of 2026-11-16: measure by the formal method; that everything works comes before settings for accuracy. The headline `dG` of a replica is the mean over the second half of the run of dG0(t) from the accumulated bias (the first half is rejected); new key `dG_error`, its standard error from 5 blocks. The two estimates from the samples are cross-checks at the unchanged 4 kJ/mol; `dG_source` is gone. No threshold and no test or gate criterion changed. Toy, 8 × 20 ns: error +0.32 ± 0.15 (RMSE 0.52) and +0.41 ± 0.15 kJ/mol (RMSE 0.58) for wells of 20 and 40 kJ/mol, `dG_error` 0.34 and 0.35 against a scatter between seeds of 0.43; no well: 8 of 8 no binding. Same runs, new headline: trypsin −28.28 kJ/mol (95% −66.93 to 10.37; was −27.35), TYK2 with ejm_46 −14.85 (95% −26.60 to −3.11; was −10.05). `ruff` passes, `pytest` 160 passed. Not run: GPU gates on this code (once, on the final code), `pytest -m slow`. Correction: replica 0 of the trypsin run with the default bias left the site once, at 27.5 ns, and did not come back; "one never left the site" in the entry "Verdict of the bias scan" was wrong.
