@@ -430,16 +430,38 @@ def with_cysteines(path, source, separation):
                          (23, "SG", "S", at[23, "CB"] - half * axis + out)])
 
 
-@pytest.mark.parametrize("hydrogens", [True, False])
-def test_gap_in_the_chain_is_split_and_capped(inputs, tmp_path, amber, hydrogens):
+def with_ter(path, number):
+    """Put a TER record behind residue ``number`` of a PDB file: for OpenMM the rest is then
+    a chain of its own."""
+    lines = path.read_text().splitlines()
+    last = max(i for i, line in enumerate(lines) if line.startswith("ATOM") and int(line[22:26]) == number)
+    path.write_text("\n".join(lines[:last + 1] + ["TER"] + lines[last + 1:]) + "\n")
+    return path
+
+
+@pytest.mark.parametrize("case", ["hydrogens", "filled", "heavy", "heavy_ter"])
+def test_gap_in_the_chain_is_split_and_capped(inputs, tmp_path, amber, case):
     """Three residues are missing: the chain ends there in an NME and starts again with an ACE
     (OpenMM alone bonds ARG 14 to ALA 18 over 0.447 nm and the force field accepts it). The
-    caps stand where the missing neighbours were. Heavy atoms only: through PDBFixer."""
+    caps stand where the missing neighbours were. ``filled``: a preparation program put a
+    hydrogen on each open end (an aldehyde and an amine, which are no termini). Heavy atoms
+    only: through PDBFixer, which makes charged termini of the two ends when a TER record
+    marks the gap and nothing caps it."""
+    hydrogens = case in ("hydrogens", "filled")
     if not hydrogens:
         pytest.importorskip("pdbfixer")
     missing = atoms_of(inputs[0])
+
+    def filler(index, parent, was):
+        bond = missing[was] - missing[index, parent]
+        return missing[index, parent] + 0.1 * bond / np.linalg.norm(bond)
+
     path = edited(tmp_path / "gap.pdb", inputs[0], skip=lambda atom: atom.residue.index in (14, 15, 16)
-                  or (not hydrogens and atom.element.symbol == "H"))
+                  or (not hydrogens and atom.element.symbol == "H"),
+                  extra=[(13, "HXT", "H", filler(13, "C", (14, "N"))),
+                         (17, "H2", "H", filler(17, "N", (16, "C")))] if case == "filled" else ())
+    if case == "heavy_ter":
+        with_ter(path, 14)
     topology, positions, protein = modelled(path, amber, fix=not hydrogens)
 
     names = [residue.name for residue in topology.residues()]
@@ -462,6 +484,54 @@ def test_gap_of_one_residue_is_refused(inputs, tmp_path):
     path = edited(tmp_path / "gap.pdb", inputs[0], skip=lambda atom: atom.residue.index == 15)
     with pytest.raises(ValueError, match="A:SER15 and A:PHE17 are not bonded .* no room for caps"):
         read_protein(path, fix=False)
+
+
+@pytest.mark.parametrize("stated", ["OXT", "H3"])
+def test_chain_end_stated_by_the_input_is_not_capped(inputs, tmp_path, amber, stated):
+    """Two chains under one identifier with the numbering going on (a file from an MD
+    program): the OXT of the first states its end, or the three hydrogens on the nitrogen of
+    the second its start, so the two ends stay termini."""
+    at = atoms_of(inputs[0])
+    if stated == "OXT":
+        path = edited(tmp_path / "chains.pdb", inputs[0], extra=[(13, "OXT", "O", at[14, "N"])],
+                      skip=lambda atom: atom.residue.index in (14, 15, 16) or atom.element.symbol == "H")
+    else:
+        pytest.importorskip("pdbfixer")                       # it completes the end without OXT
+        to_h, to_ca = (at[17, name] - at[17, "N"] for name in ("H", "CA"))
+        away = -(to_h / np.linalg.norm(to_h) + to_ca / np.linalg.norm(to_ca))
+        normal = np.cross(to_h, to_ca)
+        tilted = [away / np.linalg.norm(away) + sign * normal / np.linalg.norm(normal) for sign in (1.0, -1.0)]
+        path = edited(tmp_path / "chains.pdb", inputs[0], skip=lambda atom: atom.residue.index in (14, 15, 16),
+                      extra=[(17, name, "H", at[17, "N"] + 0.1 * bond / np.linalg.norm(bond))
+                             for name, bond in zip(("H2", "H3"), tilted)])
+    topology, _, protein = modelled(with_ter(path, 14), amber, fix=stated == "H3")
+    names = [residue.name for residue in topology.residues()]
+    assert topology.getNumChains() == 2 and len(names) == 32 and not {"ACE", "NME"} & set(names)
+    assert "OXT" in names_of(topology, 13) and {"H2", "H3"} <= names_of(topology, 14)
+    assert protein.info["gaps_capped"] == []
+
+
+def test_kept_ion_listed_in_the_protein_chain(inputs, tmp_path):
+    """A kept ion that follows the last residue without a TER record is read into the protein
+    chain (OPM files). It gets a chain of its own, so PDBFixer sees the C terminus and
+    completes it (before FM-D15: no OXT, and no template for the last residue)."""
+    pytest.importorskip("pdbfixer")
+    path = edited(tmp_path / "ion.pdb", inputs[0],
+                  skip=lambda atom: atom.element.symbol == "H" or atom.name == "OXT")
+    lines = [line for line in path.read_text().splitlines() if line.startswith("ATOM")]
+    x, y, z = 10.0 * read_structure(path)[1].max(axis=0) + 5.0
+    ion = f"HETATM{len(lines) + 1:5d} NA    NA A  36    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00          NA"
+    path.write_text("\n".join(lines + [ion, "END"]) + "\n")
+    assert read_structure(path)[0].getNumChains() == 1
+
+    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3p.xml")
+    protein = read_protein(path, fix=True, keep_hetero=["NA"])
+    modeller = app.Modeller(protein.topology, protein.positions * unit.nanometer)
+    complete_hydrogens(modeller, forcefield, 7.0, protein.variants)
+    chains = [[residue.name for residue in chain.residues()] for chain in modeller.topology.chains()]
+    assert len(chains[0]) == 35 and chains[1:] == [["NA"]]
+    assert "OXT" in names_of(modeller.topology, 34) and protein.info["kept_hetero"] == {"NA": 1}
+    assert net_charge(forcefield, modeller.topology) == pytest.approx(3.0, abs=1e-6)
 
 
 @pytest.mark.parametrize("fix", [False, True])
@@ -491,11 +561,13 @@ def test_caps_in_the_input_are_kept(inputs, tmp_path, amber, style, fix):
 def test_protonation_states_of_the_input_are_kept(inputs, tmp_path, amber):
     """HIP, ASH, GLH and a neutral lysine written in the hydrogens of the input reach the
     model (+4), also when a hydrogen with a foreign name makes fmeta rebuild them all (before
-    FM-D15: +5 with the lysine charged again, and +2 after a rebuild). The report of
-    ``prepare`` holds what was taken."""
+    FM-D15: +5 with the lysine charged again, and +2 after a rebuild). A file without
+    hydrogens states them in its residue names. The report of ``prepare`` holds what was taken."""
     states = {"ASH": ["A:ASP3"], "GLH": ["A:GLU4"], "LYN": ["A:LYS7"], "HIP": ["A:HIS27"]}
-    for foreign in (False, True):
-        path = protonated(tmp_path / f"states{foreign}.pdb", inputs[0], foreign=foreign)
+    named = edited(tmp_path / "named.pdb", inputs[0], skip=lambda atom: atom.element.symbol == "H",
+                   residues={2: "ASH", 3: "GLH", 6: "LYN", 26: "HIP"})
+    for path, foreign in ((named, False), (protonated(tmp_path / "written.pdb", inputs[0]), False),
+                          (protonated(tmp_path / "foreign.pdb", inputs[0], foreign=True), True)):
         topology, _, protein = modelled(path, amber)
         assert any("were rebuilt" in note for note in protein.notes) == foreign
         assert {"HD1", "HE2"} <= names_of(topology, 26) and "HD2" in names_of(topology, 2)

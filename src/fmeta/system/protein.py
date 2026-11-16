@@ -117,15 +117,16 @@ def _roomiest(build, residue, fixed, positions: np.ndarray, heavy, avoid=()) -> 
 def acetyl_position(residue, positions: np.ndarray, heavy, avoid=()) -> dict:
     """Heavy atoms of an ACE in front of ``residue``: trans to CA, in the plane of the amide
     hydrogen (or CD of proline) when the input has it, else where there is most room
-    (``avoid``: the cap on the other side of the gap)."""
+    (``avoid``: the cap on the other side of the gap). Two hydrogens on the nitrogen (an
+    open end a preparation program filled) do not say which of them is the amide one."""
     n, ca, c = (positions[_atom(residue, name).index] for name in ("N", "CA", "C"))
 
     def build(carbon):
         return {"CH3": _place(ca, n, carbon, _C_CH3, _C_C_N, 180.0), "C": carbon,
                 "O": _place(ca, n, carbon, _C_O, _O_C_N, 0.0)}
 
-    partner = _atom(residue, "H") or (_atom(residue, "CD") if residue.name == "PRO" else None)
-    if partner is None:
+    partner = _atom(residue, "CD") if residue.name == "PRO" else _atom(residue, "H")
+    if partner is None or _atom(residue, "H2") is not None:
         return _roomiest(lambda dihedral: build(_place(c, ca, n, _C_N, _C_N_C, dihedral)),
                          residue, ("N", "CA"), positions, heavy, avoid)
     bond = positions[partner.index] - n
@@ -158,6 +159,19 @@ class _Piece:
     gap: float | None = None            # C-N distance to the piece before it in the chain (nm)
     acetyl: dict | None = None
     methylamide: dict | None = None
+
+
+def _goes_on(last, residue) -> bool:
+    """Whether ``residue`` belongs to the chain of the residue ``last`` before it: the same
+    chain of the topology, or the next one under the same identifier with the numbering
+    going on (a TER record inside a chain, as files have it at missing residues)."""
+    if residue.chain is last.chain:
+        return True
+    try:
+        return (residue.chain.id == last.chain.id
+                and (int(residue.id), residue.insertionCode) > (int(last.id), last.insertionCode))
+    except ValueError:
+        return False
 
 
 def _existing_caps(topology, positions, amino, pieces) -> tuple[set, list[str]]:
@@ -203,12 +217,14 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
     """The protein of a structure as it will be simulated.
 
     Amino-acid residues (N, CA and C present) are kept; of the rest only water with
-    ``keep_water`` and the residues named in ``keep_hetero``. A chain is split where the
-    C-N distance of consecutive residues is above ``GAP_NM`` (residues missing from the
-    structure): the two ends are capped with NME and ACE unless the input states a terminus
-    there (OXT; H2 and H3). Acetyl and N-methyl groups of the input stay as ACE and NME.
-    Residue names that state a protonation state become the standard name plus a variant.
-    ``names`` are the residue names of the file where OpenMM renamed them (``scan_pdb``).
+    ``keep_water`` and the residues named in ``keep_hetero``, in chains of their own. A
+    chain is split where the C-N distance of consecutive residues is above ``GAP_NM``
+    (residues missing from the structure), with or without a TER record there: the two ends
+    are capped with NME and ACE. Where the input states a terminus nothing is added: after
+    an OXT, and before a residue with H2 and H3, a new chain starts. Acetyl and N-methyl
+    groups of the input stay as ACE and NME. Residue names that state a protonation state
+    become the standard name plus a variant. ``names`` are the residue names of the file
+    where OpenMM renamed them (``scan_pdb``).
     """
     names = names or {}
     keep = {name.strip().upper() for name in keep_hetero}
@@ -221,35 +237,36 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
         for residue in chain.residues():
             if residue not in amino:
                 continue
-            last = pieces[-1] if pieces and pieces[-1].chain is chain else None
+            last = pieces[-1].residues[-1] if pieces and _goes_on(pieces[-1].residues[-1], residue) else None
             gap = None if last is None else float(np.linalg.norm(
-                positions[_atom(last.residues[-1], "C").index] - positions[_atom(residue, "N").index]))
-            if last is None or gap > GAP_NM:
-                pieces.append(_Piece(chain, [residue], gap))
-            else:
-                last.residues.append(residue)
+                positions[_atom(last, "C").index] - positions[_atom(residue, "N").index]))
+            if gap is not None and gap <= GAP_NM:
+                pieces[-1].residues.append(residue)
+                continue
+            if last is not None and (_atom(last, "OXT") is not None
+                                     or {"H2", "H3"} <= {atom.name for atom in residue.atoms()}):
+                gap = None                                 # a terminus as stated: no gap
+            pieces.append(_Piece(chain, [residue], gap))
     caps, caps_kept = _existing_caps(topology, positions, amino, pieces)
 
     gaps = []
     for before, piece in zip(pieces, pieces[1:]):
-        if piece.gap is None:                              # the first piece of its chain
+        if piece.gap is None:                              # the piece starts a chain
             continue
         last, first = before.residues[-1], piece.residues[0]
         added = []
-        if before.methylamide is None and _atom(last, "OXT") is None:
+        if before.methylamide is None:
             before.methylamide = methylamide_position(last, positions, heavy)
             added.append("NME")
-        if piece.acetyl is None and not {"H2", "H3"} & {atom.name for atom in first.atoms()}:
-            piece.acetyl = acetyl_position(first, positions, heavy,
-                                           list((before.methylamide or {}).values()))
+        if piece.acetyl is None:
+            piece.acetyl = acetyl_position(first, positions, heavy, list(before.methylamide.values()))
             added.append("ACE")
         if added:
             # the caps stand where the missing residues were: with a single residue missing
             # (or none: a stretched bond) the two would overlap
-            ends = [(cap, positions[[atom.index for atom in other.atoms() if not _is_hydrogen(atom)]])
-                    for cap, other in ((before.methylamide, first), (piece.acetyl, last)) if cap]
-            room = min([_separation(cap, points) for cap, points in ends]
-                       + [_separation(before.methylamide, piece.acetyl)] * (len(ends) == 2))
+            room = min([_separation(before.methylamide, piece.acetyl)] + [
+                _separation(cap, positions[[atom.index for atom in other.atoms() if not _is_hydrogen(atom)]])
+                for cap, other in ((before.methylamide, first), (piece.acetyl, last))])
             if room < CAP_CLASH_NM:
                 raise ValueError(
                     f"{label(last)} and {label(first)} are not bonded (C-N {piece.gap:.2f} nm) and "
@@ -334,7 +351,7 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
     if caps_kept:
         notes.append("caps of the input kept: " + ", ".join(caps_kept))
     for gap in gaps:
-        what = " and ".join(gap["caps"]) or "no cap: the input states termini"
+        what = " and ".join(gap["caps"]) or "the caps of the input stay"
         notes.append(f"residues are missing between {gap['after']} and {gap['before']} "
                      f"(C-N {gap['c_n_nm']:.2f} nm): chain split there ({what})")
     info = dict(removed=removed, kept_hetero=kept, caps_kept=caps_kept, gaps_capped=gaps)
