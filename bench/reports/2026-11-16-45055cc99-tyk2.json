@@ -1,0 +1,671 @@
+{
+ "schema": 1,
+ "set": "tyk2",
+ "title": "TYK2 kinase, JACS set (Schrodinger public binding free energy benchmark)",
+ "date": "2026-11-16",
+ "commit": "45055cc99cce3cb8c1c89c69e89c55cf8f99eae2",
+ "dirty": false,
+ "environment": {
+  "image": "sha256:b08f577e5238bd6470a491c3e86fe78a9739263f4b5efd489c5027be2ed150b9",
+  "lock_sha256": "d061e45a7a9a86f0ae693dd0fb720fd9ef7d182a7a3634f0bd44bda3fef81347"
+ },
+ "runs": [
+  {
+   "time": "2026-11-16T01:23:53+00:00",
+   "commit": "eeb53023f9b437693e479cda61384c137b1dbe03",
+   "dirty": false,
+   "image": "sha256:b08f577e5238bd6470a491c3e86fe78a9739263f4b5efd489c5027be2ed150b9",
+   "lock_sha256": "d061e45a7a9a86f0ae693dd0fb720fd9ef7d182a7a3634f0bd44bda3fef81347"
+  },
+  {
+   "time": "2026-11-16T03:19:04+00:00",
+   "commit": "f2ea6539ee7b0cbdffb8d5bb5cebe3c9bdd32bfd",
+   "dirty": false,
+   "image": "sha256:b08f577e5238bd6470a491c3e86fe78a9739263f4b5efd489c5027be2ed150b9",
+   "lock_sha256": "d061e45a7a9a86f0ae693dd0fb720fd9ef7d182a7a3634f0bd44bda3fef81347"
+  }
+ ],
+ "definition": {
+  "set_yaml_sha256": "be731a9e8259aec5a8009cb107d60b3cc5315967892564718a261513e28a595a",
+  "reference_csv_sha256": "8fe50f5b1480e1c185cc72820617eeaaeb418b4b820c9685f008273264766d34",
+  "source": {
+   "repository": "https://github.com/schrodinger/public_binding_free_energy_benchmark",
+   "commit": "a65d86b782a678c75388566ce00446e45283ee63",
+   "raw": "https://raw.githubusercontent.com/schrodinger/public_binding_free_energy_benchmark/a65d86b782a678c75388566ce00446e45283ee63/",
+   "licence": "MIT"
+  },
+  "files": {
+   "protein": "48f74bbee93e858b1af628edb4620ec12061f51dc0f93850346c68d0626f6a52",
+   "ligands": "8cc5b64c524cc70b70a0075d68d9ea65a4a32e0e50fb88bd9f6678466b6b8a0b",
+   "predictions": "67191f5998cc3b4701c58cde28fae71f07ec102ecdb2b02dd709265e6d5d60f7"
+  },
+  "superpose_on_sha256": null,
+  "configuration_sha256": "1845622ea926a8b48cd41a32206bd2c2e6ea18bfce75bf1d75fdc654c059b5b0"
+ },
+ "conditions": {
+  "temperature_k": 300.0,
+  "length_ns": 20.0,
+  "replicas": 5,
+  "standard_state": "1 mol/L",
+  "standard_volume_nm3": 1.660539,
+  "experiment": "as the reference file gives them; a value given as Ki is converted at the temperature of its measurement; no value is corrected to the temperature of the simulation"
+ },
+ "ligands": [
+  {
+   "name": "ejm_44",
+   "directory": "ejm_44",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -18.9586,
+    "kcal_mol": -4.5312
+   },
+   "sem": {
+    "kj_mol": 3.4085,
+    "kcal_mol": 0.8146
+   },
+   "ci95": {
+    "kj_mol": [
+     -28.4221,
+     -9.4951
+    ],
+    "kcal_mol": [
+     -6.793,
+     -2.2694
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 9,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -9.1783,
+      "kcal_mol": -2.1937
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -28.7904,
+      "kcal_mol": -6.8811
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -23.9271,
+      "kcal_mol": -5.7187
+     },
+     "rebinding_events": 2,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -17.6215,
+      "kcal_mol": -4.2116
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -15.2757,
+      "kcal_mol": -3.651
+     },
+     "rebinding_events": 4,
+     "no_binding": false
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "1 rebinding event(s), fewer than 3",
+     "dG still drifting (+9.18 kJ/mol over the plateau window)",
+     "unbound region not flat (std 2.46 kJ/mol)",
+     "reweighted estimate differs by +18.65 kJ/mol from the mean of dG(t) from the bias",
+     "dG changes by -6.05 kJ/mol when only the second half of the run is used"
+    ],
+    "rep1": [
+     "1 rebinding event(s), fewer than 3",
+     "reweighted estimate differs by +7.59 kJ/mol from the mean of dG(t) from the bias"
+    ],
+    "rep2": [
+     "2 rebinding event(s), fewer than 3",
+     "dG still drifting (-13.20 kJ/mol over the plateau window)"
+    ],
+    "rep3": [
+     "1 rebinding event(s), fewer than 3",
+     "unbound region not flat (std 3.46 kJ/mol)",
+     "reweighted estimate differs by +19.05 kJ/mol from the mean of dG(t) from the bias"
+    ],
+    "rep4": [
+     "dG still drifting (+16.99 kJ/mol over the plateau window)",
+     "reweighted estimate differs by -10.61 kJ/mol from the mean of dG(t) from the bias",
+     "dG changes by +13.83 kJ/mol when only the second half of the run is used"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -31.0453,
+     "kcal_mol": -7.42
+    },
+    "temperature_k": null,
+    "doi": "10.1021/ja512751q"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -27.1123,
+     "kcal_mol": -6.48
+    },
+    "se": {
+     "kj_mol": 0.5439,
+     "kcal_mol": 0.13
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "ejm_31",
+   "directory": "ejm_31",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -11.1395,
+    "kcal_mol": -2.6624
+   },
+   "sem": {
+    "kj_mol": 6.474,
+    "kcal_mol": 1.5473
+   },
+   "ci95": {
+    "kj_mol": [
+     -29.1143,
+     6.8353
+    ],
+    "kcal_mol": [
+     -6.9585,
+     1.6337
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 5,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -12.9575,
+      "kcal_mol": -3.0969
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -3.4496,
+      "kcal_mol": -0.8245
+     },
+     "rebinding_events": 1,
+     "no_binding": true
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -1.7965,
+      "kcal_mol": -0.4294
+     },
+     "rebinding_events": 3,
+     "no_binding": true
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -35.67,
+      "kcal_mol": -8.5253
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -1.8237,
+      "kcal_mol": -0.4359
+     },
+     "rebinding_events": 1,
+     "no_binding": true
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "0 rebinding event(s), fewer than 3",
+     "dG still drifting (+10.39 kJ/mol over the plateau window)",
+     "reweighted estimate differs by +9.26 kJ/mol from the mean of dG(t) from the bias",
+     "dG changes by -4.74 kJ/mol when only the second half of the run is used"
+    ],
+    "rep1": [
+     "dG is within 1 kT of what an empty funnel gives (-1.33 kJ/mol): no binding beyond the funnel volume, and the value depends on where the bound region is said to end",
+     "1 rebinding event(s), fewer than 3",
+     "dG still drifting (-6.63 kJ/mol over the plateau window)",
+     "reweighted estimate differs by +16.83 kJ/mol from the mean of dG(t) from the bias"
+    ],
+    "rep2": [
+     "dG is within 1 kT of what an empty funnel gives (-1.33 kJ/mol): no binding beyond the funnel volume, and the value depends on where the bound region is said to end",
+     "reweighted estimate differs by +22.28 kJ/mol from the mean of dG(t) from the bias",
+     "dG changes by -6.59 kJ/mol when only the second half of the run is used"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG still drifting (+37.98 kJ/mol over the plateau window)",
+     "dG changes by +13.73 kJ/mol when only the second half of the run is used"
+    ],
+    "rep4": [
+     "dG is within 1 kT of what an empty funnel gives (-1.33 kJ/mol): no binding beyond the funnel volume, and the value depends on where the bound region is said to end",
+     "1 rebinding event(s), fewer than 3",
+     "dG still drifting (+11.19 kJ/mol over the plateau window)",
+     "reweighted estimate differs by +18.01 kJ/mol from the mean of dG(t) from the bias"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -39.9154,
+     "kcal_mol": -9.54
+    },
+    "temperature_k": null,
+    "doi": "10.1021/ja512751q"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -41.4634,
+     "kcal_mol": -9.91
+    },
+    "se": {
+     "kj_mol": 0.4602,
+     "kcal_mol": 0.11
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  },
+  {
+   "name": "ejm_46",
+   "directory": "ejm_46",
+   "charge": 0,
+   "dg": {
+    "kj_mol": -23.713,
+    "kcal_mol": -5.6675
+   },
+   "sem": {
+    "kj_mol": 11.1783,
+    "kcal_mol": 2.6717
+   },
+   "ci95": {
+    "kj_mol": [
+     -54.7489,
+     7.3228
+    ],
+    "kcal_mol": [
+     -13.0853,
+     1.7502
+    ]
+   },
+   "n_replicas": 5,
+   "replicas_planned": 5,
+   "replicas_finished": 5,
+   "no_binding": false,
+   "rebinding_events": 2,
+   "replicas": [
+    {
+     "name": "rep0",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -6.5644,
+      "kcal_mol": -1.5689
+     },
+     "rebinding_events": 1,
+     "no_binding": false
+    },
+    {
+     "name": "rep1",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -23.7618,
+      "kcal_mol": -5.6792
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep2",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -64.9994,
+      "kcal_mol": -15.5352
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep3",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -21.8162,
+      "kcal_mol": -5.2142
+     },
+     "rebinding_events": 0,
+     "no_binding": false
+    },
+    {
+     "name": "rep4",
+     "simulated_ns": 20.0,
+     "dg": {
+      "kj_mol": -1.4232,
+      "kcal_mol": -0.3402
+     },
+     "rebinding_events": 1,
+     "no_binding": true
+    }
+   ],
+   "diagnostics": {
+    "rep0": [
+     "1 rebinding event(s), fewer than 3",
+     "unbound region not flat (std 2.97 kJ/mol)",
+     "reweighted estimate differs by +11.54 kJ/mol from the mean of dG(t) from the bias"
+    ],
+    "rep1": [
+     "0 rebinding event(s), fewer than 3",
+     "dG still drifting (+22.30 kJ/mol over the plateau window)",
+     "dG changes by +23.95 kJ/mol when only the second half of the run is used"
+    ],
+    "rep2": [
+     "0 rebinding event(s), fewer than 3",
+     "dG still drifting (+26.18 kJ/mol over the plateau window)",
+     "no estimate from the samples after the first 2.0 ns (they do not cover the unbound region): dG is the mean of dG(t) from the bias"
+    ],
+    "rep3": [
+     "0 rebinding event(s), fewer than 3",
+     "dG still drifting (+13.59 kJ/mol over the plateau window)",
+     "reweighted estimate differs by +18.98 kJ/mol from the mean of dG(t) from the bias",
+     "dG changes by +8.49 kJ/mol when only the second half of the run is used"
+    ],
+    "rep4": [
+     "dG is within 1 kT of what an empty funnel gives (-1.36 kJ/mol): no binding beyond the funnel volume, and the value depends on where the bound region is said to end",
+     "1 rebinding event(s), fewer than 3",
+     "reweighted estimate differs by +26.28 kJ/mol from the mean of dG(t) from the bias"
+    ]
+   },
+   "not_analysed": {},
+   "error": null,
+   "experiment": {
+    "dg": {
+     "kj_mol": -47.321,
+     "kcal_mol": -11.31
+    },
+    "temperature_k": null,
+    "doi": "10.1021/ja512751q"
+   },
+   "fep": {
+    "dg": {
+     "kj_mol": -45.2709,
+     "kcal_mol": -10.82
+    },
+    "se": {
+     "kj_mol": 0.5021,
+     "kcal_mol": 0.12
+    },
+    "kind": "relative",
+    "source": "10.1038/s42004-023-01019-9"
+   },
+   "afe": null
+  }
+ ],
+ "not_prepared": [
+  "ejm_49",
+  "ejm_43",
+  "ejm_48",
+  "ejm_42",
+  "ejm_54",
+  "jmc_28",
+  "jmc_23"
+ ],
+ "statistics": {
+  "fmeta_vs_experiment": {
+   "ligands": [
+    "ejm_44",
+    "ejm_31",
+    "ejm_46"
+   ],
+   "n": 3,
+   "mue": {
+    "value": {
+     "kj_mol": 21.4902,
+     "kcal_mol": 5.1363
+    },
+    "ci95": {
+     "kj_mol": [
+      12.0867,
+      28.7759
+     ],
+     "kcal_mol": [
+      2.8888,
+      6.8776
+     ]
+    }
+   },
+   "rmse": {
+    "value": {
+     "kj_mol": 22.5941,
+     "kcal_mol": 5.4001
+    },
+    "ci95": {
+     "kj_mol": [
+      12.0867,
+      28.7759
+     ],
+     "kcal_mol": [
+      2.8888,
+      6.8776
+     ]
+    }
+   },
+   "mean_signed_error": {
+    "value": {
+     "kj_mol": 21.4902,
+     "kcal_mol": 5.1363
+    },
+    "ci95": {
+     "kj_mol": [
+      12.0867,
+      28.7759
+     ],
+     "kcal_mol": [
+      2.8888,
+      6.8776
+     ]
+    }
+   },
+   "mue_offset_removed": {
+    "value": {
+     "kj_mol": 6.269,
+     "kcal_mol": 1.4983
+    },
+    "ci95": {
+     "kj_mol": [
+      0.0,
+      7.4174
+     ],
+     "kcal_mol": [
+      0.0,
+      1.7728
+     ]
+    }
+   },
+   "rmse_offset_removed": {
+    "value": {
+     "kj_mol": 6.976,
+     "kcal_mol": 1.6673
+    },
+    "ci95": {
+     "kj_mol": [
+      0.0,
+      7.8674
+     ],
+     "kcal_mol": [
+      0.0,
+      1.8803
+     ]
+    }
+   },
+   "pearson_r": {
+    "value": 0.3258,
+    "ci95": [
+     -1.0,
+     1.0
+    ]
+   },
+   "kendall_tau": {
+    "value": 0.3333,
+    "ci95": [
+     -1.0,
+     1.0
+    ]
+   }
+  },
+  "fep_vs_experiment": {
+   "ligands": [
+    "ejm_44",
+    "ejm_31",
+    "ejm_46"
+   ],
+   "n": 3,
+   "mue": {
+    "value": {
+     "kj_mol": 2.5104,
+     "kcal_mol": 0.6
+    },
+    "ci95": {
+     "kj_mol": [
+      1.548,
+      3.933
+     ],
+     "kcal_mol": [
+      0.37,
+      0.94
+     ]
+    }
+   },
+   "rmse": {
+    "value": {
+     "kj_mol": 2.7122,
+     "kcal_mol": 0.6482
+    },
+    "ci95": {
+     "kj_mol": [
+      1.548,
+      3.933
+     ],
+     "kcal_mol": [
+      0.37,
+      0.94
+     ]
+    }
+   },
+   "mean_signed_error": {
+    "value": {
+     "kj_mol": 1.4784,
+     "kcal_mol": 0.3533
+    },
+    "ci95": {
+     "kj_mol": [
+      -1.548,
+      3.933
+     ],
+     "kcal_mol": [
+      -0.37,
+      0.94
+     ]
+    }
+   },
+   "mue_offset_removed": {
+    "value": {
+     "kj_mol": 2.0176,
+     "kcal_mol": 0.4822
+    },
+    "ci95": {
+     "kj_mol": [
+      0.0,
+      2.436
+     ],
+     "kcal_mol": [
+      0.0,
+      0.5822
+     ]
+    }
+   },
+   "rmse_offset_removed": {
+    "value": {
+     "kj_mol": 2.2738,
+     "kcal_mol": 0.5435
+    },
+    "ci95": {
+     "kj_mol": [
+      0.0,
+      2.5838
+     ],
+     "kcal_mol": [
+      0.0,
+      0.6175
+     ]
+    }
+   },
+   "pearson_r": {
+    "value": 0.9634,
+    "ci95": [
+     0.9634,
+     1.0
+    ]
+   },
+   "kendall_tau": {
+    "value": 1.0,
+    "ci95": [
+     1.0,
+     1.0
+    ]
+   }
+  },
+  "afe_vs_experiment": null,
+  "without_value": [],
+  "bootstrap": {
+   "resamples": 10000,
+   "seed": 20261116,
+   "interval": "2.5 - 97.5 percentile over ligands drawn with replacement"
+  }
+ }
+}

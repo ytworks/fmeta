@@ -18,3 +18,19 @@ a report has no "converged" column either: the replicas of a ligand together are
 measurement, and the interval says what their scatter leaves open (FM-D9, second amendment).
 
 The set definitions are in `examples/benchmarks/<set>/`.
+
+## Pilot reports
+
+Three ligands per set ran before the scan of the bias gave the defaults: 5 replicas of 20 ns
+with the hill widths that were the default then (`metad.sigma_s` 0.025 and `sigma_rho`
+0.05 nm), on commits eeb5302 and f2ea653. They measured the throughput and showed defects.
+Nothing was selected from them, and they are not results of the official defaults.
+
+| Report | Set | Ligands |
+|---|---|---|
+| `2026-11-16-45055cc99-tyk2` | TYK2 | ejm_44, ejm_31, ejm_46 |
+
+The set definition of a pilot report is that of `examples/benchmarks/<set>/` with one
+difference, `config: {metad: {sigma_s: 0.025, sigma_rho: 0.05}}`: the `set.yaml` hash in the
+report is therefore not that of the repository. The analysis is that of the commit the report
+names.
