@@ -9,7 +9,7 @@ same ligand is part of the TYK2 benchmark (`examples/benchmarks/tyk2`).
 |---|---|---|
 | Experimental Ki | 4.8 nM | Liang et al., Eur. J. Med. Chem. 67, 175 (2013), doi:10.1016/j.ejmech.2013.03.070, as listed for the entry by BindingDB |
 | Experimental binding free energy | −11.3 kcal/mol | RT ln Ki (−11.35 at 298.15 K; the benchmark tables list −11.31) |
-| fmeta | −2.4 kcal/mol, 95% interval −5.9 to 1.1 | 5 replicas of 40 ns with the defaults; see "Result" below |
+| fmeta | −3.55 kcal/mol, 95% interval −6.36 to −0.74 | 5 replicas of 40 ns with the defaults; see "Result" below |
 
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at

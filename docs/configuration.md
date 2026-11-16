@@ -237,7 +237,7 @@ file. None was tuned against experimental values.
   defaults are 0.025 and 0.05 nm [BSS-F]; [E20] used 0.03 nm for its second variable.
 - **Length.** 40 ns per replica, the longest the scan ran. [E20] ran 500 ns per simulation and
   [L23] recommends 500 to 2000 ns. On trypsin-benzamidine five replicas of 40 ns with the
-  defaults give −27.4 kJ/mol with a 95% interval of −68.7 to 14.0.
+  defaults give −28.3 kJ/mol with a 95% interval of −66.9 to 10.4.
 - **Deposition rate.** Hills of 1.5 kJ/mol every 1 ps; [E20] and the BioSimSpace protocol
   default [BSS-P] deposit every 2 ps (1000 steps of 2 fs). At the same height the bias starts
   to grow twice as fast. Hills of 3.0 kJ/mol and a bias factor of 20 were in the scan and

@@ -687,7 +687,8 @@ defaults were chosen; the analysis no longer reports such a count.
   value of −2.89 kJ/mol, within 1 kT of the empty funnel (−0.78 kJ/mol), which would report
   trypsin-benzamidine as no binding.
 - A run with the defaults gives on this system a value with a wide interval: −27.35 kJ/mol,
-  95% interval −68.67 to 13.98.
+  95% interval −68.67 to 13.98 (−28.28, −66.93 to 10.37 with the headline of the third
+  amendment of FM-D9).
 - The value depends on the bias setting, with every estimator that was tried (FM-D9, second
   amendment). dG0 of the set at 40 ns in kJ/mol, with the standard error of the mean (C, R) or
   of the jackknife (P):
