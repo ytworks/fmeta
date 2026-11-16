@@ -88,16 +88,28 @@ superposition) and the sodium ion kept (`keep_hetero: [NA]`). Everything else is
 default, at 300 K. The standard state of every value is 1 mol/L.
 
 `Modeller.addMembrane` builds the bilayer from whole lipid patches of 6.37 x 6.69 nm, so the
-size of the system moves in steps. For `4q` in this frame, with the input handling of 8d1f10a:
+size of the system moves in steps. For `4q` in this frame:
 
 | `system.padding` | Membrane | Box (nm) | Atoms |
 |---|---|---|---|
-| 1.2 nm (the preset, used here) | 2 x 1 patches | 12.74 x 6.69 x 13.27 | 110 352 |
+| 1.2 nm (the preset, used here) | 2 x 1 patches, 228 POPC | 12.74 x 6.69 x 13.92 | 115 625 (c41c08b) |
 | 1.5 nm (the set until 2026-11-16) | 2 x 2 patches | 12.74 x 13.37 x 13.92 | 231 482 (eeb5302) |
 
 Both pass the box rule (the unbound ligand is 2.54 nm, or 4.31 nm, from the nearest periodic
 image). The set was changed to 1.2 nm before any ligand was equilibrated: the larger value
 doubled the cost and no rule asks for it.
+
+The three pilot ligands as built on c41c08b (`fmeta benchmark run --until prepare`):
+
+| Ligand | Atoms | Box height (nm) | Asked for by the box rule (nm) | Pose inside the wall (nm) | Nearest periodic image of the unbound ligand (nm) |
+|---|---|---|---|---|---|
+| `4q` | 115 625 | 13.92 | 12.89 | 0.34 | 2.54 |
+| `4d` | 117 494 | 14.11 | 13.06 | 0.23 | 2.50 |
+| `4e D` | 116 949 | 14.07 | 13.02 | 0.32 | 2.43 |
+
+No error in the validation of any of them; each has the two warnings of the example (no
+straight open path from the site to bulk, site closed for a 0.3 nm probe). The unbound region
+is 2.17 to 2.24 nm above the membrane.
 
 ## The protein file as fmeta reads it
 
@@ -113,7 +125,7 @@ and `4q/prepared/report.json` of the work directory).
 | Break between LEU 208 and GLU 219 (C-N 1.57 nm) | chain split there, N-methylamide on LEU 208 and acetyl on GLU 219 |
 | Disulfide bonds | four: 71-159, 74-146, 77-166, 259-262 |
 | Hydrogens | the 2354 hydrogens of the file did not match the force field's names and were rebuilt, in the protonation states read before |
-| System of `4q` | built with `system.padding: 1.5`, the value of the set at that commit: 231 482 atoms; no error in the validation; the same two warnings as the example (no straight open path, site closed for a 0.3 nm probe) |
+| System of `4q` | built with `system.padding: 1.5`, the value of the set at that commit: 231 482 atoms; no error in the validation. The systems of the set as it is now: "Configuration" above |
 
 Two differences from the model of the FEP+ input remain:
 
@@ -128,6 +140,7 @@ Two differences from the model of the FEP+ input remain:
 
 - The temperature of the measurements is not in the source; a report compares the values as
   given, without a correction to 300 K.
-- No ligand of this set has been equilibrated or run yet.
+- No ligand of this set has been run yet; the equilibration of the pilot ligands was started
+  on 2026-11-16.
 - The hydrophobic thickness of OPM (2 x 15.7 Å) is not used: the bilayer is built with the
   default `membrane.half_thickness`.

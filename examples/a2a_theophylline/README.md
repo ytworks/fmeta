@@ -1,9 +1,9 @@
-# Adenosine A2A receptor with theophylline (draft)
+# Adenosine A2A receptor with theophylline
 
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
-theophylline, from the crystal structure 5MZJ. **Draft of 2026-11-16.** The inputs can be made
-and the system builds and equilibrates, but only with the workaround of "State of the draft";
-no metadynamics has been run and no free energy is reported.
+theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the inputs are made
+by the steps below and the system builds from them; its equilibration is running; no
+metadynamics has been run and no free energy is reported ("State" below).
 
 Numbers in this file come from four places, and are marked: **[entry]** the header of the
 RCSB entry 5MZJ, **[file]** the OPM file and fmeta runs on it (both read or run on 2026-11-16),
@@ -34,7 +34,8 @@ not read), and **[unconfirmed]** a note from planning whose source nobody has re
 The receptor is simulated as crystallised. Nine engineered mutations lie in the modelled
 part: A54L, T88A, R107A, K122A, N154A, L202A, L235A, V239A, S277A (a tenth, G318A, is beyond
 the last modelled residue). **[entry]** The BRIL is absent and residues 209-218 are not
-rebuilt: the chain is broken between LEU 208 and GLU 219. The sodium ion is kept
+rebuilt: the chain is split between LEU 208 and GLU 219 and capped there (N-methylamide and
+acetyl), so no charged ends are made inside the receptor. The sodium ion is kept
 (`system.keep_hetero`) and treated as part of the receptor; crystal waters, cholesterol and
 the crystal's lipids are removed.
 
@@ -54,7 +55,7 @@ For a comparison with measurements this means:
   the wild-type receptor. No mutated side chain touches the ligand, but two are in the second
   shell of the site and of the sodium ion, and the construct was made to stabilise the receptor
   (the entry's title; in which state, and by how much the affinity of an antagonist changes,
-  was not read for this draft). An indirect effect on the affinity is possible and is not
+  was not read for this example). An indirect effect on the affinity is possible and is not
   estimated here.
 - A wild-type measurement is therefore a reference with a caveat. A difference of the size
   of the effect of the mutations cannot be put down to the method. The clean reference is a
@@ -114,59 +115,54 @@ scripts/in_docker.sh --gpus 0,1,2,3 --detach --name a2a fmeta run runs/a2a_theop
 scripts/in_docker.sh fmeta analyze runs/a2a_theophylline/work --plot
 ```
 
-The SMILES is neutral theophylline with the hydrogen on N7: a choice of this draft.
+The SMILES is neutral theophylline with the hydrogen on N7: a choice of this example.
 
-## State of the draft
+## State (2026-11-16)
 
-With the code of 2026-11-16 `fmeta prepare` stops on the input as `fmeta split` writes it:
+- `fmeta prepare` builds the system from the files as `fmeta split` writes them: no editing of
+  the protein file is needed (the code before b54292f stopped at SER 305, and bonded across the chain break).
+- The equilibration of that system was started on 2026-11-16 and had not ended when this was
+  written. No metadynamics has been run and no free energy is reported.
+- Open choices, none examined yet:
+  - The 116 crystal waters are removed (`system.keep_water` is off), also those near the ligand
+    and the sodium ion.
+  - Protonation states are those of the hydrogen placement at pH 7, because the OPM file has no
+    hydrogens: all six histidines are neutral with the hydrogen on ND1. The prepared structure
+    of the benchmark set (`examples/benchmarks/a2a`, from 5OLZ) has HIS 264 and HIS 278 doubly
+    protonated instead.
+  - Run length and replicas are the official defaults; the first run says whether that is
+    enough here.
 
-```
-fmeta: error: the protein does not fit the force field's residue templates (No template found
-for residue 295 (SER). The atoms and bonds in the residue match SER, but the set of externally
-bonded atoms is missing 1 C atom. Is the chain missing a terminal capping group? ...
-```
+## Preparation (2026-11-16)
 
-Two things in the protein model are open, both belonging to the protein-model part of FM-D15
-(`docs/design/engine.md`), not to this example:
-
-1. In the OPM file the sodium ion follows SER 305 without a `TER` record. It is read into the
-   protein's chain, so SER 305 is no chain end and gets no terminal oxygen: the error above.
-2. Without a `TER` at the chain break, LEU 208 C and GLU 219 N are bonded across 1.15 nm and
-   nothing stops the build. The intended model has caps (ACE / NME) at the break.
-
-The numbers below were made with a placeholder: a `TER` record at the break and before the
-hetero atoms, which gives two chains with charged ends at the break. Insert it after `fmeta
-split` (the result is the input of the runs below, byte for byte):
-
-```bash
-awk 'substr($0,1,4)=="ATOM" && substr($0,23,4)+0==219 && !gap {print "TER"; gap=1}
-     substr($0,1,6)=="HETATM" && !het {print "TER"; het=1} {print}' \
-    runs/a2a_theophylline/inputs/protein.pdb > runs/a2a_theophylline/inputs/protein_ter.pdb
-mv runs/a2a_theophylline/inputs/protein_ter.pdb runs/a2a_theophylline/inputs/protein.pdb
-```
-
-Open choices, none examined yet: the 116 crystal waters are removed (`system.keep_water` is
-off), also those near the ligand and the sodium ion; protonation states are the defaults at
-pH 7; run length and replicas are the official defaults (5 × 500 ns), and the pilot run says
-whether that is enough here.
-
-## First preparation (2026-11-16)
-
-Placeholder input as above, the configuration of that day (this `fmeta.yaml` with
-`system.temperature: 310.0` and `equilibration.free_ps: 500`), one NVIDIA RTX PRO 6000
-Blackwell, image `fmeta:dev`. **[file]** Not repeated at 300 K yet.
+The input as `fmeta split` writes it, this `fmeta.yaml`, commit b54292f, image `fmeta:dev`.
+**[file]**
 
 | Quantity | Value |
 |---|---|
-| Atoms | 221 143: protein 4630, theophylline 21, 484 POPC (64 856), 50 451 waters, 137 Na+ and 145 Cl- of the solvent, the kept Na+ |
-| Box as built | 12.74 x 13.38 x 13.24 nm |
-| Time | `prepare` 101 s, of which the membrane build 64 s |
+| What the build did with the protein file | removed 3 CLR, 22 OLA, 7 OLC, 116 HOH and the 1282 dummy atoms; kept the sodium ion; split the chain between LEU 208 and GLU 219 (C-N 1.15 nm) and capped it there (N-methylamide on LEU 208, acetyl on GLU 219); rebuilt 1 missing heavy atom; added 2353 hydrogens at pH 7; four disulfide bonds (71-159, 74-146, 77-166, 259-262) |
+| Atoms | 221 110: 484 POPC (64 856 atoms), 50 437 waters, the receptor with its sodium ion, theophylline (21), the ions of the solvent |
+| Box as built | 12.74 x 13.37 x 13.24 nm |
 | Funnel | exit direction (-0.09, 0.26, 0.96): 16 deg from +z, into the extracellular water. Lower wall 0.70, bound state at s = 1.20, inflection 3.20, upper wall 5.00 nm |
-| Validation | no errors. Two warnings: no straight open path from the site to bulk (least obstructed direction, blocking 0.40), and the site is closed for a 0.3 nm probe in this structure: unbinding will need the protein to open. Unbound region 1.04 nm clear of the solute and 1.90 nm above the membrane; no lipid in the funnel |
-| fmeta's own orientation estimate | 14 deg from the OPM normal, midplane 0.2 nm off (confident): `orient: check` would pass it, `orient: auto` would turn a correct input by 14 deg |
-| Equilibration, 1 ns (100 ps heating, 400 ps release, 500 ps free) | 558 s; about 167 ns/day at 2 fs, NPT |
-| Wall energy on the bound ligand, free stage | mean 0.000, max 0.000 kJ/mol; ligand 0.40 nm inside the wall at s = 1.21 nm |
-| Box after 1 ns | 12.74 x 13.38 x 12.76 nm (height -3.7%); the box rule asks for z >= 12.28 nm. Area per lipid 0.70 nm² (box area over 242 lipids per leaflet, receptor included) |
+| Validation | no errors. Two warnings: no straight open path from the site to bulk (least obstructed direction, blocking 0.40), and the site is closed for a 0.3 nm probe in this structure: unbinding will need the protein to open |
+| Pose and funnel | theophylline 0.43 nm inside the wall at s = 1.20 nm; unbound region 1.04 nm clear of the solute and 1.90 nm above the membrane; no lipid in the funnel |
+| Box rule | z 13.24 nm against the 12.26 nm asked for, x and y against 5.00 nm; the unbound ligand is 4.00 nm from the nearest periodic image |
 
-The warning about the closed site is the point to watch in the pilot run: whether theophylline
+The bilayer of `Modeller.addMembrane` is made of whole lipid patches of 6.37 x 6.69 nm. In
+this frame it is 2 x 2 patches with `system.padding: 1.5` and also with the preset's 1.2 nm
+(221 176 atoms, measured with eeb5302), so here the padding does not decide the cost. The
+receptor of the benchmark set, in the frame of 5OLZ, fits 2 x 1 patches with 1.2 nm (about
+116 000 atoms).
+
+Earlier measurements on a placeholder model of the same file (charged ends at the break,
+310 K, 221 143 atoms), kept because the 300 K equilibration has not ended:
+
+| Quantity | Value |
+|---|---|
+| fmeta's own orientation estimate | 14 deg from the OPM normal, midplane 0.2 nm off (confident): `orient: check` would pass it, `orient: auto` would turn a correct input by 14 deg |
+| Equilibration, 1 ns (100 ps heating, 400 ps release, 500 ps free) | 558 s; about 167 ns/day at 2 fs, NPT, one NVIDIA RTX PRO 6000 Blackwell |
+| Wall energy on the bound ligand, free stage | mean 0.000, max 0.000 kJ/mol; ligand 0.40 nm inside the wall at s = 1.21 nm |
+| Box after 1 ns | 12.74 x 13.38 x 12.76 nm (height -3.7%). Area per lipid 0.70 nm² (box area over 242 lipids per leaflet, receptor included) |
+
+The warning about the closed site is the point to watch in the first run: whether theophylline
 leaves along this funnel within the run length has not been tried.
