@@ -66,10 +66,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   decide nothing. The record before it: d4bbcc6, the code before that fix.
 - Review of PR #1 (2026-11-16, 6 findings on ec27496): being fixed one commit each. Done: a
   walker without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
-  restart under other conditions is refused (FM-D5). Open: protein atoms repaired before
-  residues are dropped, protonation names and bond orders through `fmeta split`, the bias of
-  asynchronous walkers in the cross-checks. The code after 7386d28 has no gate record yet: the
-  gates and the image check run once on the last fix.
+  restart under other conditions is refused (FM-D5); the protein of a split complex keeps the
+  protonation states its residue names state (5792001); a complex is split only with the
+  SMILES of the ligand (FM-D11). Open: protein atoms repaired before residues are dropped, the
+  bias of asynchronous walkers in the cross-checks. The code after 7386d28 has no gate record
+  yet: the gates and the image check run once on the last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -119,6 +120,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-16 — [amendment] FM-D11: a complex is split only with the SMILES of the ligand
+- What: `fmeta split` (`--smiles` is required) and `input.complex` (`input.ligand_smiles`) stop with an error before a file is written when the SMILES is missing; the route that wrote the ligand from the bonds of the structure file is removed (`_write_molfile`). In the same review (5792001): the protein of a split PDB complex keeps the residue names that state a protonation state (HIP, ASH, ...). Both new test cases failed before their fix (HIP read back as no state; the split without SMILES did not raise); `ruff` passes, `pytest` 165 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).
+- Why: review of PR #1: a structure file states neither bond orders nor formal charges, with or without hydrogens. A benzene with its six hydrogens was written with single bonds, and OpenFF read it as a cyclohexane short of six hydrogens. No committed result is affected: every `fmeta split` command of the examples passes `--smiles`, the crystal files state no variant names, and the benchmark route does not split.
+- Refs: FM-D11 (amendment); `src/fmeta/system/inputs.py`, `src/fmeta/cli.py`, `tests/test_inputs.py`, `docs/configuration.md`, the presets, `README.md`.
 
 ### 2026-11-16 — [amendment] FM-D5: a restart under other conditions than the run's `run.yaml` is refused before a file is touched
 - What: before a checkpoint is restored, `MetadynamicsRun` compares the funnel, the bias settings (with the temperature), the grid, the time step, the system (particle count, barostat and pressure: new block `system` in `run.yaml`) and the trajectory layout with `run.yaml` and stops with an error that names the difference. The length, the device, the checkpoint interval and the walker settings may change; an entry that an older `run.yaml` lacks is not judged. With walkers the bias settings and the time step of every walker are checked before any walker is rolled back. `device.json` is written after the check. The new test failed before the fix (the run continued); `ruff` passes, `pytest` 164 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).

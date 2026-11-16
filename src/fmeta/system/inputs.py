@@ -322,16 +322,21 @@ def drop_residues(topology: app.Topology, positions: np.ndarray,
     return modeller.topology, _nm(modeller.positions), notes
 
 
-def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
+def split_complex(path, resname: str, out_dir, smiles: Optional[str],
                   chain: Optional[str] = None, resid: Optional[str] = None,
                   drop: Sequence[str] = (), notes: Optional[list] = None) -> tuple[str, str]:
     """Split a complex (PDB or mmCIF) into ``protein.pdb`` and ``ligand.sdf``.
 
     The ligand is the residue called ``resname`` (narrow it down with ``chain``
-    and ``resid`` if there are several copies). Crystal structures carry no
-    ligand hydrogens or bond orders, so give its SMILES in the protonation state
-    you want to simulate; RDKit then assigns bond orders from it and adds the
-    hydrogens. Without ``smiles`` the ligand must already have hydrogens and bonds.
+    and ``resid`` if there are several copies). A structure file states neither
+    the bond orders nor the formal charges of a ligand, with or without its
+    hydrogens, so its SMILES in the protonation state to simulate is required:
+    RDKit assigns the bond orders from it and adds the hydrogens to the heavy
+    atoms of the file, which stay where they are. Without ``smiles`` the split
+    is refused before a file is written.
+
+    Residue names of a PDB file that state a protonation state (HIP, ASH, ...)
+    are written to ``protein.pdb`` as the file has them.
 
     ``drop`` removes parts of the file first (``drop_residues``), e.g. a fusion partner
     such as ``A:1001-1106``: nothing after this point sees them, neither the ligand search
@@ -339,6 +344,10 @@ def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
     appended to ``notes`` if a list is given.
     Returns the two file paths.
     """
+    if not smiles:
+        raise ValueError("a ligand cut out of a complex needs the SMILES of the ligand in the protonation "
+                         "state to simulate (--smiles, --ligand-smiles or input.ligand_smiles): a structure "
+                         "file states neither its bond orders nor its formal charges")
     topology, positions = read_structure(path)
     if drop:
         topology, positions, dropped = drop_residues(topology, positions, drop)
@@ -370,30 +379,11 @@ def split_complex(path, resname: str, out_dir, smiles: Optional[str] = None,
         app.PDBFile.writeFile(modeller.topology, modeller.positions, handle, keepIds=True)
 
     ligand_atoms = list(ligand.atoms())
-    index = {atom.index: k for k, atom in enumerate(ligand_atoms)}
     coords = positions[[atom.index for atom in ligand_atoms]]
     elements = [atom.element.symbol for atom in ligand_atoms]
-    bonds = [(index[a.index], index[b.index], 1) for a, b in topology.bonds()
-             if a.index in index and b.index in index]
     ligand_path = out_dir / "ligand.sdf"
-    if smiles is None:
-        if "H" not in elements or len(bonds) < len(elements) - 1:
-            raise ValueError("the ligand in the complex has no hydrogens or bonds; pass its SMILES "
-                             "(in the protonation state to simulate) so they can be added")
-        _write_molfile(ligand_path, resname, elements, coords, bonds)
-    else:
-        _write_ligand_from_smiles(ligand_path, resname, elements, coords, smiles)
+    _write_ligand_from_smiles(ligand_path, resname, elements, coords, smiles)
     return str(protein_path), str(ligand_path)
-
-
-def _write_molfile(path, name: str, elements, coords_nm, bonds) -> None:
-    lines = [name, f"{'':2s}{'fmeta':<8s}{'':10s}3D", "",
-             f"{len(elements):3d}{len(bonds):3d}  0  0  0  0  0  0  0  0999 V2000"]
-    for symbol, (x, y, z) in zip(elements, np.asarray(coords_nm) * 10.0):
-        lines.append(f"{x:10.4f}{y:10.4f}{z:10.4f} {symbol:<3s} 0  0  0  0  0  0  0  0  0  0  0  0")
-    lines += [f"{a + 1:3d}{b + 1:3d}{order:3d}  0" for a, b, order in bonds]
-    lines += ["M  END", "$$$$"]
-    Path(path).write_text("\n".join(lines) + "\n")
 
 
 def _write_ligand_from_smiles(path, name: str, elements, coords_nm, smiles: str) -> None:

@@ -68,7 +68,7 @@ sources are listed at the end.
 
 ## input
 
-Either `protein` and `ligand`, or `complex` and `ligand_resname`.
+Either `protein` and `ligand`, or `complex`, `ligand_resname` and `ligand_smiles`.
 
 | Key | Unit | Default | What it does; where the value comes from |
 |---|---|---|---|
@@ -76,7 +76,7 @@ Either `protein` and `ligand`, or `complex` and `ligand_resname`.
 | `input.ligand` | path | `null` | The ligand in its bound pose, in the frame of the protein: SDF, which carries bond orders and formal charges (MOL and MOL2 are read as well). A ligand that is not in contact with the protein is refused (design: FM-D11). |
 | `input.complex` | path | `null` | Instead of the two files: one PDB or mmCIF with both. The ligand residue is cut out into its own file. |
 | `input.ligand_resname` | - | `null` | With `complex`: the residue name of the ligand. |
-| `input.ligand_smiles` | - | `null` | With `complex`: the SMILES of the ligand in the protonation state to simulate. A crystal structure has no hydrogens; they are added from this. Without it the residue must already have hydrogens and bonds. |
+| `input.ligand_smiles` | - | `null` | With `complex`, required: the SMILES of the ligand in the protonation state to simulate. A structure file states neither bond orders nor formal charges, with or without hydrogens: both come from the SMILES, and the hydrogens are added to the heavy atoms of the file. Without it the build stops (design: FM-D11). |
 | `input.ligand_chain` | - | `null` | With `complex`: the chain of the ligand, when there are several copies. |
 | `input.ligand_resid` | - | `null` | With `complex`: the residue number of the ligand, when there are several copies. |
 

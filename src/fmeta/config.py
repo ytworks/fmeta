@@ -60,7 +60,7 @@ class InputConfig:
     # ... or a complex file from which the ligand residue is cut out:
     complex: Optional[str] = None            # PDB / mmCIF holding protein and ligand
     ligand_resname: Optional[str] = None     # residue name of the ligand in the complex
-    ligand_smiles: Optional[str] = None      # its SMILES (protonation state to simulate)
+    ligand_smiles: Optional[str] = None      # its SMILES (protonation state to simulate): required
     ligand_chain: Optional[str] = None       # to pick one of several copies
     ligand_resid: Optional[str] = None
 

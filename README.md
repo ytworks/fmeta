@@ -105,7 +105,7 @@ fmeta analyze run1 --plot          # ΔG° と 95% 信頼区間、レプリカ�
 
 - 取り除きたくない非タンパク質成分（金属イオンなど）は `system.keep_hetero: [ZN]` のように残基名で指定し、それを扱える力場ファイルを `system.forcefields` に加えます。残した成分は受容体の一部として扱います: 平衡化ではタンパク質と同じく位置拘束され、ファネルの自動配置と検査では障害物になり、箱の大きさにも数えられます（FM-D15）。結晶水を残すなら `system.keep_water: true`（残した水は拘束されません）。
 - リガンドの力場は `system.ligand_method` で選びます: `openff`（既定）、`gaff`、`xml`（自分の ffxml を `ligand_xml` に指定）。
-- リガンドの SDF が手元になく PDB エントリの中にあるだけなら、`fmeta split entry.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1"` で `protein.pdb` と `ligand.sdf` に切り出せます（SMILES に書いたプロトン化状態どおりに水素を付けます。重原子座標はそのまま）。`input: {complex:, ligand_resname:, ligand_smiles:}` と書けば構築時に同じ処理をします。
+- リガンドの SDF が手元になく PDB エントリの中にあるだけなら、`fmeta split entry.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1"` で `protein.pdb` と `ligand.sdf` に切り出せます（SMILES に書いたプロトン化状態どおりに水素を付けます。重原子座標はそのまま）。`input: {complex:, ligand_resname:, ligand_smiles:}` と書けば構築時に同じ処理をします。SMILES は必須です。構造ファイルは、水素があってもなくても、リガンドの結合次数と形式電荷を持ちません。SMILES がなければ切り出しはエラーで止まります。PDB ファイルの残基名が示すプロトン化状態（HIP、ASH など）は `protein.pdb` にそのまま残ります。
 - 融合タンパク質のように計算に入れない部分は、`fmeta split` の `--drop CHAIN[:FIRST-LAST]`（複数指定可）で切り出しの前に取り除きます。例: `--drop A:1001-1106`。
 - すでに OpenMM の `System` と `Topology` として組み上がった系には、Python から `fmeta.system.builder.prepare_from_system()` でファネルだけを付けられます。他の MD プログラム（GROMACS、AMBER、CHARMM）の入力形式は扱いません。
 

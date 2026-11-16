@@ -29,14 +29,15 @@ from fmeta.system.protein import model_states
 from fmeta.workflow import prepare_stage
 
 
-def crystal_like_complex(inputs, path):
-    """Protein plus the benzene heavy atoms only, as a PDB entry would have it."""
+def crystal_like_complex(inputs, path, hydrogens=False):
+    """Protein plus the benzene heavy atoms only, as a PDB entry would have it (or with the
+    hydrogens of the benzene, as a prepared complex would)."""
     topology, positions = read_structure(inputs[0])
     ligand_topology, ligand_positions = read_ligand(inputs[1], "BNZ")
     modeller = app.Modeller(topology, positions * unit.nanometer)
     modeller.add(ligand_topology, ligand_positions * unit.nanometer)
     modeller.delete([a for a in modeller.topology.atoms()
-                     if a.residue.name == "BNZ" and a.element.symbol == "H"])
+                     if a.residue.name == "BNZ" and a.element.symbol == "H" and not hydrogens])
     with open(path, "w") as handle:
         app.PDBFile.writeFile(modeller.topology, modeller.positions, handle)
     return ligand_positions
@@ -54,12 +55,19 @@ def test_split_complex_adds_hydrogens_from_smiles(inputs, tmp_path):
     assert np.linalg.norm(positions[6:] - positions[:6], axis=1) == pytest.approx(0.109, abs=0.005)
     assert read_structure(protein)[0].getNumResidues() == 35
 
-    for smiles, message in ((None, "no hydrogens"), ("c1ccncc1", "does not match"),
-                            ("CCCCCC", "does not match"), ("Cc1ccccc1", "7 heavy atoms")):
+    for smiles, message in (("c1ccncc1", "does not match"), ("CCCCCC", "does not match"),
+                            ("Cc1ccccc1", "7 heavy atoms")):
         with pytest.raises(ValueError, match=message):
-            split_complex(tmp_path / "complex.pdb", "BNZ", tmp_path / "bad", smiles=smiles)
+            split_complex(tmp_path / "complex.pdb", "BNZ", tmp_path / "bad", smiles)
     with pytest.raises(ValueError, match="exactly one"):
-        split_complex(tmp_path / "complex.pdb", "XXX", tmp_path / "bad", smiles="C")
+        split_complex(tmp_path / "complex.pdb", "XXX", tmp_path / "bad", "C")
+    # hydrogens and CONECT records state no bond orders: without the SMILES this benzene was
+    # written with single bonds, which a parameter generator reads as a cyclohexane short of
+    # six hydrogens (review of PR #1)
+    crystal_like_complex(inputs, tmp_path / "hydrogenated.pdb", hydrogens=True)
+    with pytest.raises(ValueError, match="needs the SMILES"):
+        split_complex(tmp_path / "hydrogenated.pdb", "BNZ", tmp_path / "none", None)
+    assert not (tmp_path / "none").exists()
 
 
 def test_split_keeps_the_protonation_state_a_residue_name_states(inputs, tmp_path):
@@ -79,6 +87,7 @@ def test_split_keeps_the_protonation_state_a_residue_name_states(inputs, tmp_pat
 def test_split_drops_chains_and_residue_ranges_before_the_ligand_search(tmp_path, capsys):
     """`fmeta split --drop` on a receptor with a fusion partner numbered 1001-1106 in the same
     chain and a second copy of the complex in chain B."""
+    pytest.importorskip("rdkit")
     from fmeta.cli import main as cli
     topology = app.Topology()
     carbon, hydrogen = app.Element.getBySymbol("C"), app.Element.getBySymbol("H")
@@ -99,7 +108,7 @@ def test_split_drops_chains_and_residue_ranges_before_the_ligand_search(tmp_path
 
     def kept(*drop):
         out = tmp_path / f"out{len(list(tmp_path.iterdir()))}"
-        cli(["split", str(tmp_path / "fusion.pdb"), "--resname", "LIG", "-o", str(out)]
+        cli(["split", str(tmp_path / "fusion.pdb"), "--resname", "LIG", "--smiles", "C", "-o", str(out)]
             + [word for selection in drop for word in ("--drop", selection)])
         return [f"{r.chain.id}{r.id}{r.insertionCode.strip()}"
                 for r in read_structure(out / "protein.pdb")[0].residues()]
@@ -113,7 +122,7 @@ def test_split_drops_chains_and_residue_ranges_before_the_ligand_search(tmp_path
     for drop, message in (([], "exactly one"), (["A:3000-3010", "B"], "matches no residue"),
                           (["A:1106-1001", "B"], "ends before"), (["A:1001..1106", "B"], "cannot read")):
         with pytest.raises(ValueError, match=message):
-            split_complex(tmp_path / "fusion.pdb", "LIG", tmp_path / "bad", drop=drop)
+            split_complex(tmp_path / "fusion.pdb", "LIG", tmp_path / "bad", "C", drop=drop)
 
 
 def test_complex_input_through_prepare_stage(inputs, tmp_path):

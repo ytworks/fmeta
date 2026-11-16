@@ -14,7 +14,8 @@ amended three times (2026-11-16, owner: the first 2 ns are not used; then: a rep
 converge on its own, the set of replicas is the measurement and there is no verdict; then: the
 value of a replica is measured by the published procedure, from the bias), with FM-D16 and
 FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16): FM-D5 (a restart
-under other conditions is refused).
+under other conditions is refused), FM-D11 (a complex is split only with the SMILES of the
+ligand).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -294,6 +295,14 @@ Amendment (2026-11-15): fmeta names the ligand force field itself when the setti
 (`system/ligand.py`). The first run with the real packages showed that the generators of
 `openmmforcefields` 0.16 have no default (two files alone failed), and a default taken from the
 installed packages would change the parameters with the environment.
+Amendment (2026-11-16, review of PR #1): a ligand is cut out of a complex (`fmeta split`,
+`input.complex`) only with its SMILES; without it the split stops before a file is written. The
+route that wrote the ligand from the bonds of the structure file is removed. A structure file
+states neither bond orders nor formal charges, with or without hydrogens: a benzene with its
+six hydrogens was written with single bonds, and the parameter generator read it as a
+cyclohexane short of six hydrogens. The protein of a split PDB complex keeps the residue names
+that state a protonation state (HIP, ASH, ...), as the direct route does (FM-D15): OpenMM reads
+them as the standard names, and the split had written those.
 Why: owner decisions — OpenMM only, and two files must be enough.
 
 ### FM-D12 — Verification: a solvable toy system, CPU CI, GPU gates with recorded evidence

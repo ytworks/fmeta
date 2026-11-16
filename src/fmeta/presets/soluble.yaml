@@ -18,7 +18,7 @@ input:
   ligand: ligand.sdf              # [path] the ligand in its bound pose with hydrogens, in the frame of the protein: SDF (MOL, MOL2)
   complex: null                   # [path] instead of the two files above: one PDB or mmCIF with both; the ligand residue is cut out
   ligand_resname: null            # [-] with complex: the residue name of the ligand
-  ligand_smiles: null             # [-] with complex: the SMILES of the ligand in the protonation state to simulate; adds its hydrogens
+  ligand_smiles: null             # [-] with complex, required: the SMILES of the ligand in the protonation state to simulate; its bond orders, charges and hydrogens come from it
   ligand_chain: null              # [-] with complex: the chain of the ligand, to pick one of several copies
   ligand_resid: null              # [-] with complex: the residue number of the ligand, to pick one of several copies
 

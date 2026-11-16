@@ -40,8 +40,8 @@ def _config_from_args(args) -> Config:
         elif args.protein and args.ligand:
             data = {"input": {"protein": args.protein, "ligand": args.ligand}}
         else:
-            sys.exit("give a configuration file, --protein and --ligand, or --complex and "
-                     "--ligand-resname")
+            sys.exit("give a configuration file, --protein and --ligand, or --complex, "
+                     "--ligand-resname and --ligand-smiles")
         config = Config.from_dict(data, base_dir=Path.cwd())
     if args.membrane:
         from .system.builder import MembraneSettings
@@ -72,7 +72,8 @@ def _add_setup_options(parser) -> None:
     parser.add_argument("--ligand", help="posed ligand with hydrogens (SDF, MOL, MOL2)")
     parser.add_argument("--complex", help="structure holding protein and ligand (PDB or mmCIF)")
     parser.add_argument("--ligand-resname", help="residue name of the ligand in --complex")
-    parser.add_argument("--ligand-smiles", help="ligand SMILES, to add its hydrogens (needs RDKit)")
+    parser.add_argument("--ligand-smiles", help="with --complex: the ligand SMILES in the protonation state "
+                                                "to simulate (required; needs RDKit)")
     parser.add_argument("--membrane", nargs="?", const="POPC", metavar="LIPID",
                         help="embed in a lipid bilayer (default POPC); the protein must be "
                              "oriented with the membrane normal along z")
@@ -322,7 +323,9 @@ def main(argv=None) -> None:
     sub = commands.add_parser("split", help="cut a complex into protein.pdb and ligand.sdf")
     sub.add_argument("complex")
     sub.add_argument("--resname", required=True, help="ligand residue name")
-    sub.add_argument("--smiles", help="ligand SMILES in the protonation state to simulate")
+    sub.add_argument("--smiles", required=True,
+                     help="ligand SMILES in the protonation state to simulate: its bond orders, charges "
+                          "and hydrogens come from it (needs RDKit)")
     sub.add_argument("--chain")
     sub.add_argument("--resid")
     sub.add_argument("--drop", action="append", default=[], metavar="CHAIN[:FIRST-LAST]",
