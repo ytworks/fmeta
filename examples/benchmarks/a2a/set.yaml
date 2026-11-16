@@ -47,12 +47,12 @@ ligands:
 # The weakest, a middle and the strongest binder: these run before the whole set is paid for.
 pilot: ["4q", "4d", "4e D"]
 
-# Differences from the preset "membrane" (POPC around z = 0, 10 ns of free equilibration): the
-# same as in examples/a2a_theophylline, which is the same construct of the receptor.
+# Differences from the preset "membrane" (POPC around z = 0, 10 ns of free equilibration).
+# system.padding stays at the preset's 1.2 nm: in this frame the membrane is then 2 x 1 lipid
+# patches of OpenMM, and 2 x 2 (twice the atoms) with 1.5 nm (README.md).
 config:
   preset: membrane
   system:
-    padding: 1.5              # nm of lipid around the receptor in the membrane plane
     keep_hetero: [NA]         # the sodium ion in the allosteric site
   membrane:
     orient: input             # the frame comes from the superposition

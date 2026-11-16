@@ -83,10 +83,21 @@ set is 4a (experiment -9.41, FEP+ -7.15 kcal/mol).
 ## Configuration
 
 `config` in `set.yaml` is the preset `membrane` (a POPC bilayer around z = 0, 10 ns of free
-equilibration) with three differences, the same as in `examples/a2a_theophylline`:
-`orient: input` (the frame is that of the superposition), the sodium ion kept
-(`keep_hetero: [NA]`) and 1.5 nm of lipid around the receptor (`system.padding`). Everything
-else is the official default, at 300 K. The standard state of every value is 1 mol/L.
+equilibration) with two differences: `orient: input` (the frame is that of the
+superposition) and the sodium ion kept (`keep_hetero: [NA]`). Everything else is the official
+default, at 300 K. The standard state of every value is 1 mol/L.
+
+`Modeller.addMembrane` builds the bilayer from whole lipid patches of 6.37 x 6.69 nm, so the
+size of the system moves in steps. For `4q` in this frame, with the input handling of 8d1f10a:
+
+| `system.padding` | Membrane | Box (nm) | Atoms |
+|---|---|---|---|
+| 1.2 nm (the preset, used here) | 2 x 1 patches | 12.74 x 6.69 x 13.27 | 110 352 |
+| 1.5 nm (the set until 2026-11-16) | 2 x 2 patches | 12.74 x 13.37 x 13.92 | 231 482 (eeb5302) |
+
+Both pass the box rule (the unbound ligand is 2.54 nm, or 4.31 nm, from the nearest periodic
+image). The set was changed to 1.2 nm before any ligand was equilibrated: the larger value
+doubled the cost and no rule asks for it.
 
 ## The protein file as fmeta reads it
 
@@ -102,7 +113,7 @@ and `4q/prepared/report.json` of the work directory).
 | Break between LEU 208 and GLU 219 (C-N 1.57 nm) | chain split there, N-methylamide on LEU 208 and acetyl on GLU 219 |
 | Disulfide bonds | four: 71-159, 74-146, 77-166, 259-262 |
 | Hydrogens | the 2354 hydrogens of the file did not match the force field's names and were rebuilt, in the protonation states read before |
-| System of `4q` | 231 482 atoms; no error in the validation; the same two warnings as the example (no straight open path, site closed for a 0.3 nm probe) |
+| System of `4q` | built with `system.padding: 1.5`, the value of the set at that commit: 231 482 atoms; no error in the validation; the same two warnings as the example (no straight open path, site closed for a 0.3 nm probe) |
 
 Two differences from the model of the FEP+ input remain:
 
