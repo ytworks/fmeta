@@ -67,27 +67,30 @@ Measured on 2026-11-16 (UTC): the steps above with the official defaults (5 repl
 on commit 47e84f7 in the official image. One difference from the `fmeta run` line above: the
 five replicas ran at the same time on one GPU with NVIDIA MPS
 (`scripts/in_docker.sh --mps --gpus 3 ... fmeta run runs/tyk2 --gpus 0 --per-gpu 5`), at about
-300 ns/day each. The numbers are those of `fmeta analyze runs/tyk2 --plot`.
+300 ns/day each. The numbers are those of `fmeta analyze runs/tyk2 --plot` with the analysis of
+the third amendment of FM-D9 (`docs/design/engine.md`): the value of a replica is the mean over
+the second half of the run of dG(t) from the accumulated bias, with a block error.
 
 | Quantity | fmeta | Experiment |
 |---|---|---|
-| dG0 | −10.05 kJ/mol (−2.40 kcal/mol) | −47.3 kJ/mol (−11.31 kcal/mol) |
-| 95% interval of the five replicas | −24.57 to 4.47 kJ/mol (standard error 5.23) | |
-| Each replica | −4.65, −9.51, −6.80, 0.58, −29.89 kJ/mol | |
+| dG0 | −14.85 kJ/mol (−3.55 kcal/mol) | −47.3 kJ/mol (−11.31 kcal/mol) |
+| 95% interval of the five replicas | −26.60 to −3.11 kJ/mol (standard error 4.23) | |
+| Each replica, with its block error | −18.48 ± 2.04, −12.51 ± 3.58, −3.97 ± 2.82, −10.31 ± 3.07, −29.00 ± 7.13 kJ/mol | |
+| From the samples after the first 2 ns (cross-check) | −4.65, −9.51, −6.80, 0.58, −29.89 kJ/mol | |
 | Rebinding events per replica | 5, 0, 1, 1, 1 | |
 | Replicas with a note in the diagnostics | 5 of 5 | |
 
-The value is 37 kJ/mol (8.9 kcal/mol) above the experimental one, and the experimental value is
+The value is 32 kJ/mol (7.8 kcal/mol) above the experimental one, and the experimental value is
 outside the interval. It is reported as measured: nothing was tuned on this system, and the
-five replicas together are the measurement (FM-D9, second amendment, `docs/design/engine.md`).
+five replicas together are the measurement (FM-D9, second amendment).
 
 What the diagnostics of `fmeta analyze` say:
 
 - Four of the five replicas have fewer than 3 rebinding events. In every replica the bias
   pushed the ligand out early (`COLVAR`: s above 3.0 nm for the first time at 1.0 to 5.1 ns);
   in those four it then came back from the unbound region to the site once or not at all.
-- Replica 3 (0.58 kJ/mol) is within 1 kT of what an empty funnel gives (−1.32 kJ/mol): "no
-  binding beyond the funnel volume".
+- In four of the five replicas an estimate from the samples (after the first 2 ns, or of the
+  second half) differs from the value by 6.6 to 20.6 kJ/mol.
 - In every replica dG(t) from the bias changed by 12 to 43 kJ/mol over the last half of the
   run. The bias fills the free-energy surface for as long as the run lasts, and the difference
   between the site and the unbound region moves with it: from −84 kJ/mol at 2 ns to −14 kJ/mol

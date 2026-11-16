@@ -58,8 +58,10 @@ checkpoints. With one GPU use `--gpus 0` and `--mode sequential`.
 
 With the defaults the five replicas give a value with a wide interval. A replica of 40 ns does
 not converge on its own: the five together are the measurement, and the interval is what they
-say (FM-D9, second amendment, `docs/design/engine.md`). The numbers are reported as measured;
-the mean without its interval is not a binding free energy to quote.
+say (FM-D9, second amendment, `docs/design/engine.md`). The value of a replica is the mean over
+the second half of the run of dG(t) from the accumulated bias, with a block error (the published
+procedure; FM-D9, third amendment). The numbers are reported as measured; the mean without its
+interval is not a binding free energy to quote.
 
 Two runs have the values of the defaults. The first is the scan run `sig2` of the section
 below (commit f2ea653): five replicas at the same time on one GPU with NVIDIA MPS, from the
@@ -70,25 +72,30 @@ ends.
 
 | Quantity | Scan run with the values of the defaults (5 replicas on one GPU with MPS) |
 |---|---|
-| dG0 | −27.35 kJ/mol (−6.54 kcal/mol) |
-| 95% interval of the five replicas | −68.67 to 13.98 kJ/mol (standard error 14.88) |
-| Each replica | −78.17, −1.73, −44.29, −3.42, −9.13 kJ/mol |
+| dG0 | −28.28 kJ/mol (−6.76 kcal/mol) |
+| 95% interval of the five replicas | −66.93 to 10.37 kJ/mol (standard error 13.92) |
+| Each replica, with its block error | −78.17 ± 16.18, −4.60 ± 1.06, −39.18 ± 2.57, −6.60 ± 1.61, −12.87 ± 2.21 kJ/mol |
+| From the samples after the first 2 ns (cross-check) | none, −1.73, −44.29, −3.42, −9.13 kJ/mol |
 | Rebinding events per replica | 0, 3, 5, 5, 5 |
 | Replicas with a note in the diagnostics | 3 of 5 |
 
 What the diagnostics of `fmeta analyze` say about those three:
 
-- Replica 0 never left the site in 40 ns. There is no estimate from its samples, and its value
-  is the mean of dG(t) from the bias, which changed by +98.8 kJ/mol over the last half of the
-  run: the bias was filling the site all that time.
-- Replica 1 is within 1 kT of what an empty funnel gives (−0.83 kJ/mol): "no binding beyond the
-  funnel volume".
-- For replica 2, dG(t) from the bias changed by +15.3 kJ/mol over the last half of the run, and
-  its value changes by +38.2 kJ/mol when only the second half is used.
+- Replica 0 left the site once, at 27.5 ns, and did not come back (`COLVAR`). dG(t) from the
+  bias changed by +98.8 kJ/mol over the last half of the run: the bias was filling the site for
+  most of it. Its samples after the first 2 ns give no estimate, so the value has no cross-check
+  from them; the samples of the second half alone give a value 24.4 kJ/mol higher.
+- For replica 1, dG(t) from the bias changed by +6.5 kJ/mol over the last half of the run, and
+  the samples of the second half give a value 4.0 kJ/mol higher.
+- For replica 2, dG(t) from the bias changed by +15.3 kJ/mol over the last half of the run; the
+  samples after the first 2 ns give a value 5.1 kJ/mol lower and those of the second half one
+  33.1 kJ/mol higher.
 
 The mean of the five lies near the experimental range (−26.8 to −30.5 kJ/mol). That is an
-average over replicas that differ by 76 kJ/mol, with an interval that includes zero: it says
-nothing about agreement.
+average over replicas that differ by 74 kJ/mol, with an interval that includes zero: it says
+nothing about agreement. The block error of a replica (1.1 to 16.2 kJ/mol) is far below that
+difference: it says how far a value moved within the second half of its own run, not how far
+the run is from the answer.
 
 The calcium ion is removed by default. Keeping it (`system.keep_hetero`) is a variation that
 has not been run.
@@ -104,9 +111,11 @@ length) were withdrawn with those decisions before either gave a value. Of their
 one with 2 fs and real masses had started; it was stopped at 15 to 18 ns and not analysed.
 
 On the same day the owner asked that the start of a run, where the bias changes fastest, is not
-used. Since then the headline of `fmeta analyze` is the estimate from the samples after the
-first 2 ns, and the mean of dG(t) from the bias is a cross-check (FM-D9 amendment,
-`docs/design/engine.md`). Every number below is from that analysis.
+used. The headline of `fmeta analyze` then was the estimate from the samples after the first
+2 ns, with the mean of dG(t) from the bias as a cross-check (FM-D9, first amendment,
+`docs/design/engine.md`). The bias was chosen with that analysis, and every number below is from
+it. Since the third amendment of FM-D9 the two have changed places: the Result section above is
+from the analysis with the headline from the bias.
 
 **The former default bias.** The run of five replicas by the steps above (commit 8d1f10a, five
 GPUs at the same time) was stopped at 75 to 81 ns. Cut at a length and analysed:
@@ -164,13 +173,14 @@ brackets. No replica of any setting passes at 10, 15, 20 or 30 ns.
 
 By the second point of the rule the defaults are `sig2` (hill widths 0.05 / 0.1 nm; bias factor
 10 and hills of 1.5 kJ/mol stay) and 40 ns per replica: 2 of 5 replicas pass at 40 ns. With the
-analysis before the FM-D9 amendment the choice is the same (`sig2` 2 of 5, every other setting
+analysis before the first amendment of FM-D9 the choice is the same (`sig2` 2 of 5, every other setting
 0 of 5).
 
 What the count does not say:
 
-- `sig2` has the widest scatter between replicas of all settings, and one of its replicas never
-  left the site. The rule counts replicas that pass and was applied as written.
+- `sig2` has the widest scatter between replicas of all settings, and one of its replicas left
+  the site only once, at 27.5 ns, and did not come back (corrected on 2026-11-16: this line said
+  that it never left). The rule counts replicas that pass and was applied as written.
 - A run can be extended exactly (`fmeta run runs/tb --length-ns 80`); how long this system
   needs for a narrow interval was not measured, because nothing runs longer than 40 ns by the
   owner's decision.
@@ -186,13 +196,15 @@ value with an interval, and the checks of a replica are diagnostics (FM-D9, seco
 Read that way, the scan says:
 
 - The value depends on the bias setting. At 40 ns the six settings give −2.9 to −28.0 kJ/mol
-  (the last column of values in the table above), a spread of 25.1 kJ/mol.
-- Another estimator does not remove that. Two estimators that use only local equilibrium under
-  the bias of the moment (mean-force integration, per replica and pooled over the replicas)
-  were compared with the present one by a rule written first. All three are within 0.80 kJ/mol
-  of the exact value on the toy system. On this scan their spread between the settings is 32.8
-  and 42.0 kJ/mol, more than the 25.1 of the present estimator, which therefore stays
-  (FM-D16, third amendment, with the table).
+  (the last column of values in the table above), a spread of 25.1 kJ/mol, with the estimate
+  from the samples, the headline when the scan was read. With the headline from the bias (FM-D9,
+  third amendment) they give −14.9 to −29.1 kJ/mol, a spread of 14.1.
+- Another estimator from the samples does not remove that. Two estimators that use only local
+  equilibrium under the bias of the moment (mean-force integration, per replica and pooled over
+  the replicas) were compared with the estimate from the samples by a rule written first. All
+  three are within 0.80 kJ/mol of the exact value on the toy system. On this scan their spread
+  between the settings is 32.8 and 42.0 kJ/mol, more than the 25.1 of the estimate from the
+  samples, which therefore stayed (FM-D16, third amendment, with the table).
 - The reason is in the data. The replicas fall in two groups, about 0 to −9 and −30 to
   −78 kJ/mol, with 0 to 17 rebinding events each in 40 ns: too few crossings to average the
   two. That is a limit of the sampling at this length.
