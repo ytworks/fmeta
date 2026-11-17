@@ -32,8 +32,8 @@ Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D17 Accept
 FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
 scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
-ended and every check of it that this machine can run has run. Open: the result of CI on the
-review fixes; the replies on the review threads.
+ended and every check of it that this machine can run has run. The review of PR #1 is
+answered and CI is green on the final code (both below).
 
 | Milestone | Status |
 |---|---|
@@ -46,7 +46,7 @@ review fixes; the replies on the review threads.
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e (the code of c59ec99): 17 passed, 232 entries of the calling user, `fmeta` imported from the image. The same on 4f976cb, the final code with the review fixes: 17 passed, 234 entries of the calling user, `fmeta` imported from the image; only documents and evidence changed after it. The result of the CI job `docker` is not checked here; the publish workflow has never run |
+| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e (the code of c59ec99): 17 passed, 232 entries of the calling user, `fmeta` imported from the image. The same on 4f976cb, the final code with the review fixes: 17 passed, 234 entries of the calling user, `fmeta` imported from the image; only documents and evidence changed after it. The CI job `docker` passed on 4f976cb and on 5e03c02; the publish workflow has never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -71,9 +71,9 @@ review fixes; the replies on the review threads.
   protonation states its residue names state (5792001); a complex is split only with the
   SMILES of the ligand (FM-D11); an amino acid without a backbone atom is rebuilt before the
   chains are split, never dropped (FM-D15); a sample of a walker is weighted with the bias
-  that walker had, rebuilt from its `SYNC` record (FM-D9, FM-D10). The replies on the review
-  threads are not posted (no GitHub write access in the session). The gates and the image
-  check ran on 4f976cb, the last fix.
+  that walker had, rebuilt from its `SYNC` record (FM-D9, FM-D10). The replies are posted on the
+  six threads and the threads are resolved (2026-11-17, with `gh`, on the owner's instruction).
+  The gates and the image check ran on 4f976cb, the last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -88,9 +88,9 @@ review fixes; the replies on the review threads.
   image check without the mounted source passed on 4f976cb (the image row above). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
-- CI: green on 171220a (read here). The owner's review of 2026-11-16 states that CI passed on
-  ec27496 (not read here). The result on the commits of the review fixes (6fa7cd2 and later)
-  is not checked here.
+- CI: green on 4f976cb, the final code, and on 5e03c02 (both `cpu` jobs and `docker`; read with
+  `gh` on 2026-11-17); green on the review fixes from 5cda44c on. The run of 6fa7cd2 was
+  cancelled by the push of 5cda44c 25 s later (`cancel-in-progress`), which holds its change.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
