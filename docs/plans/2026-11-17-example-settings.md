@@ -146,6 +146,13 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
    way, summed over the walkers and counted as the product analysis counts them). Point 3
    chooses among the lengths at which every replica has a walker that reached the unbound
    window.
+5. Amended 2026-11-17 on the owner's word, given after the TYK2 reading at 10 ns below and
+   before any other round 2 reading: the length is not limited to 20 ns; accuracy comes first,
+   and of the lengths that give it the shorter is the better. Points 1 and 4 stay as they are,
+   thresholds included. The lengths of point 2 go on in steps of 5 ns to 40 ns, and point 3
+   applies if none qualifies up to 40 ns. 40 ns is the owner's limit of 2026-11-16 for any run;
+   a longer one needs their word. The runs go on in steps of 10 ns (TYK2, then A2A) and stop
+   at the first length that qualifies.
 
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
