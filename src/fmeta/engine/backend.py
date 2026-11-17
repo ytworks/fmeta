@@ -70,11 +70,9 @@ def _kind(system: mm.System) -> str:
     return "membrane" if membrane else "soluble"
 
 
-def unmet(platform: str, precision: str, system: mm.System, box=None) -> Optional[str]:
-    """The first condition of the plugin that a run does not meet, as text (None: all hold).
-
-    ``box`` holds the periodic box vectors the run starts from (default: those of ``system``).
-    These are the settings the plugin refuses by name; the box rule is from its documentation."""
+def unavailable(platform: str, precision: str) -> Optional[str]:
+    """Why the plugin cannot take part in any run of this process, as text (None: it can): the
+    conditions that do not depend on the system."""
     if platform != "CUDA":
         return f"the platform is {platform}, and cuPotential is a plugin of the CUDA platform"
     if precision not in ("single", "mixed"):
@@ -83,6 +81,17 @@ def unmet(platform: str, precision: str, system: mm.System, box=None) -> Optiona
         plugin()
     except ImportError as error:
         return str(error)
+    return None
+
+
+def unmet(platform: str, precision: str, system: mm.System, box=None) -> Optional[str]:
+    """The first condition of the plugin that a run does not meet, as text (None: all hold).
+
+    ``box`` holds the periodic box vectors the run starts from (default: those of ``system``).
+    These are the settings the plugin refuses by name; the box rule is from its documentation."""
+    reason = unavailable(platform, precision)
+    if reason is not None:
+        return reason
     forces = [force for force in system.getForces() if isinstance(force, mm.NonbondedForce)]
     if len(forces) != 1:
         return f"the system has {len(forces)} NonbondedForce objects, and cuPotential replaces exactly one"
@@ -123,6 +132,23 @@ def resolve(requested: str, platform: str, precision: str, system: mm.System, bo
     if requested == "cupotential":
         raise ValueError(f"the cupotential back end cannot run this: {reason}. "
                          "Use run.backend: openmm (or auto, for a new run).")
+    return Backend("openmm", reason=reason)
+
+
+def integrator_only(requested: str, platform: str, precision: str) -> Backend:
+    """The back end of a run of a system without a PME force, which the plugin's force cannot
+    take (the toy system, whose exact free energy is known): the plugin's integrator moves the
+    particles wherever a run of a real system would get it, and OpenMM's own does elsewhere.
+    ``cupotential`` where the plugin cannot take part is a ``ValueError``, as in :func:`resolve`."""
+    if requested not in BACKENDS:
+        raise ValueError(f"run.backend must be one of {BACKENDS}, not {requested!r}")
+    if requested == "openmm" or not any("integrator" in parts for parts in CONFIGURATION.values()):
+        return Backend("openmm")
+    reason = unavailable(platform, precision)
+    if reason is None:
+        return Backend("cupotential", ("integrator",))
+    if requested == "cupotential":
+        raise ValueError(f"the cupotential back end cannot run this: {reason}. Use run.backend: openmm (or auto).")
     return Backend("openmm", reason=reason)
 
 

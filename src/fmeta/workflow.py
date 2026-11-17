@@ -222,8 +222,8 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
     run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings,
                           conditions=conditions)
     with open(directory / "device.json", "w") as handle:    # after a restart was accepted or refused
-        json.dump(dict(device_record(simulation.context, device, gpus_before), **backend.record()), handle,
-                  indent=2)
+        json.dump(dict(device_record(simulation.context, device, gpus_before), **backend.record(),
+                       restored_from=run.restored), handle, indent=2)
     length = run_cfg.length_ns if length_ns is None else length_ns
     run.run(round(length * 1000.0 / hill_ps))
     run.close()

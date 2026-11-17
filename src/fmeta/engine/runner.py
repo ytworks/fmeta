@@ -83,6 +83,9 @@ class MetadynamicsRun:
         if self.pace % self.stride:
             raise ValueError("colvar_stride must divide the hill pace")
         self.n_hills = 0
+        # What a continued run was restored from: "checkpoint" (the binary one: the exact state)
+        # or "state" (the State XML: positions and velocities, another random stream). None: new.
+        self.restored: Optional[str] = None
         self._traj: Optional[TrajectoryWriter] = None
         self._others = [HillsFollower(Path(d) / "HILLS")
                         for d in (self.settings.walker_dirs or [])
@@ -178,9 +181,11 @@ class MetadynamicsRun:
             xml = archive.read("state.xml").decode()
         try:
             context.loadCheckpoint(binary)
+            self.restored = "checkpoint"
         except Exception as error:  # different platform or hardware: use the portable state
             log.warning("binary checkpoint unusable (%s); restoring from State XML", error)
             context.setState(mm.XmlSerializer.deserialize(xml))
+            self.restored = "state"
         self.n_hills = int(meta["n_hills"])
 
         replayed = sum_hills(read_hills(self.workdir / "HILLS"), self.bias.grid)

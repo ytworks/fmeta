@@ -14,7 +14,7 @@ import yaml
 
 from fmeta.config import Config, RunConfig
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings, backend
-from fmeta.engine.backend import CONFIGURATION, Backend, build, resolve, settle, unmet
+from fmeta.engine.backend import CONFIGURATION, Backend, build, integrator_only, resolve, settle, unmet
 from fmeta.engine.hills import read_hills
 from fmeta.testing.toy import make_simulation, make_toy
 from fmeta.workflow import run_stage
@@ -104,6 +104,19 @@ def test_auto_takes_the_plugin_where_its_conditions_hold_and_openmm_with_the_rea
             resolve("cupotential", platform, precision, system)
     with pytest.raises(ValueError, match="run.backend"):
         resolve("cuda", "CUDA", "mixed", system)
+
+
+def test_a_system_without_a_pme_force_gets_the_plugin_integrator_where_runs_get_it(stand_in, monkeypatch):
+    """The toy system of the checks: its exact free energy then tests the integrator of the runs."""
+    assert integrator_only("auto", "CUDA", "mixed") == Backend("cupotential", ("integrator",))
+    assert integrator_only("openmm", "CUDA", "mixed") == Backend("openmm")
+    fallback = integrator_only("auto", "Reference", "mixed")
+    assert fallback.name == "openmm" and fallback.reason.startswith("the platform is Reference")
+    with pytest.raises(ValueError, match="the platform is Reference"):
+        integrator_only("cupotential", "Reference", "mixed")
+    for kind in CONFIGURATION:                                 # no run gets that integrator: nor does the toy
+        monkeypatch.setitem(CONFIGURATION, kind, ("force",))
+    assert integrator_only("auto", "CUDA", "mixed") == Backend("openmm")
 
 
 def test_a_plugin_that_is_missing_or_does_not_load_is_a_reason_with_a_name(monkeypatch):

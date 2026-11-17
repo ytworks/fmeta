@@ -1071,8 +1071,10 @@ subset picked by noise.
 Status: **Accepted** (2026-11-17, owner request). In force as an option: `run.backend` is
 `openmm` unless a configuration says otherwise. The parts the plugin provides for each kind of
 system are chosen from measurements (M2 of the plan
-`docs/plans/2026-11-17-cupotential-backend.md`). Open (M3, M4): the accuracy criteria of a gate
-item for the back end, and `auto` as the default.
+`docs/plans/2026-11-17-cupotential-backend.md`), and `fmeta check` has the items of the back
+end with their criteria (M3): they passed item by item with `--backend openmm`, `cupotential`
+and `auto` on 2026-11-17, and no gate record holds them yet. Open (M4): `auto` as the default,
+and the gate records of the final code for the two back ends.
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
@@ -1134,6 +1136,72 @@ disclosure of benchmark results without permission (clause 2.12; owner, 2026-11-
 measured with the plugin in a tracked file, a commit message or a text on GitHub).
 `scripts/verify_bench_results.py` rejects such a record with a speed, in CI; with NVIDIA's
 permission the switch is `PLUGIN_WITHHELD` there.
+Checks (`fmeta check`, 19 items with the two of the back end; M3, 2026-11-17). `platform`:
+where `run.backend` gives cuPotential, the plugin makes 100 steps of a small PME system (512
+ions), so a plugin that loads and cannot make a Context is found before the long items.
+`backend` (the soluble test system, a rhombic dodecahedron) and `membrane_backend` (the
+membrane test system, a rectangular box with the membrane barostat) work on the equilibrated
+state, with every Context built as a run builds it:
+(1) `run.backend: auto` gives cuPotential where the plugin can take part (CUDA, single or mixed
+precision, the plugin loads); OpenMM there is a failure.
+(2) The nonbonded energy and forces, alone in a force group, with OpenMM's PME and with the
+back end of the runs, against the same System with an Ewald tolerance of 1e-6 in double
+precision, at the equilibrated coordinates and with the molecules moved by lattice vectors (the
+complex by one cell along each axis, every other molecule by cells drawn at random): energy
+≤ 1e-4, force ≤ 2e-3, relative as in `forces` (the energy by max(1, |E|) of the reference, the
+largest difference of a force component by the largest component of the reference).
+(3) The CVs and the wall and bias energies and forces (three hills at the ligand) with
+cuPotential against OpenMM's at the same coordinates: CV ≤ 2e-5 nm, energy ≤ 1e-4, force ≤ 2e-3.
+(4) The plugin's barostat holds the pressure and the temperature of the configuration.
+The numbers are those of `forces`, the upper bound that the plan set. Measured before they
+were fixed (3 frames of each test system, 24062 and 37422 atoms; the reference moves by 1.1e-8
+in energy and 1.7e-6 in force between tolerances of 1e-7 and 1e-6): OpenMM's PME at 5e-4 in
+mixed precision is within 1.8e-5 in energy and 7.6e-4 in force of the reference, the plugin
+within 3.9e-6 and 4.6e-4, and the two are up to 8.8e-4 in force from each other; the funnel
+groups were identical in the two Contexts; moving the molecules by lattice vectors changed the
+forces of one Context by at most 5.4e-5 (OpenMM) and 4.5e-5 (plugin). The largest force
+component differs from frame to frame (OpenMM: 5.9e-4 to 7.6e-4), so a criterion close to these
+values would decide by the frame and not by the code; the items are there for the forces of
+another model (a lost exception, another cutoff, the mesh of another box), not for the last
+digit of the mesh. In the runs of the items with the three settings of `--backend`: OpenMM
+within 3.1e-5 and 8.0e-4, cuPotential within 2.8e-6 and 4.5e-4, the funnel groups identical.
+The toy items run with the integrator that a run of a real system gets (`integrator_only`): the
+toy system has no PME force, so the plugin's force cannot take part, and under `cupotential`
+and `auto` on CUDA the plugin's integrator moves the particle. Their criteria are unchanged
+(2.0 and 3.0 kJ/mol). With the plugin's integrator, at the seed of the item: reweighted −4.36
+and plateau −3.78 kJ/mol against the exact −4.95; with OpenMM's in the same image −4.76 and
+−4.34.
+`device.json` names what the last segment of a run began from (`restored_from`: `checkpoint`,
+the binary checkpoint of the platform; `state`, the State XML that is read when the binary one
+does not load; null for a new run). `toy_restart` and `production` require `checkpoint`. That
+is stricter than before: a run that fell to the State XML passed them, and a back end whose
+checkpoint cannot be read would have gone unnoticed. With each back end the continued test runs
+were restored from their binary checkpoints. Not measured: whether a continued run under the
+plugin repeats an uninterrupted one bit for bit (the contract "N + N hills against 2N" is
+checked on the Reference platform, with OpenMM's integrator).
+Every test run of `production`, `walkers`, `replicas_*` and `membrane_run` is verified from its
+`device.json`: the back end is the one asked for, and under `auto` it is cuPotential where the
+plugin can take part. Without this, a default that fell to OpenMM would pass every item and
+read as a verified plugin.
+The integrator and the barostat on the real test systems (measured once, 2026-11-17; not a gate
+item): NPT, 8 seeds of 1 ns at 4 fs, CUDA, mixed precision; means over 100 to 1000 ps as the
+difference from stock OpenMM, with the standard error of that difference, for the potential
+energy (kJ/mol), the density (g/cm3) and the kinetic temperature (K). Soluble system (stock:
+−333977, 0.99958, 300.97): the plugin's force alone −34 ± 18, −3.6e-5 ± 6.1e-5, −0.01 ± 0.04;
+force and integrator +12 ± 12, −1.9e-5 ± 7.4e-5, +0.13 ± 0.05; force, integrator and barostat
+−13 ± 15, −0.3e-5 ± 9.7e-5, +0.14 ± 0.03. Membrane system (stock: −416692, 1.02173, 300.93):
+force alone −1 ± 43, +3.7e-5 ± 1.8e-4, −0.02 ± 0.03; force and integrator −64 ± 32, −7.5e-5 ±
+2.1e-4, −0.01 ± 0.02. The density is within 0.6 standard errors of stock in every set, the
+potential energy within 2.0 (1.9 and 2.0 in two of the five sets). The kinetic temperature of
+the soluble system is 0.13 K (0.04%) higher with the plugin's integrator, in both sets that use
+it (2.8 and 4.4 standard errors), not with the plugin's force alone and not in the membrane
+system. Its origin is not known, and nothing was adjusted for it. (Stock itself reads 300.97 K
+under a thermostat of 300 K at this time step; that was not investigated either.)
+What no gate item measures under the plugin: the density, and the binding free energy of a real
+system (the replicas of one setting scatter by tens of kJ/mol, FM-D9). The evidence for the
+back end is the accuracy of its forces (`backend`, `membrane_backend`), the toy free energy
+with its integrator, the NPT means above, and the unchanged items that move a real system with
+it (`periodic_images`, `production`, `walkers`, `replicas_*`, `membrane_run`).
 Not done: the plugin in the equilibration or inside `addMembrane` (1 to 2.5% of the GPU time
 of a calculation, and the restraints and stages there would need their own verification);
 changing the back end of a run that has begun (its bias would be a sum of hills from two sets

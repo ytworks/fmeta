@@ -94,11 +94,15 @@ def make_toy(well_depth: float = 20.0, well_sigma: float = 0.15, site_s: float =
 
 def make_simulation(toy: ToySystem, temperature: float = 300.0, friction: float = 1.0,
                     timestep: float = 0.02, seed: int = 1, platform: str = "Reference",
-                    properties: dict | None = None):
-    """A Langevin simulation of the toy. Call after the bias force was added."""
-    integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin, friction / unit.picosecond,
-                                             timestep * unit.picosecond)
-    integrator.setRandomNumberSeed(seed)
+                    properties: dict | None = None, integrator: mm.Integrator | None = None):
+    """A Langevin simulation of the toy. Call after the bias force was added.
+
+    ``integrator``: one made by a back end (``fmeta.engine.backend.build``) in place of OpenMM's
+    own; ``friction`` and ``timestep`` are then its own, and ``seed`` sets the velocities only."""
+    if integrator is None:
+        integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin, friction / unit.picosecond,
+                                                 timestep * unit.picosecond)
+        integrator.setRandomNumberSeed(seed)
     simulation = app.Simulation(toy.topology, toy.system, integrator,
                                 mm.Platform.getPlatformByName(platform), properties or {})
     simulation.context.setPositions(toy.positions)
