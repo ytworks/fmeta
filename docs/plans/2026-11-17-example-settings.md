@@ -150,6 +150,27 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
 
+**Round 2, readings** (2026-11-17). Work directories `runs/r2/tyk2` and `runs/r2/a2a`: the
+equilibrated directories of the examples with `run.replicas: 4`, `run.walkers: 8`, everything
+else the defaults. The numbers at a cut length come from the functions of the product analysis
+on the first N ns of the files; at the length of the run they are the output of
+`fmeta analyze` (checked at 10 ns on TYK2: the same mean, interval and replica values).
+
+- TYK2 to 10 ns, no fault. kJ/mol; experiment −47.3:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 5 | −93.39 | −121.76 to −65.02 | 28.37 | 46.09 | −108.9, −70.2, −105.7, −88.8 | 2/0, 3/0, 1/0, 3/0 |
+  | 7.5 | −82.19 | −108.58 to −55.80 | 26.39 | 34.89 | −97.2, −64.3, −95.4, −71.9 | 2/0, 3/0, 2/0, 4/0 |
+  | 10 | −73.26 | −96.89 to −49.63 | 23.63 | 25.96 | −91.8, −59.4, −78.5, −63.3 | 3/0, 4/0, 2/0, 4/0 |
+
+  No part of the rule is met on TYK2 at 5 or at 10 ns (half-width, distance, passages back),
+  so no length up to 10 ns qualifies whatever A2A gives: both systems go on to 20 ns, TYK2
+  after the 10 ns of A2A, then A2A. As in round 1, no walker came back from the unbound window
+  into the site. The replicas differ in both levels of the surface: at 10 ns the largest bias
+  in the site is 178.4, 164.4, 157.6 and 157.5 kJ/mol, and the bias in the unbound window
+  76.3, 91.0, 78.1 and 81.9.
+
 **What the choice means.** The setting is chosen on these two systems with their experimental
 values in view. Its agreement with experiment there is the outcome of the choice, not a
 validation of the method, and the READMEs and FM-D19 say so. The package defaults do not
