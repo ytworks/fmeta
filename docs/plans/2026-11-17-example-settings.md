@@ -338,6 +338,35 @@ on the first N ns of the files; at the length of the run they are the output of
   rising: −18.21 at 55 ns, −18.38 at 60 ns.
 - The rule is not met at 55 or at 60 ns: on TYK2 the half-width, on A2A the mean by 0.22 to
   0.39. Both systems go on to 70 ns.
+- TYK2 to 70 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 62.5 | −45.36 | −66.66 to −24.05 | 21.30 | 1.94 | −49.9, −52.5, −53.6, −25.4 | 6/2, 6/1, 6/2, 8/6 |
+  | 65 | −44.64 | −65.71 to −23.58 | 21.07 | 2.66 | −49.0, −51.5, −53.1, −25.0 | 6/2, 6/1, 6/2, 8/6 |
+  | 67.5 | −43.99 | −64.66 to −23.31 | 20.68 | 3.31 | −48.2, −50.8, −52.2, −24.7 | 6/2, 6/1, 6/2, 8/6 |
+  | 70 | −43.37 | −63.60 to −23.13 | 20.24 | 3.93 | −47.3, −50.0, −51.7, −24.5 | 6/2, 6/1, 6/2, 8/6 |
+
+  The half-width does not meet the rule at 65 or at 70 ns. It has its largest value at 60 ns
+  (21.55) and goes down by 0.2 to 0.4 per 2.5 ns after it: the fourth replica rises by 1.5 in
+  these 10 ns, the other three by 2.9 to 3.5, and it is 25 above their mean (27 at 60 ns). The
+  mean is now above the experimental value, by 3.93 at 70 ns.
+- A2A to 70 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 62.5 | −18.69 | −22.57 to −14.81 | 3.88 | 8.31 | −21.0, −16.7, −20.6, −16.4 | 5/3, 7/3, 5/2, 7/4 |
+  | 65 | −18.75 | −22.72 to −14.77 | 3.98 | 8.25 | −21.0, −16.5, −20.9, −16.7 | 5/3, 6/2, 5/2, 7/4 |
+  | 67.5 | −19.00 | −23.06 to −14.94 | 4.06 | 8.00 | −21.3, −16.6, −21.1, −17.0 | 5/3, 6/2, 5/2, 7/4 |
+  | 70 | −18.98 | −23.04 to −14.92 | 4.06 | 8.02 | −21.1, −16.4, −21.2, −17.2 | 5/3, 6/2, 5/2, 7/4 |
+
+  A2A meets points 1 and 4 at 65 and at 70 ns: half-width 3.98 and 4.06, the mean 8.25 and
+  8.02 above the experimental range (8.4 allowed), every replica with a passage each way. The
+  mean has gone down since 55 ns (−18.21) by 0.8.
+- The rule is not met at 65 or at 70 ns, because of the half-width of TYK2 alone. With three
+  replicas at one value and the fourth a distance g from them, the half-width of the interval
+  is 0.80 g (standard error g/4, times 3.18): 8.4 needs g below 10.6, and g is 25. Both systems
+  go on to 80 ns.
 - The count of passages at a length is not the count at a shorter length plus the new ones.
   The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
   and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
