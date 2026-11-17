@@ -17,3 +17,6 @@ runs/
 
 # Working copies of parallel sessions
 .claude/worktrees/
+
+# measurements that are not published (speeds with the cuPotential plugin)
+bench/private/
