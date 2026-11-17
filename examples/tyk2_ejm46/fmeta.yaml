@@ -1,0 +1,15 @@
+# TYK2 kinase domain (JH1) with the inhibitor ejm_46 (PDB entry 4GIH, ligand 0X5). No membrane.
+# Steps, measured values and the result: README.md in this directory.
+#
+#   4gih.pdb     - the entry as downloaded
+#   ejm_46.sdf   - the ligand in its bound pose, cut out of the entry by `fmeta split`
+#
+# Only the difference from the preset is here. Every other value is the official default
+# (5 replicas of 40 ns, 300 K, OpenFF ligand parameters, bias factor 10, ...):
+# "fmeta init --preset soluble" writes them all, docs/configuration.md gives the reasons, and
+# run/config.yaml records the values that were used.
+preset: soluble
+
+input:
+  protein: 4gih.pdb
+  ligand: ejm_46.sdf

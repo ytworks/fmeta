@@ -1,0 +1,27 @@
+# Trypsin-benzamidine, the classic funnel metadynamics test case (PDB entry 3PTB).
+#
+# Two files are needed, nothing else:
+#   3ptb.pdb         - the entry as downloaded. Waters, the calcium ion and the crystal
+#                      ligand are removed, missing atoms are rebuilt (if PDBFixer is
+#                      installed) and hydrogens are added automatically.
+#   benzamidine.sdf  - benzamidine in its bound pose, in the frame of 3ptb.pdb.
+#                      To cut it out of the entry itself, with hydrogens for the charged
+#                      (amidinium) form:
+#                        fmeta split 3ptb.pdb --resname BEN --smiles "NC(=[NH2+])c1ccccc1" -o .
+#                        mv ligand.sdf benzamidine.sdf
+#
+#   fmeta prepare fmeta.yaml -o run && fmeta funnel run     # look at the funnel first:
+#      load run/prepared/funnel.pdb together with run/prepared/topology.cif
+#   fmeta equilibrate run && fmeta run run --gpus 0 && fmeta analyze run --plot
+#
+# Steps as run on the real entry, measured values and the result: README.md in this directory.
+#
+# Only the difference from the preset is here. Every other value is the official default
+# (5 replicas of 40 ns, OpenFF ligand parameters, ...): "fmeta init --preset soluble" writes
+# them all, docs/configuration.md gives the reasons, and run/config.yaml records the values
+# that were used. In the analysis, watch dG(t) and the rebinding count.
+preset: soluble
+
+input:
+  protein: 3ptb.pdb
+  ligand: benzamidine.sdf

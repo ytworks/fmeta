@@ -1,0 +1,42 @@
+# TYK2 kinase, 10 ligands of the "JACS set" series (see README.md).
+#   fmeta benchmark prepare examples/benchmarks/tyk2 -o runs/bench-tyk2      # the pilot ligands
+#   fmeta benchmark run     examples/benchmarks/tyk2 -o runs/bench-tyk2 --gpus 0,1,2,3
+#   fmeta benchmark report  examples/benchmarks/tyk2 -o runs/bench-tyk2
+name: tyk2
+title: TYK2 kinase, JACS set (Schrodinger public binding free energy benchmark)
+
+source:
+  repository: https://github.com/schrodinger/public_binding_free_energy_benchmark
+  commit: a65d86b782a678c75388566ce00446e45283ee63          # main and tag v2.0 on 2026-11-16
+  raw: https://raw.githubusercontent.com/schrodinger/public_binding_free_energy_benchmark/a65d86b782a678c75388566ce00446e45283ee63/
+  licence: MIT
+
+files:
+  protein:
+    path: fep_benchmark_inputs/structure_inputs/jacs_set/tyk2_protein.pdb
+    sha256: 48f74bbee93e858b1af628edb4620ec12061f51dc0f93850346c68d0626f6a52
+  ligands:
+    path: fep_benchmark_inputs/structure_inputs/jacs_set/tyk2_ligands.sdf
+    sha256: 8cc5b64c524cc70b70a0075d68d9ea65a4a32e0e50fb88bd9f6678466b6b8a0b
+  predictions:                # where reference.csv comes from; fetched and verified, not read
+    path: 21_4_results/ligand_predictions/jacs_set/tyk2_out.csv
+    sha256: 67191f5998cc3b4701c58cde28fae71f07ec102ecdb2b02dd709265e6d5d60f7
+
+# In the order of the experimental affinity, weakest first: 4.3 kcal/mol between the ends.
+ligands:
+  - {name: ejm_44, charge: 0}
+  - {name: ejm_49, charge: 0}
+  - {name: ejm_43, charge: 0}
+  - {name: ejm_48, charge: 0}
+  - {name: ejm_31, charge: 0}
+  - {name: ejm_42, charge: 0}
+  - {name: ejm_54, charge: 0}
+  - {name: jmc_28, charge: 0}
+  - {name: ejm_46, charge: 0}
+  - {name: jmc_23, charge: 0}
+
+# The weakest, a middle and a strong binder: these run before the whole set is paid for.
+pilot: [ejm_44, ejm_31, ejm_46]
+
+# Differences from the default configuration: none.
+config: {}

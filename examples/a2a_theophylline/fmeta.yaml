@@ -1,0 +1,23 @@
+# Human adenosine A2A receptor (the stabilised construct of PDB entry 5MZJ) with theophylline,
+# in POPC. Steps, measured values and the state of the example: README.md in this directory.
+#
+#   inputs/protein.pdb  - written by `fmeta split` from the file oriented by OPM: the receptor
+#                         and the sodium ion, membrane normal along z, midplane at z = 0
+#   inputs/ligand.sdf   - theophylline in the crystal pose, cut from the same file
+#
+# Only the difference from the preset is here. Every other value is the official default
+# (POPC, 5 replicas of 40 ns, 300 K, 2 ns of free equilibration with a membrane, OpenFF ligand
+# parameters, bias factor 10, ...): "fmeta init --preset membrane" writes them all,
+# docs/configuration.md gives the reasons, and work/config.yaml records the values that were used.
+preset: membrane
+
+input:
+  protein: inputs/protein.pdb
+  ligand: inputs/ligand.sdf
+
+system:
+  padding: 1.5                 # nm of lipid around the receptor in the membrane plane
+  keep_hetero: [NA]            # the sodium ion below the site (residue 2400) stays, as part of the receptor
+
+membrane:
+  orient: input                # the file comes from OPM: its orientation is taken as it is

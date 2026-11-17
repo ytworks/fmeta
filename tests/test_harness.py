@@ -1,0 +1,92 @@
+"""The development harness: progress-log budget, and GPU evidence that the recorder writes
+and the CI verifier accepts (and rejects once it is inconsistent)."""
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import check_progress_size  # noqa: E402
+import gpu_gates  # noqa: E402
+import verify_bench_results  # noqa: E402
+
+from fmeta.check import Item  # noqa: E402
+
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
+WHERE = dict(image="sha256:" + "a" * 64, lock_sha256="b" * 64, gpu_uuids=["GPU-0", "GPU-1"])
+
+
+def test_progress_log_budget():
+    entry = "### 2026-01-01 — [progress] x\n- What: y\n"
+    good = "# Progress\n\n## Product\n\n## Current Status\n\n## Change Log\n\n" + entry * 10
+    assert check_progress_size.problems_in(good) == []
+    assert any("11 Change Log entries" in p for p in check_progress_size.problems_in(good + entry))
+    assert any("sections" in p for p in check_progress_size.problems_in(good.replace("## Product\n", "")))
+    assert any("lines" in p for p in check_progress_size.problems_in(good + "x\n" * 200))
+
+
+def record(items):
+    criteria = {item.name: f"criterion of {item.name}" for item in items}
+    tests = dict(name="gpu-tests", passed=True, metrics=dict(summary="2 passed", n_passed=2),
+                 criteria="pytest -m gpu")
+    return gpu_gates.make_record(items, [tests], COMMIT, False, "2026-11-15", 2, "Test GPU", "CUDA",
+                                 "8.6.1", criteria, WHERE)
+
+
+def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
+    passed = [Item("forces", "PASS", "ok", 1.0), Item("toy_free_energy", "PASS", "ok", 60.0)]
+    good = record(passed)
+    assert good["all_passed"] and len(good["gates"]) == 3
+    path = gpu_gates.write_record(good, tmp_path)
+    assert path.name == "2026-11-15-012345678-gpu-gates.json"
+    assert verify_bench_results.verify(tmp_path) == ([], 1)
+    gpu_gates.write_record(good, tmp_path)                       # a rerun replaces its entry
+    assert len(json.loads((tmp_path / "index.json").read_text())["entries"]) == 1
+
+    # a skipped item (e.g. the ligand generators missing) is not a pass
+    skipped = record(passed + [Item("pdb_sdf_openff", "SKIP", "not installed", 0.0)])
+    assert not skipped["all_passed"]
+    with pytest.raises(KeyError):                                # every gate needs a stated criterion
+        gpu_gates.make_record(passed, [], COMMIT, False, "2026-11-15", 1, "g", "CUDA", "8", {}, WHERE)
+
+    # evidence must name the image it was taken in
+    data = json.loads(path.read_text())
+    path.write_text(json.dumps({**data, "environment": {**WHERE, "image": None}}))
+    errors, _ = verify_bench_results.verify(tmp_path)
+    assert any("no environment" in e for e in errors)
+
+    # the verifier notices a record edited after the fact, and files that are not indexed
+    data["gates"][1]["passed"] = False
+    path.write_text(json.dumps(data))
+    errors, _ = verify_bench_results.verify(tmp_path)
+    assert any("all_passed does not match" in e for e in errors)
+    (tmp_path / "2026-11-16-fffffffff-gpu-gates.json").write_text(json.dumps(good))
+    errors, _ = verify_bench_results.verify(tmp_path)
+    assert any("not listed in index.json" in e for e in errors)
+    path.write_text('{"all_passed": NaN}')
+    errors, _ = verify_bench_results.verify(tmp_path)
+    assert any("not strict JSON" in e for e in errors)
+    assert verify_bench_results.verify(tmp_path / "empty") == ([], -1)   # no evidence yet is fine
+
+
+def test_only_the_image_built_from_the_repository_lock_is_official(tmp_path, monkeypatch):
+    monkeypatch.delenv("FMETA_IMAGE_ID", raising=False)
+    monkeypatch.setattr(gpu_gates, "gpu_uuids", lambda: ["GPU-0"])
+    repo, installed = tmp_path / "repo", tmp_path / "image" / gpu_gates.LOCK
+    repo.mkdir()
+    installed.parent.mkdir()
+    (repo / gpu_gates.LOCK).write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # not inside an image
+    installed.write_text("@EXPLICIT\nopenmm-8.5.0\n")
+    assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # an image of another lock
+    installed.write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    assert not gpu_gates.environment(repo, installed)[1]                 # the image is not known
+    where, official = gpu_gates.environment(repo, installed, "sha256:1")
+    assert official
+    assert where == dict(image="sha256:1", gpu_uuids=["GPU-0"],
+                         lock_sha256=hashlib.sha256(installed.read_bytes()).hexdigest())

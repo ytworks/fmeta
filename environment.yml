@@ -1,0 +1,27 @@
+# The environment of the official image (GPU, ligand parameterisation, tests and lint).
+# The image is not built from this file but from conda-linux-64.lock, the explicit lock solved
+# from it: after a change here, run scripts/update_lock.sh. Outside Docker (not what the
+# project verifies):
+#   conda env create -f environment.yml && conda activate fmeta && pip install -e .
+name: fmeta
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - openmm>=8.1          # conda-forge builds ship the CUDA/OpenCL platforms
+  - cuda-version=12.9    # the CUDA runtime the OpenMM build links against
+  - numpy>=2.0
+  - scipy
+  - pyyaml
+  - pdbfixer
+  - openmmforcefields    # GAFF / OpenFF template generators: ligand parameters from an SDF
+  - openff-toolkit
+  - ambertools           # AM1-BCC charges and GAFF atom typing for the two generators
+  - rdkit
+  - pytorch-cpu          # openff-nagl pulls PyTorch in; fmeta never uses it on the GPU
+  - matplotlib-base      # figures are written to files: no Qt
+  - pytest
+  - ruff
+  - git                  # the gate script records the commit it ran on
+  - tini                 # init process of the image: forwards the signals of `docker stop`
+  - pip

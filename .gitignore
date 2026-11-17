@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+*.dcd
+*.chk
+
+# work directories of the acceptance checks
+fmeta_check/
+gates_work/
+
+# work directories of production runs
+runs/
+
+# Working copies of parallel sessions
+.claude/worktrees/
