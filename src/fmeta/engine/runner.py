@@ -273,7 +273,8 @@ def check_same_run(workdir, now: dict) -> None:
     states, before any of its files is touched: its hills and samples would no longer be those
     of one bias and one system. ``now`` holds entries as ``run.yaml`` does; an entry that one
     side lacks is not judged (a ``run.yaml`` from before the entry existed). The length, the
-    device, the checkpoint interval and the walker settings may change."""
+    device, the checkpoint interval and how often walkers read each other may change. The set of
+    walkers may only grow: the workflow refuses a run that leaves a walker with hills out."""
     stored = load_run_metadata(workdir)
     judged = [(key, key, stored, now) for key in ("funnel", "bias", "grid", "timestep_ps", "system")]
     judged += [(f"settings.{key}", key, stored.get("settings", {}), now.get("settings", {}))

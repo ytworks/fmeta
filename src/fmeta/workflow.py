@@ -169,6 +169,7 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
     workdir = Path(workdir)
     if (walker is None) != (config.run.walkers <= 1):
         raise ValueError("pass walker=<index> exactly when config.run.walkers > 1")
+    check_walker_set(replica_directory(workdir, replica), config.run.walkers)
     directory = replica_directory(workdir, replica, walker)
     with directory_lock(directory):
         _run(config, workdir, directory, replica, device, length_ns, walker)
@@ -222,11 +223,29 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
     run.close()
 
 
+def check_walker_set(replica: Path, n_walkers: int) -> None:
+    """Refuse a run of ``n_walkers`` walkers that would leave hills of its replica directory
+    out of its bias, before a file is touched. The analysis adds every HILLS file of the
+    replica, and a walker reads only the walkers it is run with: with 3 walkers cut to 2, the
+    bias of the analysis was off by 2.7 kJ/mol from the bias of the run (review of PR #1).
+    More walkers than before are fine: the new one reads the hills that are there."""
+    n_walkers = n_walkers if n_walkers > 1 else 0
+    left_out = [d.name for d in walker_directories(replica) if int(d.name[1:]) >= n_walkers]
+    if n_walkers and (replica / "HILLS").exists():
+        left_out.append("HILLS (a run without walkers)")
+    if left_out:
+        raise RuntimeError(f"{replica} holds hills that a run with {n_walkers or 'no'} walkers leaves out of its "
+                           f"bias ({', '.join(left_out)}), and the analysis would add them. Continue with the "
+                           "walkers it was run with (more are allowed), or use a new directory.")
+
+
 def _rollback_walkers(directories: Sequence[Path], conditions: dict) -> None:
     """Roll every walker of a replica back to its checkpoint, before any of them starts and
     reads the hills of the others. A walker without a checkpoint goes back to the start: the
     hills it wrote before it was stopped belong to no run. Nothing is touched when a walker was
-    run under other ``conditions`` (entries of its run.yaml) than the ones it would continue with."""
+    run under other ``conditions`` (entries of its run.yaml) than the ones it would continue with,
+    or when the replica holds hills of a walker that is not among ``directories``."""
+    check_walker_set(Path(directories[0]).parent, len(directories))
     for directory in directories:
         if is_locked(directory):
             raise RuntimeError(f"{directory} is in use by another fmeta process")

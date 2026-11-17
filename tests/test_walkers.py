@@ -6,10 +6,11 @@ from scipy.interpolate import CubicSpline
 
 from fmeta.analysis import analyze_run
 from fmeta.analysis.walkers import SharedBias, hills_on_grid
+from fmeta.config import Config, RunConfig
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.engine.hills import HillsFollower, merge_hills, read_colvar, read_hills, sum_hills
 from fmeta.testing.toy import make_simulation, make_toy
-from fmeta.workflow import _rollback_walkers
+from fmeta.workflow import _rollback_walkers, run_stage
 
 SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
                 pace=100, points_per_sigma=2.0)
@@ -206,6 +207,42 @@ def test_samples_under_hills_that_a_restart_removed_are_left_out(tmp_path):
     assert np.abs(of_a - written_a)[~lost].max() < 1e-5 and np.abs(of_b - written_b).max() < 1e-5
     result = analyze_run(tmp_path, write=False)
     assert any(note.startswith("19 sample(s) are left out") for note in result["diagnostics"])
+
+
+def test_a_run_that_leaves_out_a_walker_with_hills_is_refused(tmp_path):
+    """The analysis adds every HILLS file of a replica, and a walker reads only the ones it is
+    run with: with a walker left out, the bias of the analysis is not the bias of the run."""
+    base = tmp_path / "rep0"
+    for k in range(3):
+        walker = make_walker(base, k, 3, seed=k + 1)[1]
+        walker.run(20)                  # a checkpoint each
+        walker.close()
+    files = [base / f"w{k}" / name for k in range(3) for name in ("HILLS", "COLVAR", "SYNC")]
+    before = [path.read_bytes() for path in files]
+    with pytest.raises(RuntimeError, match="w2"):
+        _rollback_walkers([base / "w0", base / "w1"], CONDITIONS)
+    for n_walkers, index in ((2, 0), (1, None)):
+        with pytest.raises(RuntimeError, match="w2"):
+            run_stage(Config(run=RunConfig(walkers=n_walkers)), tmp_path, walker=index)
+    assert before == [path.read_bytes() for path in files]
+
+    (tmp_path / "rep1").mkdir()                     # a run without walkers is not continued with walkers
+    (tmp_path / "rep1" / "HILLS").write_text("")
+    with pytest.raises(RuntimeError, match="without walkers"):
+        run_stage(Config(run=RunConfig(walkers=2)), tmp_path, replica=1, walker=0)
+
+    # one walker more: it reads the hills that are there, and the others read its hills
+    _rollback_walkers([base / f"w{k}" for k in range(4)], CONDITIONS)
+    walkers = [make_walker(base, k, 4, seed=k + 1)[1] for k in range(4)]
+    for walker in walkers:
+        walker.run(25)
+    for walker in walkers:
+        walker.sync_walkers()
+    expected, hills = total_bias(base, walkers[0].bias.grid, 4)
+    assert len(hills) == 100
+    for walker in walkers:
+        assert np.allclose(walker.bias.grid.values, expected, rtol=1e-7, atol=1e-7)
+        walker.close()
 
 
 @pytest.mark.slow
