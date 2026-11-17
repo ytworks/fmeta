@@ -279,6 +279,37 @@ on the first N ns of the files; at the length of the run they are the output of
   lowest replicas rise and the highest goes down. The mean rises by 0.35 to 0.61 per 2.5 ns and
   is 7.13 above the experimental range at 40 ns; point 1 allows 8.4. Both systems go on to
   50 ns.
+- TYK2 to 50 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 42.5 | −52.17 | −71.00 to −33.34 | 18.83 | 4.87 | −57.3, −59.1, −57.8, −34.5 | 5/1, 5/1, 5/1, 8/3 |
+  | 45 | −51.37 | −70.78 to −31.95 | 19.42 | 4.07 | −56.2, −58.6, −57.5, −33.1 | 5/1, 5/1, 5/1, 8/3 |
+  | 47.5 | −50.59 | −70.43 to −30.75 | 19.84 | 3.29 | −55.3, −57.8, −57.3, −32.0 | 5/1, 5/1, 5/1, 8/4 |
+  | 50 | −49.65 | −69.93 to −29.37 | 20.28 | 2.35 | −54.3, −56.9, −56.7, −30.6 | 6/2, 6/1, 5/1, 8/4 |
+
+  The mean (2.35 from experiment at 50 ns) and the passages meet the rule at 45 and at 50 ns;
+  the half-width does not, and it goes on growing (18.10 at 40 ns, 20.28 at 50 ns). Three
+  replicas are within 2.6 of each other at 50 ns (−56.9 to −54.3); the fourth is 25 above
+  their mean (23 at 40 ns).
+- A2A to 50 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 42.5 | −19.35 | −27.22 to −11.49 | 7.87 | 7.65 | −22.1, −18.4, −24.0, −12.8 | 4/1, 6/0, 5/0, 7/3 |
+  | 45 | −18.93 | −25.47 to −12.38 | 6.55 | 8.07 | −21.4, −17.8, −22.9, −13.7 | 4/1, 6/0, 5/0, 7/3 |
+  | 47.5 | −18.65 | −24.18 to −13.12 | 5.53 | 8.35 | −20.9, −17.5, −22.0, −14.3 | 5/2, 6/0, 5/0, 7/4 |
+  | 50 | −18.44 | −23.17 to −13.71 | 4.73 | 8.56 | −20.7, −16.9, −21.1, −15.0 | 5/2, 7/2, 5/0, 7/4 |
+
+  The half-width meets the rule from 42.5 ns (6.55 at 45 ns, 4.73 at 50 ns): the four replicas
+  are within 6.1 of each other at 50 ns. At 45 ns the mean is within 8.4 of the range (8.07)
+  and two replicas of four have a passage back: point 4 is not met. At 50 ns the mean is 8.56
+  above the range, 0.16 more than point 1 allows, and three replicas of four have a passage
+  back. The rise of the mean slows (0.52, 0.42, 0.28 and 0.21 per 2.5 ns).
+- The rule is not met at 45 or at 50 ns. What keeps each system from it has changed since
+  30 ns: on TYK2 the interval (one replica of four away from the other three), on A2A the
+  distance of the mean from the experimental range and the passages back of one replica. Both
+  systems go on to 60 ns.
 - The count of passages at a length is not the count at a shorter length plus the new ones.
   The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
   and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
