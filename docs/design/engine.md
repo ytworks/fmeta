@@ -17,7 +17,9 @@ FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16 and 17
 restart under other conditions is refused), FM-D11 (a complex is split only with the SMILES of
 the ligand), FM-D15 (an amino acid without a backbone atom is rebuilt before the chains are
 split, never dropped), FM-D9 and FM-D10 (a sample of a walker is weighted with the bias that
-walker had, rebuilt from a record of the hills it had read).
+walker had, rebuilt from a record of the hills it had read); from its second round (2026-11-17):
+FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chain ends at a gap
+before a missing backbone atom is rebuilt).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -130,6 +132,16 @@ back; each walker then makes the whole check. The reviewed code continued whenev
 existed: with `metad.bias_factor` changed from 10 to 2 after 3 hills, the next hills went into
 the same HILLS file, and because every row is decoded with the factor of the first, the bias
 rebuilt from the file was off by up to 1.09 kJ/mol while `run.yaml` still said 10.
+Amendment (2026-11-17, second review of PR #1): of the walker settings only how often walkers
+read each other may change freely. The set of walkers may only grow. A run is refused, before a
+file is touched, when its replica directory holds hills that the run would leave out of its
+bias: a walker directory with hills beyond `run.walkers`, walker directories under a run
+without walkers, or the `HILLS` of a run without walkers under a run with walkers
+(`check_walker_set`, at the start of `fmeta run` and again before walkers are rolled back). The
+directory is judged, not `run.yaml`, which a restart does not rewrite. This corrects the
+sentence above ("the walker settings may change"): with `run.walkers` cut from 3 to 2 the two
+walkers continued without the hills of `w2`, while the analysis adds every HILLS file of the
+replica; the bias of the analysis was off by up to 2.74 kJ/mol from the bias of the run.
 Why: a crash between files must not leave a mixed state; on the Reference platform a split run
 reproduces the continuous one byte for byte, which makes restart testable.
 
@@ -317,6 +329,10 @@ place, the bias of the samples in between cannot be rebuilt (FM-D9, fourth amend
 contract of the grids is unchanged: each walker's grid against the sum of all HILLS files, 1e-7.
 The files alone do not say when a walker read which rows; a count with a checksum is the
 smallest record that does, and it stays right when another walker is rolled back.
+Amendment (2026-11-17, second review of PR #1): a replica continues with the walkers it was
+run with or with more, never with fewer (FM-D5, amendment of the same date). A walker that is
+added reads the hills that are there and the others read its hills; the `SYNC` records cover
+it (test: after 3 walkers became 4, every grid is the sum of the four HILLS files, 1e-7).
 Why: replicas are the honest error bar; walkers shorten wall time on several GPUs without a
 message-passing layer.
 
@@ -595,6 +611,19 @@ backbone atoms is not known by its name and is removed as before, named in the n
 "removed from the protein file". Measured on the test protein, one backbone atom deleted from
 each of five residues: the rebuilt atom lies 0.004 to 0.022 nm from the atom of the complete
 file, and the model is the one of the complete file in chains, residues and atoms (1, 35, 582).
+Amendment (2026-11-17, second review of PR #1): before that pass a chain is ended where two
+consecutive amino acids cannot be bonded (`split_at_breaks`), and the bond OpenMM makes between
+neighbours of a chain is left out there. The question is answered from the backbone atoms that
+are present: the last one of the first residue and the first one of the second, against a limit
+by the number of bonds between them (`REACH_NM`: 0.20, 0.30, 0.44, 0.55, 0.67 nm for 1 to 5
+bonds; measured on 1192 bonded pairs of four structures: at most 0.138, 0.254, 0.391, 0.505,
+0.617 nm). The residue at such an end is built with its terminal oxygen, which is taken away
+again: PDBFixer has bonds and angles only for a residue that matches one of its templates, and
+an end without OXT matches none. The reviewed code gave the pass the chain as read: ARG14
+without its C, residues 15 to 17 missing, and the C was built 0.28 nm from the N of ALA18,
+where 0.447 nm lie between the two; `prepare` stopped with "no room for caps". With the chain
+ended there the C lay 0.107 nm from its place (no template) and the caps had no room next to
+the hydrogens; with the template 0.040 nm, and the model has 32 amino acids, NME and ACE.
 Why: a residue counted as an amino acid only with all three atoms. LEU1 without its CA was
 dropped as a hetero residue (34 residues, note "removed from the protein file: LEU x1"), and
 ALA16 without its C stopped `prepare` with a message about SER15 and PHE17, although PDBFixer,

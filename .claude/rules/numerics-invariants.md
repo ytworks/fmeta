@@ -79,6 +79,10 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   or trajectory layout than its `run.yaml` states is refused before a file is touched. Every
   row of HILLS is decoded with the bias factor of the first; with the factor changed from 10 to
   2 in a run, the bias rebuilt from the file was off by 1.09 kJ/mol (review of PR #1).
+- The analysis adds every HILLS file of a replica directory, so a run never leaves one out: the
+  set of walkers may only grow, and a run that would leave out a walker with hills (or switch
+  between walkers and none) is refused before a file is touched. With 3 walkers cut to 2, the
+  bias of the analysis was off by 2.74 kJ/mol from the bias of the run (review of PR #1).
 
 ## Change gate
 
