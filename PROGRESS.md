@@ -29,11 +29,12 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
-FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is the work of PR #1.
-Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
-scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
-ended and every check of it that this machine can run has run. The three rounds of the review
-of PR #1 are fixed (below); the final code is d4041f9.
+FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). `main` is the work of PR #1 (merged; final code d4041f9; plan
+`docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`: every run ended, every check this
+machine can run has run, three review rounds fixed). In progress on branch
+`claude/cupotential-backend`: NVIDIA cuPotential as the default back end (owner request
+2026-11-17; plan `docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4). Its M0 (the image)
+has one line that fails, and that line is a stop condition of the plan (Blockers, below).
 
 | Milestone | Status |
 |---|---|
@@ -47,6 +48,7 @@ of PR #1 are fixed (below); the final code is d4041f9.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e (the code of c59ec99): 17 passed, 232 entries of the calling user, `fmeta` imported from the image. The same on 4f976cb, the final code with the review fixes: 17 passed, 234 entries of the calling user, `fmeta` imported from the image. The same on 7c731c5 (second review round) and on d4041f9, the final code with the fix of the third review round: 17 passed, 234 entries of the calling user each time; only documents and evidence changed after d4041f9. The CI job `docker` passed on 4f976cb, 5e03c02, 97bcd70 and d30d1e6; the publish workflow has never run |
+| cuPotential plan M0: the image with the plugin (FM-D13, amendment of 2026-11-17) | On the branch, not on `main`. Image f7d97cf1… of lock 0b6c344f…: OpenMM 8.4.0, CUDA 13.4, `nv-openmm-plugin` 0.3.5; on this host (driver 595.99.02) a container loads the compatibility `libcuda` 615.71.10. Passed in it: `ruff check .`, `pytest` (175 passed), `pytest -m slow` (7 passed), `openmm.testInstallation` (4 platforms); directories of OpenMM 8.6.1 load and run; a Context with the plugin steps on the rhombic dodecahedron and on a membrane box with the funnel forces and the bias; the parameters of the TYK2 ligand are identical to the old image (OpenFF and GAFF). Not run: the GPU gates in this image (next, on the clean commit, stock OpenMM). Failed: a container as a client of NVIDIA MPS (Blockers). M1 to M4: not started |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -58,30 +60,24 @@ of PR #1 are fixed (below); the final code is d4041f9.
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets ran with the defaults from 47e84f7 in fresh work directories (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns, 90 replicas, every one to its end, both exit 0); reports by the code of 7386d28: `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol, fmeta / FEP+. TYK2: MUE 3.60 / 0.37, offset removed 1.81 / 0.35, Pearson r 0.15 / 0.96; every ligand above experiment (+1.0 to +6.9); experiment inside the 95% interval for 5 of 10; 47 of 50 replicas with a return to the site. A2A: MUE 4.34 / 0.74, offset removed 3.49 / 0.79, Pearson r 0.57 / 0.79; 6 of 8 below experiment (4d −12.0, 4e D −9.3); experiment inside the interval for 7 of 8; 25 of 40 replicas without a return. Intervals 4.3 to 16.4 (TYK2) and 7.0 to 28.9 kcal/mol (A2A) wide against experimental spans of 4.3 and 3.2. R10 is closed. Reported as measured (set READMEs, `README.md`) |
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean d4041f9,
-  the final code with the fixes of the three review rounds; only documents and evidence changed
-  after it (CUDA, mixed precision, 2 GPUs, in the image, dated in UTC):
+  the final code of `main` (CUDA, mixed precision, 2 GPUs, dated in UTC; in the image of lock
+  d061e45a…, OpenMM 8.6.1: the image of the branch has no record yet, see the M0 row):
   `bench/results/2026-11-17-d4041f905-gpu-gates.json`. `toy_free_energy`: from the samples
   −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0.
   `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs (FM-D14).
   Speed (1284 ns/day plain, 1295 with the bias, 927 membrane) decides nothing. Before it: 7c731c5.
-- Review of PR #1: first round (2026-11-16, 6 findings on ec27496) fixed one commit each
-  (6fa7cd2, a4b09b1, 5792001, 3e652e0, ab8f906, 4f976cb; FM-D5, FM-D9, FM-D10, FM-D11, FM-D15).
-  Second round (2 findings on 81bc9af): the set of walkers may only grow (97bcd70; FM-D5,
-  FM-D10); a chain ends at a gap before an atom is rebuilt (7c731c5; FM-D15). Third round (1
-  finding on d30d1e6): caps of the input stay (d4041f9; FM-D15). All 9 threads answered, resolved.
+- Review of PR #1: three rounds, 9 findings, each fixed in its own commit (6fa7cd2, a4b09b1,
+  5792001, 3e652e0, ab8f906, 4f976cb; 97bcd70, 7c731c5; d4041f9; FM-D5, FM-D9, FM-D10, FM-D11,
+  FM-D15). All 9 threads answered and resolved.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
-  every function of this development that the gates do not reach has run once (walkers with
-  `docker stop` and restart, extension, `fmeta auto`, `fmeta init`, the input routes,
-  `fmeta split --drop`, `fmeta doctor`, `fmeta analyze`, `fmeta benchmark`). Table: `README.md`
-  ("機能ごとの動作確認"). One defect found and fixed in c59ec99: the cross-check from the samples
-  was missing for a replica whose weights span more than the digits of a float.
+  every function of PR #1 that the gates do not reach has run once; table in `README.md`
+  ("機能ごとの動作確認"). One defect found and fixed in c59ec99.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 175 passed on
   d4041f9; the two slow walker tests (`-m slow tests/test_walkers.py`) last ran on 4f976cb.
   Operation on a CPU platform is not guaranteed (owner, 2026-11-16, FM-D12): `pytest -m slow`
   (6 passed) and `fmeta check --platform CPU` last ran on the source of 2c4ad4e.
-- CI: green on d4041f9, the final code (both `cpu` jobs and `docker`; read with `gh` on
-  2026-11-17), and on 97bcd70, a1504a9 and d30d1e6 before it (the run of 7c731c5 itself was
-  cancelled by the next push). Green from 5cda44c on.
+- CI: green on d4041f9, the final code of `main` (both `cpu` jobs and `docker`; read with `gh`
+  on 2026-11-17). Not run on the branch: CI runs for a pull request and for `main`.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
@@ -98,16 +94,24 @@ of PR #1 are fixed (below); the final code is d4041f9.
   reweighting (about 1 run in 30 of its 10 ns missed the criterion on every platform, FM-D12);
   with the estimate from the samples its error is 1.00 kJ/mol for the gate's seed, and the
   scatter of that estimate over seeds at 10 ns is not measured.
-- GPUs (owner, 2026-11-16: all 8 are for this task): no run is in progress, the GPUs are free
-  and the MPS daemon is stopped. The second wave (47e84f7, the defaults, several replicas per
-  GPU under NVIDIA MPS, FM-D14 amendment) ran on 2026-11-16 from 06:41 to 18:54 UTC: the three
-  examples and both benchmark sets, 105 replicas of 40 ns, every command exit 0 (12 h 13 min on
-  8 GPUs). Speed: 88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8
-  replicas under MPS; the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5.
-- Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
-  machine as the git credential; the owner added the `workflow` scope).
+- GPUs (owner, 2026-11-16: all 8 are for this task): no run is in progress, the MPS daemon is
+  stopped. Speed of stock OpenMM in the image of `main` (second wave, 47e84f7, 2026-11-16):
+  88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8 replicas under MPS;
+  the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5.
+- Blockers: **NVIDIA MPS does not work with the image of the branch on this host** (driver
+  595.99.02, below the R615 of CUDA 13.4): a client with the compatibility `libcuda` does not
+  return from `cuInit`; with the host's `libcuda` the CUDA 13.4 runtime cannot load its kernels.
+  One process per GPU works. First stop condition of the cuPotential plan: the owner raises the
+  host driver to R615 or newer (the image needs no change), or decides on a trial of the MPS
+  programs of R615 in a container (not tried). Until then `run.per_gpu` above 1 is not
+  available in that image, and M2, the measurement that decides the default, waits.
 
 ## Change Log
+
+### 2026-11-17 — [amendment] FM-D13: the image holds NVIDIA's cuPotential plugin, on OpenMM 8.4.0 and CUDA 13.4; NVIDIA MPS does not work with it on the R595 host
+- What: M0 of the cuPotential plan, on branch `claude/cupotential-backend`; no code under `src/fmeta/` changed. `environment.yml`: `openmm=8.4.*`, `cuda-version=13.4`, `nv-openmm-plugin=0.3.5`; `docker/nvidia.pins` names the release of the plugin and the `.deb` of the CUDA compatibility libraries (615.71.10) with their sha256, and the lock names both (the plugin as a package line, the libraries as a comment line that `docker/install_nvidia.sh` reads), so the hash of the lock still decides what an official image is. NVIDIA's licence texts are in the image (`/opt/fmeta/licenses`). A gate record names the host driver, the loaded `libcuda`, the CUDA runtime and the plugin. With OpenMM the ligand tools went from `openmmforcefields` 0.16.0 and AmberTools 26.0 to 0.15.1 and 24.8: the parameters of the TYK2 ligand ejm_46 are identical in both images (charges, sigma, epsilon: largest difference 0; bonded terms equal; OpenFF and GAFF). In the new image (f7d97cf1…, lock 0b6c344f…, host driver 595.99.02, `libcuda` 615.71.10 loaded): `ruff check .` passes, `pytest` 175 passed, `pytest -m slow` 7 passed, `openmm.testInstallation` computes forces on 4 platforms, directories of OpenMM 8.6.1 load and run, and a Context with the plugin steps on the rhombic dodecahedron (24062 atoms) and on a membrane box (37401 atoms) with the funnel forces and the bias, energies finite, 1.3e-5 and 1.1e-5 (relative) from stock PME at the starting state. Failed: a container as an MPS client (`cuInit` does not return with the compatibility `libcuda`; with the host's `libcuda` the kernels of CUDA 13.4 do not load, `CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). Not run: GPU gates in the new image; CI (`docker` job) on the new lock.
+- Why: owner request of 2026-11-17 (cuPotential as the default back end); the plugin is built only for OpenMM 8.4, CUDA 13.4 and Python 3.12, and one image stays the rule. Speeds measured with the plugin are kept out of tracked files (owner, 2026-11-17: the licence forbids their disclosure without NVIDIA's permission). The MPS failure is the first stop condition of the plan: several replicas per GPU gave the best throughput so far (1620 against 606 ns/day at 88k atoms, old image).
+- Refs: FM-D13 amendment (`docs/design/engine.md`), `docs/plans/2026-11-17-cupotential-backend.md`; `environment.yml`, `docker/nvidia.pins`, `docker/install_nvidia.sh`, `scripts/update_lock.sh`, `conda-linux-64.lock`, `Dockerfile`, `scripts/gpu_gates.py`, `tests/test_harness.py`, `.claude/rules/docker-execution.md`, `docs/gpu-runbook.md`, `README.md`.
 
 ### 2026-11-17 — [progress] GPU gates and the image check pass on the code with the fix of the third review round (d4041f9)
 - What: `scripts/gpu_gates.py` on clean d4041f9 (2 GPUs, in the image, 02:17 to 02:21 UTC): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 9.8e-07 nm, wall energy 2.5e-10 kJ/mol; `toy_free_energy` −3.95 (samples) and −3.46 (bias) against −4.95 kJ/mol, the values of 7c731c5. Speed (a diagnostic; the image check ran on two other GPUs for the first two minutes): 1284 ns/day plain, 1295 with the bias, membrane 927. The image built from d4041f9 passed `fmeta check --quick` on CUDA with an empty directory as `/work` (02:17 to 02:19 UTC): 17 passed, 0 failed, 0 skipped; 234 entries, all of the calling user; `fmeta` imported from the image. A check, not gate evidence. `ruff check .` and `pytest` (175 passed) on the same code. CI is green on d4041f9 (both `cpu` jobs and `docker`). The reply on the review thread is posted and the thread resolved (9 of 9). Not run on this code: `pytest -m slow`.

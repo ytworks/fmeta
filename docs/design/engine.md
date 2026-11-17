@@ -20,7 +20,9 @@ split, never dropped), FM-D9 and FM-D10 (a sample of a walker is weighted with t
 walker had, rebuilt from a record of the hills it had read); from its second round (2026-11-17):
 FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chain ends at a gap
 before a missing backbone atom is rebuilt); from its third round (2026-11-17): FM-D15 (the caps
-of the input stand in the chain before a missing backbone atom is rebuilt).
+of the input stand in the chain before a missing backbone atom is rebuilt); FM-D13 amended
+(2026-11-17, owner request: the image holds NVIDIA's cuPotential plugin, with OpenMM 8.4.0 on
+CUDA 13.4 and the CUDA compatibility libraries; open: NVIDIA MPS on a host driver below R615).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -416,6 +418,56 @@ Why: owner rule of 2026-11-15 (execution and tests run on Docker, except CI). `e
 pins nothing, so it resolves differently over time: evidence taken in a conda environment does
 not describe the environment a later user gets. With one locked image, the environment that is
 verified is the one that is distributed, and a record says which one it was.
+Amendment (2026-11-17, owner request: NVIDIA cuPotential as the default back end; plan
+`docs/plans/2026-11-17-cupotential-backend.md`, its M0): the image holds NVIDIA's cuPotential
+plugin for OpenMM (`nv-openmm-plugin` 0.3.5), and the environment follows what the plugin is
+built for: OpenMM 8.4.0 on CUDA 13.4 (before: 8.6.1 on CUDA 12.9), Python 3.12. No code under
+`src/fmeta/` changed with it; the use of the plugin by a run is a later decision.
+- What the lock describes. The plugin is a conda package of NVIDIA's release, not of a channel:
+  `docker/nvidia.pins` names the release file and its sha256, `scripts/update_lock.sh` solves
+  against it and writes the URL of the package into the lock. The CUDA forward-compatibility
+  libraries (`cuda-compat-13-4` 615.71.10, a `.deb` of NVIDIA's repository) are named with their
+  sha256 in a comment line of the lock, and the image build reads them from there
+  (`docker/install_nvidia.sh`). The hash of the lock, by which an image is judged official,
+  covers both.
+- The driver of the host. CUDA 13.4 needs a driver of R615 or newer; the GPU machine has
+  595.99.02. The compatibility libraries lie in `/usr/local/cuda/compat`, where the NVIDIA
+  Container Toolkit (1.19.1 here) finds them: it puts them on the loader path of a container
+  when they are newer than the driver of the host, so with R615 or newer they are not used. A
+  gate record names the host driver, the `libcuda` the process loaded, the CUDA runtime and the
+  plugin of the lock (block `environment`): it shows in which of the two ways it was taken.
+- Licences. The plugin and the compatibility libraries are NVIDIA's software under NVIDIA's
+  licences, whose texts are in the image under `/opt/fmeta/licenses`. A speed measured with the
+  plugin is not written to a tracked file, a commit message or GitHub until NVIDIA permits it
+  (owner, 2026-11-17: the licence of the plugin forbids the disclosure of performance data
+  without written permission). Speeds of stock OpenMM are recorded as before.
+- The ligand tools go down with OpenMM: `openmmforcefields` 0.16.0 needs OpenMM 8.5.1 or newer,
+  so the image has 0.15.1, and with it AmberTools 24.8 (before: 26.0). `openff-toolkit` 0.19.0,
+  `openff-interchange` 0.5.5 and `openff-forcefields` 2026.11.0 are the same. Measured on the
+  TYK2 ligand ejm_46 through `register_ligand`, old image against new: the charge, sigma and
+  epsilon of every atom are identical (largest difference 0) and the bonds, angles and torsions
+  are the same (counts and parameter sums), for `openff` (38 / 64 / 159) and for `gaff`
+  (38 / 64 / 105). The results on record keep their parameterisation.
+- Measured in the new image on this host (image f7d97cf1…, lock 0b6c344f…, the compatibility
+  `libcuda` 615.71.10 loaded): `python -m openmm.testInstallation` computes forces on all four
+  platforms; directories prepared and equilibrated with OpenMM 8.6.1 (a soluble system in the
+  rhombic dodecahedron, 24062 atoms, and a membrane system, 37401 atoms) load and run; a
+  Context with the plugin steps on both of them with the funnel forces and the bias in the
+  System (the plugin's force alone, with its integrator, with its barostat for the soluble
+  system, and with the stock `MonteCarloMembraneBarostat` for the membrane), every energy
+  finite, the potential energy at the starting state 1.3e-5 and 1.1e-5 (relative) from the
+  stock PME of the same System (a first reading, not a criterion).
+- Open: NVIDIA MPS with a host driver older than R615. With the daemon of `scripts/mps.sh` on
+  driver 595.99.02, a client that loads the compatibility `libcuda` does not return from
+  `cuInit`, whether the MPS server loaded the compatibility library (4 clients, stopped by
+  hand) or the library of the host (stopped by a timeout). A client forced onto the host's
+  `libcuda` 595.99.02 initialises under MPS, but cannot load the kernels of the CUDA 13.4
+  runtime (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). So on this host a process of the new image
+  has a GPU context of its own, and several replicas on one GPU at the same time (`run.per_gpu`
+  above 1, FM-D14) need a host driver of R615 or newer. Not tried: the MPS programs of driver
+  R615 run in a container on the R595 kernel module.
+Why: the plugin has no build for another OpenMM or CUDA version, and one image stays the rule:
+the environment moves as a whole, and its tests and gates are taken again in it.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by

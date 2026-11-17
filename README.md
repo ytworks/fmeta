@@ -21,7 +21,7 @@ fmeta auto --protein gpcr_oriented.pdb --ligand ligand.sdf --membrane POPC -o ru
 
 ```bash
 git clone https://github.com/ytworks/fmeta && cd fmeta
-docker build -t fmeta .       # 約 6 GB。OpenMM（CUDA）、OpenFF / GAFF、RDKit、PDBFixer を含む
+docker build -t fmeta .       # 約 7.4 GB。OpenMM（CUDA）、NVIDIA cuPotential プラグイン、OpenFF / GAFF、RDKit、PDBFixer を含む
 
 # 入力ファイルのあるディレクトリで実行する。そこが /work にマウントされ、出力は自分の所有になる
 docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta \
@@ -30,15 +30,17 @@ docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta \
 
 - イメージのエントリポイントは `fmeta` です。この README に出てくる `fmeta ...` のコマンドは、`docker run ... fmeta` の後ろに続けて書きます。`doctor` を付けると、使えるプラットフォームと同梱パッケージを確認できます。
 - 環境は `conda-linux-64.lock` で固定してあります。`environment.yml` から解いた明示的なロックで、イメージは常にこのロックからビルドします。検証した環境と配布する環境が同じになります。
+- イメージには NVIDIA のソフトウェア（OpenMM 用の cuPotential プラグインと CUDA の互換ライブラリ）が NVIDIA のライセンスで入っています。ライセンス文書はイメージの `/opt/fmeta/licenses` にあります。
+- イメージの CUDA ランタイムは 13.4 です。ホストのドライバが R615 以上ならそのまま動きます。それより古いドライバでは、NVIDIA Container Toolkit がイメージ内の互換ライブラリを有効にします。この場合、NVIDIA MPS（1 枚の GPU で複数のレプリカを同時に走らせる `run.per_gpu`）は使えません。
 - 使う GPU は `--gpus '"device=2,3"'` のように絞れます。コンテナの中では、渡した GPU が 0 から番号づけされます。
 - 長い計算は `--rm` の代わりに `-d --name run1` を付けて切り離します。ログは `docker logs -f run1`、停止は `docker stop run1` です。`docker rm run1` のあと同じコマンドを実行すると、チェックポイントから再開します。
 
 ### Docker を使わない場合
 
-conda でも環境を作れます。ただし、検証は公式イメージでしか行っていません。
+conda でも環境を作れます。ただし、検証は公式イメージでしか行っていません。`nv-openmm-plugin`（NVIDIA cuPotential）は conda-forge にありません。`docker/nvidia.pins` に書いてあるリリースのチャネルを展開し、そのディレクトリを `environment.yml` の `channels` に加えてから実行します。
 
 ```bash
-conda env create -f environment.yml      # openmm (CUDA), openmmforcefields, pdbfixer, rdkit, matplotlib
+conda env create -f environment.yml      # openmm (CUDA), nv-openmm-plugin, openmmforcefields, pdbfixer, rdkit, matplotlib
 conda activate fmeta
 pip install -e .
 ```
@@ -489,7 +491,7 @@ scripts/in_docker.sh pytest -m slow                                       # 時�
 scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1    # GPU ゲート。ホストの GPU 6 と 7 を使う
 ```
 
-パッケージを変えるときは `environment.yml` を編集し、`scripts/update_lock.sh` でロックを作り直します。そのあとイメージを作り直し（`scripts/in_docker.sh --build ...`）、テストと GPU ゲートをやり直します。
+パッケージを変えるときは `environment.yml`（NVIDIA のファイルは `docker/nvidia.pins`）を編集し、`scripts/update_lock.sh` でロックを作り直します。そのあとイメージを作り直し（`scripts/in_docker.sh --build ...`）、テストと GPU ゲートをやり直します。
 
 ## 参考文献
 

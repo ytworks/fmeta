@@ -23,11 +23,19 @@ Owner rule (2026-11-15): everything except CI is executed and tested in Docker. 
 - One image (`Dockerfile`): the environment of `conda-linux-64.lock` on a base image pinned by
   digest, plus fmeta. It holds the test and lint tools, so the image that is verified is the
   image that is distributed.
-- Packages change in `environment.yml`; `scripts/update_lock.sh` regenerates the lock (in a
-  container). After a change of the lock or the `Dockerfile`: rebuild, rerun the tests and the
-  GPU gates, and commit the lock with the new evidence.
+- Packages change in `environment.yml`, NVIDIA's files (the cuPotential plugin, the CUDA
+  compatibility libraries) in `docker/nvidia.pins`; `scripts/update_lock.sh` regenerates the
+  lock (in a container), which names both. After a change of the lock or the `Dockerfile`:
+  rebuild, rerun the tests and the GPU gates, and commit the lock with the new evidence.
 - GPU evidence (`bench/results/`) is written only inside the image, when the lock in the image
-  is the lock of the repository; the record names the image, the lock and the GPUs.
+  is the lock of the repository; the record names the image, the lock, the GPUs, the host
+  driver and the `libcuda` that was loaded.
+- The image holds NVIDIA's software under NVIDIA's licences (`/opt/fmeta/licenses`). A speed
+  measured with the cuPotential plugin goes to no tracked file, commit message or GitHub text
+  until NVIDIA permits it (owner, 2026-11-17).
+- The CUDA runtime of the image (13.4) needs a host driver of R615 or newer; on an older one
+  the compatibility libraries of the image are used, and then a container cannot be an MPS
+  client (FM-D13, amendment of 2026-11-17).
 
 ## Usage
 

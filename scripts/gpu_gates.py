@@ -16,6 +16,7 @@ steps but are never recorded.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime
 import hashlib
 import json
@@ -41,14 +42,28 @@ def provenance(root: Path = ROOT) -> tuple[str, bool]:
     return commit, bool(status.strip())
 
 
-def gpu_uuids() -> list[str]:
-    """UUIDs of the GPUs this process can see, in index order (empty without nvidia-smi)."""
+def nvidia_smi(field: str) -> list[str]:
+    """One value per GPU this process can see, in index order (empty without nvidia-smi)."""
     try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=uuid", "--format=csv,noheader"],
+        out = subprocess.run(["nvidia-smi", f"--query-gpu={field}", "--format=csv,noheader"],
                              capture_output=True, text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return []
     return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def loaded_libcuda() -> Optional[str]:
+    """File name of the CUDA driver library that a process of this container loads.
+
+    Its version is the driver of the host, or that of the compatibility libraries of the image
+    when the container runtime has put them first (a host driver older than the CUDA runtime).
+    """
+    try:
+        ctypes.CDLL("libcuda.so.1")
+    except OSError:
+        return None
+    names = [line.rsplit("/", 1)[-1] for line in Path("/proc/self/maps").read_text().splitlines()]
+    return next((name for name in names if name.startswith("libcuda.so")), None)
 
 
 def environment(root: Path = ROOT, image_lock: Path = IMAGE_LOCK,
@@ -56,15 +71,24 @@ def environment(root: Path = ROOT, image_lock: Path = IMAGE_LOCK,
     """Where the gates run, and whether that is the official image.
 
     Official means: the lock installed in the image is the lock of the repository, and the
-    image is known (scripts/in_docker.sh passes its identifier as FMETA_IMAGE_ID).
+    image is known (scripts/in_docker.sh passes its identifier as FMETA_IMAGE_ID). The record
+    also names the CUDA software of the run: the driver of the host, the driver library the
+    container loads, and the CUDA runtime and the cuPotential plugin of the lock.
     """
     def digest(path: Path) -> Optional[str]:
         return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
 
+    def locked(package: str) -> Optional[str]:
+        found = re.search(rf"/{package}-([0-9][0-9.]*)-[^/]*$", lock, re.MULTILINE)
+        return found.group(1) if found else None
+
     image = image or os.environ.get("FMETA_IMAGE_ID")
     installed = digest(image_lock)
     official = bool(image) and installed is not None and installed == digest(root / LOCK)
-    return dict(image=image, lock_sha256=installed, gpu_uuids=gpu_uuids()), official
+    lock = image_lock.read_text() if image_lock.exists() else ""
+    return dict(image=image, lock_sha256=installed, gpu_uuids=nvidia_smi("uuid"),
+                driver=next(iter(nvidia_smi("driver_version")), None), libcuda=loaded_libcuda(),
+                cuda_runtime=locked("cuda-version"), plugin=locked("nv-openmm-plugin")), official
 
 
 def run_gpu_tests(root: Path = ROOT) -> dict:

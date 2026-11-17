@@ -1,0 +1,13 @@
+# Files from NVIDIA that conda-forge does not have. scripts/update_lock.sh reads this file and
+# writes both into conda-linux-64.lock (the plugin as a package line, the compatibility
+# libraries as a comment line that the Dockerfile reads), so the lock stays the one description
+# of what the image holds. After a change here: scripts/update_lock.sh.
+#
+# NVIDIA cuPotential, the plugin for OpenMM: the conda channel of a release (the package and its
+# index). The package is the file of the same release that the index names.
+PLUGIN_CHANNEL_URL=https://github.com/NVIDIA/cuPotential/releases/download/v0.3.5/nv-openmm-plugin-conda-channel-0.3.5.tar.gz
+PLUGIN_CHANNEL_SHA256=5689ab3d002bb9b068c802225a810f5342e93f6b9f65ce6b4cbfcb722c7a4e87
+# CUDA forward-compatibility libraries (NVIDIA's apt repository of CUDA for Ubuntu 24.04). With
+# them the CUDA 13.4 runtime of the image works on a host driver older than R615.
+CUDA_COMPAT_URL=https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-compat-13-4_615.71.10-1ubuntu1_amd64.deb
+CUDA_COMPAT_SHA256=f62ed0d30d8939bba3a7b55727e3fd70d657ae4973fa2875e775068a2c305f30

@@ -8,11 +8,16 @@ PROGRESS.md budget, evidence index, CPU tests, the image build). Criteria:
 ## Prerequisites
 
 - An NVIDIA GPU with a working driver, and Docker with the NVIDIA Container Toolkit
-  (`docker info` lists the `nvidia` runtime).
+  (`docker info` lists the `nvidia` runtime). The CUDA runtime of the image is 13.4: with a
+  driver of R615 or newer nothing else is needed; with an older one (R595 on the GPU machine)
+  the toolkit puts the CUDA compatibility libraries of the image on the loader path (toolkit
+  1.19.1, `cuda-compat-mode = "ldconfig"`), and NVIDIA MPS cannot be used (FM-D13). A gate
+  record names the driver and the `libcuda` that was loaded.
 - The image. `scripts/in_docker.sh` builds it from `conda-linux-64.lock` on first use (about
-  6 GB: the CUDA build of OpenMM, the ligand-parameter generators `openmmforcefields`,
-  `openff-toolkit` and `ambertools`, and the test tools). It refuses an image that was built
-  from another lock; `scripts/in_docker.sh --build ...` rebuilds.
+  7.4 GB: the CUDA build of OpenMM, NVIDIA's cuPotential plugin and CUDA compatibility
+  libraries, the ligand-parameter generators `openmmforcefields`, `openff-toolkit` and
+  `ambertools`, and the test tools). It refuses an image that was built from another lock;
+  `scripts/in_docker.sh --build ...` rebuilds.
 - Two GPUs, and both free: `nvidia-smi --query-compute-apps=pid,process_name --format=csv` shows
   no other jobs on the GPUs you pass. The items `replicas_sequential` and `replicas_parallel`
   compare the memory in use on a GPU before and after a replica starts there: another process
@@ -58,7 +63,8 @@ the items and reports them, and records nothing.
 
 ## After a change of the environment
 
-Packages change in `environment.yml`. Then:
+Packages change in `environment.yml`; the release of NVIDIA's cuPotential plugin and the file
+of the CUDA compatibility libraries, each with its sha256, in `docker/nvidia.pins`. Then:
 
 ```bash
 scripts/update_lock.sh                           # solves the lock in a container

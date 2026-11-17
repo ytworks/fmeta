@@ -1,15 +1,18 @@
 # The environment of the official image (GPU, ligand parameterisation, tests and lint).
 # The image is not built from this file but from conda-linux-64.lock, the explicit lock solved
-# from it: after a change here, run scripts/update_lock.sh. Outside Docker (not what the
-# project verifies):
+# from it: after a change here, run scripts/update_lock.sh. nv-openmm-plugin (NVIDIA
+# cuPotential) is not on conda-forge: update_lock.sh adds the channel of the release named in
+# docker/nvidia.pins. Outside Docker (not what the project verifies): unpack that channel, add
+# its directory to `channels` below, then
 #   conda env create -f environment.yml && conda activate fmeta && pip install -e .
 name: fmeta
 channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - openmm>=8.1          # conda-forge builds ship the CUDA/OpenCL platforms
-  - cuda-version=12.9    # the CUDA runtime the OpenMM build links against
+  - openmm=8.4.*         # the series the cuPotential plugin is built for (CUDA and OpenCL platforms included)
+  - cuda-version=13.4    # the CUDA runtime of the OpenMM build and of the plugin
+  - nv-openmm-plugin=0.3.5   # NVIDIA cuPotential: nonbonded force, integrator and barostat on CUDA
   - numpy>=2.0
   - scipy
   - pyyaml

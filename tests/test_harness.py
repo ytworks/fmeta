@@ -76,17 +76,25 @@ def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
 
 def test_only_the_image_built_from_the_repository_lock_is_official(tmp_path, monkeypatch):
     monkeypatch.delenv("FMETA_IMAGE_ID", raising=False)
-    monkeypatch.setattr(gpu_gates, "gpu_uuids", lambda: ["GPU-0"])
+    monkeypatch.setattr(gpu_gates, "nvidia_smi", dict(uuid=["GPU-0"], driver_version=["595.99.02"]).get)
+    monkeypatch.setattr(gpu_gates, "loaded_libcuda", lambda: "libcuda.so.615.71.10")
     repo, installed = tmp_path / "repo", tmp_path / "image" / gpu_gates.LOCK
     repo.mkdir()
     installed.parent.mkdir()
-    (repo / gpu_gates.LOCK).write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    lock = ("@EXPLICIT\nhttps://c/noarch/cuda-version-13.4-h1_3.conda#0\n"
+            "https://c/linux-64/openmm-8.4.0-py312h2_2.conda#1\n"
+            "https://n/v0.3.5/nv-openmm-plugin-0.3.5-py312_0.conda#2\n")
+    (repo / gpu_gates.LOCK).write_text(lock)
     assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # not inside an image
-    installed.write_text("@EXPLICIT\nopenmm-8.5.0\n")
+    installed.write_text(lock.replace("openmm-8.4.0", "openmm-8.6.1"))
     assert not gpu_gates.environment(repo, installed, "sha256:1")[1]     # an image of another lock
-    installed.write_text("@EXPLICIT\nopenmm-8.6.1\n")
+    installed.write_text(lock)
     assert not gpu_gates.environment(repo, installed)[1]                 # the image is not known
     where, official = gpu_gates.environment(repo, installed, "sha256:1")
     assert official
+    # the record names the CUDA software too: a host driver older than the runtime of the lock
+    # works through the compatibility libraries of the image, and the record has to show it
     assert where == dict(image="sha256:1", gpu_uuids=["GPU-0"],
-                         lock_sha256=hashlib.sha256(installed.read_bytes()).hexdigest())
+                         lock_sha256=hashlib.sha256(installed.read_bytes()).hexdigest(),
+                         driver="595.99.02", libcuda="libcuda.so.615.71.10",
+                         cuda_runtime="13.4", plugin="0.3.5")
