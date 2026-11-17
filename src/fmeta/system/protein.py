@@ -59,6 +59,17 @@ def _atom(residue, name):
     return next((atom for atom in residue.atoms() if atom.name == name), None)
 
 
+def _is_amino(residue) -> bool:
+    """An amino acid by its name, or by its backbone atoms under any name."""
+    return (residue.name.strip().upper() in AMINO_ACIDS
+            or BACKBONE <= {atom.name for atom in residue.atoms()})
+
+
+def _cap_id(neighbour, shift: int) -> str:
+    """The residue number of a cap before (-1) or after (+1) the residue it is bonded to."""
+    return str(int(neighbour.id) + shift) if neighbour.id.strip().lstrip("-").isdigit() else neighbour.id
+
+
 def scan_pdb(path) -> tuple[list[dict], dict]:
     """What OpenMM drops when it reads a PDB file: the alternate locations (it keeps the
     one listed first for a residue) and the residue names that state a protonation state.
@@ -177,41 +188,69 @@ def _goes_on(last, residue) -> bool:
         return False
 
 
-def _existing_caps(topology, positions, amino, pieces) -> tuple[set, list[str]]:
+def _apart(positions, atom, other) -> float:
+    return float(np.linalg.norm(positions[atom.index] - positions[other.index]))
+
+
+def _cap_group(residue, positions):
+    """``("ACE" | "NME", its heavy atoms by their names there)`` when the residue is no amino
+    acid or water and its heavy atoms are those of an acetyl or an N-methyl group, whatever
+    the residue and the atoms are called; else None. The acetyl is bonded to the chain by
+    its C (the carbon at the oxygen), the N-methyl group by its N."""
+    if _is_amino(residue) or residue.name.strip().upper() in WATER:
+        return None
+    atoms: dict[str, list] = {}
+    for atom in residue.atoms():
+        if not _is_hydrogen(atom):
+            atoms.setdefault("?" if atom.element is None else atom.element.symbol, []).append(atom)
+    shape = {symbol: len(group) for symbol, group in atoms.items()}
+    if shape == {"C": 2, "O": 1}:
+        carbonyl, methyl = sorted(atoms["C"], key=lambda atom: _apart(positions, atom, atoms["O"][0]))
+        return "ACE", {"CH3": methyl, "C": carbonyl, "O": atoms["O"][0]}
+    if shape == {"C": 1, "N": 1}:
+        return "NME", {"N": atoms["N"][0], "C": atoms["C"][0]}
+    return None
+
+
+def _existing_caps(topology, positions, pieces) -> tuple[set, list[str]]:
     """Acetyl and N-methyl groups of the input bonded to a chain end, whatever they are
     called (ACE / NME, or UNK from a preparation program). Returns the residues used and
-    what was found."""
-    def near(atom, other):
-        return np.linalg.norm(positions[atom.index] - positions[other.index]) < CAP_BOND_NM
-
+    what was found. A group nearer to a chain end than atoms without a bond come
+    (``CAP_CLASH_NM``) that is not bonded to it is refused: removed with the hetero
+    components it would leave a charged terminus the input does not state."""
     used, found = set(), []
     for residue in topology.residues():
-        if residue in amino or residue.name.strip().upper() in WATER:
+        group = _cap_group(residue, positions)
+        if group is None:
             continue
-        atoms: dict[str, list] = {}
-        for atom in residue.atoms():
-            if not _is_hydrogen(atom):
-                atoms.setdefault("?" if atom.element is None else atom.element.symbol, []).append(atom)
-        shape = {symbol: len(group) for symbol, group in atoms.items()}
+        kind, atoms = group
+        ends = []
         for piece in pieces:
-            first, last = piece.residues[0], piece.residues[-1]
-            if shape == {"C": 2, "O": 1} and piece.acetyl is None:
-                carbonyl = next((atom for atom in atoms["C"] if near(atom, _atom(first, "N"))), None)
-                if carbonyl is None:
-                    continue
-                methyl = next(atom for atom in atoms["C"] if atom is not carbonyl)
-                piece.acetyl = {"CH3": positions[methyl.index], "C": positions[carbonyl.index],
-                                "O": positions[atoms["O"][0].index]}
-                found.append(f"ACE before {label(first)}")
-            elif (shape == {"C": 1, "N": 1} and piece.methylamide is None
-                  and near(atoms["N"][0], _atom(last, "C"))):
-                piece.methylamide = {"N": positions[atoms["N"][0].index],
-                                     "C": positions[atoms["C"][0].index]}
-                found.append(f"NME after {label(last)}")
-            else:
+            end = piece.residues[0] if kind == "ACE" else piece.residues[-1]
+            taken = piece.acetyl if kind == "ACE" else piece.methylamide
+            gap = _apart(positions, *((atoms["C"], _atom(end, "N")) if kind == "ACE"
+                                      else (atoms["N"], _atom(end, "C"))))
+            ends.append((gap, label(end)))
+            if gap >= CAP_BOND_NM or taken is not None:
                 continue
+            place = {name: positions[atom.index] for name, atom in atoms.items()}
+            if kind == "ACE":
+                piece.acetyl = place
+                found.append(f"ACE before {label(end)}")
+            else:
+                piece.methylamide = place
+                found.append(f"NME after {label(end)}")
             used.add(residue)
             break
+        else:
+            gap, end = min(ends, default=(np.inf, ""))
+            if gap < CAP_CLASH_NM:
+                raise ValueError(
+                    f"{label(residue)} has the atoms of an {kind} cap and stands {gap:.2f} nm from the "
+                    f"chain end at {end}: nearer than atoms without a bond ({CAP_CLASH_NM} nm), not "
+                    f"bonded as a cap is ({CAP_BOND_NM} nm). Removed with the hetero components it would "
+                    "leave a charged terminus that the input does not state. Put the cap at its bond "
+                    "length, or delete it from the file")
     return used, found
 
 
@@ -259,16 +298,13 @@ def split_at_breaks(topology: app.Topology, positions: np.ndarray) -> app.Topolo
     gap from C and N: an atom built in a chain that runs over a gap is placed towards the
     residue behind it. The C of a residue stood 0.28 nm from the N behind a gap of 0.447 nm,
     and no cap had room (review of PR #1)."""
-    def amino(residue):
-        return (residue.name.strip().upper() in AMINO_ACIDS
-                or BACKBONE <= {atom.name for atom in residue.atoms()})
-
     new, copies, cut = app.Topology(), {}, set()
     new.setPeriodicBoxVectors(topology.getPeriodicBoxVectors())
     for chain in topology.chains():
         target, last = new.addChain(chain.id), None
         for residue in chain.residues():
-            if last is not None and amino(last) and amino(residue) and not _can_be_bonded(last, residue, positions):
+            if (last is not None and _is_amino(last) and _is_amino(residue)
+                    and not _can_be_bonded(last, residue, positions)):
                 target = new.addChain(chain.id)
                 cut.add(frozenset((last, residue)))
             copy = new.addResidue(residue.name, target, residue.id, residue.insertionCode)
@@ -279,6 +315,76 @@ def split_at_breaks(topology: app.Topology, positions: np.ndarray) -> app.Topolo
         if frozenset((bond[0].residue, bond[1].residue)) not in cut:
             new.addBond(copies[bond[0]], copies[bond[1]], bond.type, bond.order)
     return new
+
+
+def caps_in_place(topology: app.Topology, positions: np.ndarray) -> tuple[app.Topology, np.ndarray]:
+    """A copy of the structure in which the acetyl and N-methyl groups bonded to a chain end
+    stand in the chain as ACE and NME (their heavy atoms), wherever the file has them and
+    whatever it calls them.
+
+    For the repair of backbone atoms. PDBFixer builds a missing N or C with its bond to a cap
+    it knows; a cap written as UNK after the chain it does not know. The N of the first
+    residue was then built 0.198 nm from the acetyl carbon (0.146 nm with the cap in place):
+    no bond for ``build_model``, which removed the cap with the hetero components and left a
+    charged terminus the input does not state (review of PR #1). A cap is found from the
+    backbone atom of the end residue that is nearest to it along the chain: N or C
+    (``CAP_BOND_NM``), or CA when that atom is the missing one (two bonds, ``REACH_NM``).
+    Over three bonds a cap cannot be told from a molecule that lies next to the residue:
+    refused."""
+    before, after, moved = {}, {}, set()
+    chain_residues = [residue for residue in topology.residues() if _is_amino(residue)]
+    for residue in topology.residues():
+        group = _cap_group(residue, positions)
+        if group is None:
+            continue
+        kind, atoms = group
+        pick, link, slot = (min, "C", before) if kind == "ACE" else (max, "N", after)
+        for end in chain_residues:
+            anchor = pick((atom for atom in end.atoms() if atom.name in _ALONG),
+                          key=lambda atom: _ALONG[atom.name], default=None)
+            if anchor is None or end in slot:
+                continue
+            bonds = 1 + (_ALONG[anchor.name] if kind == "ACE" else 2 - _ALONG[anchor.name])
+            gap = _apart(positions, atoms[link], anchor)
+            if gap >= (CAP_BOND_NM if bonds == 1 else REACH_NM[bonds]):
+                continue
+            if bonds == 3:
+                raise ValueError(
+                    f"{label(residue)} has the atoms of an {kind} cap and stands {gap:.2f} nm from "
+                    f"{anchor.name} of {label(end)}, which lacks the backbone atoms between the two: "
+                    "whether it is the cap of the residue cannot be told. Complete the residue, or "
+                    "delete the residue or the group from the file")
+            slot[end] = atoms
+            moved.add(residue)
+            break
+
+    new, coordinates, copies = app.Topology(), [], {}
+    new.setPeriodicBoxVectors(topology.getPeriodicBoxVectors())
+
+    def cap(name, chain, neighbour, shift, atoms):
+        target = new.addResidue(name, chain, _cap_id(neighbour, shift))
+        for atom_name, atom in atoms.items():
+            new.addAtom(atom_name, atom.element, target)
+            coordinates.append(positions[atom.index])
+
+    for chain in topology.chains():
+        target = None
+        for residue in chain.residues():
+            if residue in moved:
+                continue
+            target = target or new.addChain(chain.id)
+            if residue in before:
+                cap("ACE", target, residue, -1, before[residue])
+            copy = new.addResidue(residue.name, target, residue.id, residue.insertionCode)
+            for atom in residue.atoms():
+                copies[atom] = new.addAtom(atom.name, atom.element, copy, atom.id)
+                coordinates.append(positions[atom.index])
+            if residue in after:
+                cap("NME", target, residue, 1, after[residue])
+    for bond in topology.bonds():
+        if bond[0] in copies and bond[1] in copies:
+            new.addBond(copies[bond[0]], copies[bond[1]], bond.type, bond.order)
+    return new, np.array(coordinates, dtype=float).reshape(-1, 3)
 
 
 def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
@@ -326,7 +432,7 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
                                      or {"H2", "H3"} <= {atom.name for atom in residue.atoms()}):
                 gap = None                                 # a terminus as stated: no gap
             pieces.append(_Piece(chain, [residue], gap))
-    caps, caps_kept = _existing_caps(topology, positions, amino, pieces)
+    caps, caps_kept = _existing_caps(topology, positions, pieces)
 
     gaps = []
     for before, piece in zip(pieces, pieces[1:]):
@@ -372,8 +478,7 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
             coordinates.append(positions[atom.index])
 
     def cap(name, chain, neighbour, shift, atoms):
-        number = str(int(neighbour.id) + shift) if neighbour.id.strip().lstrip("-").isdigit() else neighbour.id
-        target = new.addResidue(name, chain, number)
+        target = new.addResidue(name, chain, _cap_id(neighbour, shift))
         hints.append(None)
         for atom_name, position in atoms.items():
             new.addAtom(atom_name, app.Element.getBySymbol(atom_name[0]), target)

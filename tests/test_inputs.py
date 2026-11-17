@@ -662,6 +662,69 @@ def test_caps_in_the_input_are_kept(inputs, tmp_path, amber, style, fix):
         assert np.abs(found - position).max() < 1e-6
 
 
+def atom_lines(path, source, change):
+    """A copy of a PDB file with each atom record as ``change(residue name, residue number,
+    atom name, line)`` returns it; None leaves the atom out."""
+    lines = []
+    for line in source.read_text().splitlines():
+        if line.startswith(("ATOM", "HETATM")):
+            line = change(line[17:20], int(line[22:26]), line[12:16].strip(), line)
+        if line is not None:
+            lines.append(line)
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+@pytest.mark.parametrize("number, name", [(6, "N"), (12, "C")])
+def test_caps_written_as_unk_are_kept_when_the_atom_they_are_bonded_to_is_rebuilt(inputs, tmp_path, amber,
+                                                                                   number, name):
+    """The backbone atom a cap is bonded to is missing and the caps are UNK residues after the
+    chain. They stand in the chain as ACE and NME before the atom is rebuilt, so it is built
+    with its bond to the cap (measured: N 0.146 nm from the acetyl carbon and 0.021 nm from
+    its place; C 0.131 and 0.005 nm). Before, the N was built 0.198 nm from the carbon (the C
+    0.162 nm from the nitrogen, where 0.17 nm is the limit): the acetyl was removed with the
+    hetero components and the model had +2 (review of PR #1)."""
+    pytest.importorskip("pdbfixer")
+    capped = capped_fragment(tmp_path / "capped.pdb", inputs[0], "unk")
+    path = atom_lines(tmp_path / "broken.pdb", capped, lambda residue, found, atom, line: (
+        None if (found, atom) == (number, name) and residue != "UNK" else line))
+    topology, positions, protein = modelled(path, amber, fix=True)
+    names = [residue.name for residue in topology.residues()]
+    assert names == ["ACE", "PHE", "LYS", "ALA", "VAL", "PHE", "GLY", "MET", "NME"]
+    assert protein.info["caps_kept"] == ["ACE before A:PHE6", "NME after A:MET12"]
+    assert protein.info["removed"] == {}
+    assert net_charge(amber, topology) == pytest.approx(1.0, abs=1e-6)
+    rebuilt = atom_position(topology, positions, number - 5, name)
+    assert np.linalg.norm(rebuilt - atoms_of(inputs[0])[number - 1, name]) < 0.05
+
+
+@pytest.mark.parametrize("case", ["apart", "two_missing"])
+def test_group_that_may_be_a_cap_is_not_removed_without_a_word(inputs, tmp_path, case):
+    """A group with the atoms of an acetyl that is no cap by the rule, and too near to the
+    chain end to be a molecule of its own: the input is refused (it was removed with the
+    hetero components, which left a charged terminus the input does not state). ``apart``:
+    the acetyl stands 0.07 nm further from the N of PHE 6, 0.20 nm. ``two_missing``: PHE 6
+    lacks N and CA, and its C alone does not say whose cap the acetyl is."""
+    capped = capped_fragment(tmp_path / "capped.pdb", inputs[0], "unk")
+    at = atoms_of(inputs[0])
+    away = at[4, "C"] - at[5, "N"]
+    away *= 0.7 / np.linalg.norm(away)                     # in the units of the file
+
+    def change(residue, number, atom, line):
+        if case == "apart" and (residue, number) == ("UNK", 5):
+            moved = np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]) + away
+            return line[:30] + "".join(f"{value:8.3f}" for value in moved) + line[54:]
+        if case == "two_missing" and (residue, number) == ("PHE", 6) and atom in ("N", "CA"):
+            return None
+        return line
+
+    path = atom_lines(tmp_path / "unclear.pdb", capped, change)
+    if case == "two_missing":
+        pytest.importorskip("pdbfixer")
+    with pytest.raises(ValueError, match="UNK5 has the atoms of an ACE cap .* A:PHE6"):
+        read_protein(path, fix=case == "two_missing")
+
+
 def test_protonation_states_of_the_input_are_kept(inputs, tmp_path, amber):
     """HIP, ASH, GLH and a neutral lysine written in the hydrogens of the input reach the
     model (+4), also when a hydrogen with a foreign name makes fmeta rebuild them all (before

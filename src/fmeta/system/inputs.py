@@ -15,6 +15,7 @@ from .protein import (
     ProteinInput,
     backbone_listing,
     build_model,
+    caps_in_place,
     incomplete_backbone,
     read_states,
     scan_pdb,
@@ -152,7 +153,9 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     if incomplete and use_fixer:
         # which residues follow each other, and where a chain is split and capped, is read
         # from the backbone atoms: they have to be there before the model is made. A chain
-        # ends where residues are missing: no atom is built towards a bond over the gap
+        # ends where residues are missing: no atom is built towards a bond over the gap. The caps
+        # of the input stand in the chain as ACE and NME: an atom is built with its bond to them
+        topology, positions = caps_in_place(topology, positions)
         modeller, rebuilt = _fix_with_pdbfixer(
             app.Modeller(split_at_breaks(topology, positions), positions * unit.nanometer), atoms_only=True)
         topology, positions = modeller.topology, _nm(modeller.positions)
