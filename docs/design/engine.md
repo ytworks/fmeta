@@ -1207,7 +1207,10 @@ the hash is the one from before the key existed. With `auto` as the default, a s
 no back end is another configuration than the one of the sets reported so far, which were made
 with OpenMM. A work directory prepared for OpenMM is therefore refused by such a set, with the
 way to go on (`run: {backend: openmm}` in the `config` of `set.yaml`), and a `config.yaml`
-written before the key existed is read as `openmm`, not with the default of today. A report
+written before the key existed is read as `openmm`, not with the default of today: by the set,
+and by the build process of a ligand (`fmeta benchmark build`), which writes the file again
+(`saved_config`; review of PR #3: the build read it with the default, and the set then refused
+its own work directory as changed). A report
 names the back end of every replica (`backend`, from its `run.yaml`) and has one line for them
 in its header. Under `auto` the ligands of a set may get different back ends (the conditions of
 the plugin are those of each system): replicas of more than one back end are named in that

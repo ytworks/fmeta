@@ -538,7 +538,7 @@ def _plan(config: Config) -> tuple:
     return float(config.run.length_ns), int(config.run.replicas)
 
 
-def _saved_config(path: Path) -> Config:
+def saved_config(path) -> Config:
     """The configuration that 'fmeta benchmark prepare' wrote for a ligand. It writes every key,
     so a file without ``run.backend`` is from before the key existed and was written for OpenMM
     (FM-D18): it is read so, and not with the default of today."""
@@ -571,7 +571,7 @@ def _stored(benchmark: BenchmarkSet, workdir: Path) -> list:
                           "config of set.yaml; for another back end use a new work directory")
             raise ValueError(f"{directory} was prepared with another configuration or set definition. Results "
                              f"of two configurations do not go into one report: {remedy}")
-        config = _saved_config(directory / "config.yaml")
+        config = saved_config(directory / "config.yaml")
         if configuration_hash(benchmark, config) != expected:
             raise ValueError(f"{directory}/config.yaml was changed after 'fmeta benchmark prepare'. The ligands "
                              "of a set run with one configuration: change set.yaml and use a new work directory")

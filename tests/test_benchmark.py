@@ -274,7 +274,8 @@ def test_a_work_directory_from_before_the_back_end_key_goes_on_once_the_set_name
     """The default back end is ``auto`` (FM-D18), which is another configuration than OpenMM. A
     work directory from before ``run.backend`` existed (the hash of its marker is the one OpenMM
     keeps, and its ``config.yaml`` has no such key) is refused with the way to go on, and goes on,
-    with OpenMM, once the set names it."""
+    with OpenMM, once the set names it: also after the build of a ligand, a process of its own
+    that reads the ``config.yaml`` and writes it again."""
     work = tmp_path / "work"
     prepare_set(load_set(write_set(tmp_path / "before", inputs, _names_openmm)), work)
     for path in work.glob("*/config.yaml"):
@@ -283,7 +284,9 @@ def test_a_work_directory_from_before_the_back_end_key_goes_on_once_the_set_name
         path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValueError, match="backend: openmm"):
         prepared_ligands(load_set(write_set(tmp_path / "default", inputs)), work)
-    items = prepared_ligands(load_set(write_set(tmp_path / "named", inputs, _names_openmm)), work)
+    named = load_set(write_set(tmp_path / "named", inputs, _names_openmm))
+    main(["benchmark", "build", str(work / "b_D")])            # what 'benchmark run' starts for a ligand
+    items = prepared_ligands(named, work)
     assert [(item.ligand.name, item.config.run.backend) for item in items] == [("a", "openmm"), ("b D", "openmm")]
 
 

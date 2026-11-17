@@ -226,9 +226,11 @@ def cmd_benchmark_prepare(args) -> None:
 
 
 def cmd_benchmark_build(args) -> None:
-    """One job of 'benchmark run': the prepare stage of one ligand, on the device the scheduler gave."""
+    """One job of 'benchmark run': the prepare stage of one ligand, on the device the scheduler gave.
+    The stage writes the configuration again, so it is read as the set reads it."""
+    from .benchmark import saved_config
     from .workflow import prepare_stage
-    config = Config.load(Path(args.workdir) / "config.yaml")
+    config = saved_config(Path(args.workdir) / "config.yaml")
     prepared = prepare_stage(config, args.workdir, _first_device(config, args.device))
     print(prepared.report)
     print(f"\n{prepared.topology.getNumAtoms()} atoms; files in {Path(args.workdir) / 'prepared'}")
