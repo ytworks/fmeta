@@ -92,6 +92,36 @@ height or number of walkers) is added when round 1 points to it, and recorded th
   by 10 instead of 22.4 kJ/mol per factor e of time. A2A arm B itself: walkers left from 0.7 ns
   on at a bias of 45 to 62, one reached the unbound window (3 ns), the headline was −48.7 at
   4.5 ns. Its pair of GPUs went to arm F on A2A.
+- Arm A, the bias of the defaults with 8 walkers (TYK2 to its 20 ns, A2A stopped at 10.1 ns).
+  Headline, the bias in the site and the bias in the unbound window, kJ/mol:
+
+  | Length, ns | TYK2 headline | site | window | A2A headline | site | window |
+  |---|---|---|---|---|---|---|
+  | 2 | −135.2 | 143.9 | 0 | −70.6 | 107.3 | 38.3 |
+  | 5 | −92.9 | 153.0 | 61.6 | −36.9 | 118.5 | 70.7 |
+  | 10 | −72.0 | 158.6 | 77.1 | −35.8 | 129.5 | 83.2 |
+  | 15 | −63.4 | 159.8 | 85.1 | | | |
+  | 20 | −54.2 | 162.2 | 102.2 | | | |
+
+  A2A is within 3 kJ/mol of the experimental −33.0 from 5 ns on (−36.9, −35.4 at 7.5 ns,
+  −35.8). TYK2 moves towards the experimental −47.3 through the whole run, by 9 kJ/mol in the
+  last 5 ns, while the walkers in the site go from 3 to 1 of 8.
+- Arm F stopped (TYK2 at 12.4 ns, A2A at 4.8 ns): behind arm A at every length on both
+  systems. TYK2: headline −96.8 at 5 ns, −80.6 at 10 ns, −78.1 at 12 ns; the site at 118.6 and
+  the window at 29.9 at 10 ns, a difference of 88.7 against 81.5 in arm A. A2A: −67.5 at
+  4.5 ns, the first walker in the window at 3.3 ns. The lower height leaves the site 40 kJ/mol
+  lower, and the bias in the window then grows at a third of the rate: the two cancel, as the
+  growth with the logarithm of time says (the height multiplies the time in the site and
+  outside alike). The hill height does not shorten the run.
+- No passage from the unbound window back into the site in any arm (TYK2 arm A: 4 passages
+  out in 160 ns of walkers, none back). Walkers that went 0.5 nm or more beyond the site did
+  not come back into it within the runs; walkers that returned had been less far.
+- Round 2 is made with the setting of arm A alone: bias factor 10, height 1.5 kJ/mol,
+  8 walkers. No arm is ahead of it in any quantity that was read, and a second setting would
+  double the 3 hours of the measurement.
+- Faults: none after the first one (six runs of 13 to 62 minutes on the pair daemons).
+  Round 2 has 32 walkers of one work directory (one `fmeta run` per directory), so it is one
+  run on one MPS daemon over the 8 GPUs, started again on a CUDA error as before.
 
 **Round 2, the measurement.** 4 independent replicas of 8 walkers of the setting (or two
 settings) from round 1, on both systems. The first N ns of a run are the run of N ns, so the
