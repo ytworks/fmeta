@@ -252,12 +252,47 @@ on the first N ns of the files; at the length of the run they are the output of
   8.4 of point 1) and rises by 0.3 to 0.5 per 2.5 ns after 25 ns, a third of the rate before.
   The half-width goes down after 25 ns: the highest replica has stopped rising (−6.1 at 25 ns,
   −7.3 at 30 ns) and the two lowest go on rising. Both systems go on to 40 ns.
+- TYK2 to 40 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 32.5 | −54.59 | −69.11 to −40.07 | 14.52 | 7.29 | −62.2, −58.6, −56.2, −41.4 | 5/1, 5/0, 4/1, 7/3 |
+  | 35 | −54.02 | −70.14 to −37.91 | 16.11 | 6.72 | −60.9, −59.1, −57.1, −39.0 | 5/1, 5/1, 4/1, 8/3 |
+  | 37.5 | −53.51 | −70.76 to −36.26 | 17.25 | 6.21 | −59.5, −59.5, −57.7, −37.3 | 5/1, 5/1, 5/1, 8/3 |
+  | 40 | −52.87 | −70.96 to −34.77 | 18.10 | 5.57 | −58.2, −59.5, −57.9, −35.8 | 5/1, 5/1, 5/1, 8/3 |
+
+  From 35 ns every replica has a passage out and a passage back (point 4), and the mean is
+  within 8.4 of experiment. The half-width does not meet the rule at 35 or at 40 ns, and it
+  grows after 30 ns (13.72 to 18.10): three replicas are within 1.6 of each other at 40 ns
+  (−59.5 to −57.9), and the fourth rises away from them (−43.3 at 30 ns, −35.8 at 40 ns).
+- A2A to 40 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 32.5 | −21.34 | −36.23 to −6.45 | 14.89 | 5.66 | −27.0, −20.7, −29.3, −8.4 | 4/1, 6/0, 5/0, 7/3 |
+  | 35 | −20.99 | −33.83 to −8.15 | 12.84 | 6.01 | −25.6, −20.7, −27.9, −9.8 | 4/1, 6/0, 5/0, 7/3 |
+  | 37.5 | −20.48 | −31.55 to −9.40 | 11.07 | 6.52 | −24.3, −20.2, −26.6, −10.8 | 4/1, 6/2, 5/0, 7/3 |
+  | 40 | −19.87 | −29.29 to −10.46 | 9.41 | 7.13 | −23.2, −19.3, −25.2, −11.8 | 0/1, 6/0, 5/0, 7/3 |
+
+  The rule is not met at 35 or at 40 ns: half-width 12.84 and 9.41, and at most three replicas
+  of four with a passage back. The half-width goes down by 1.7 to 2.2 per 2.5 ns: the two
+  lowest replicas rise and the highest goes down. The mean rises by 0.35 to 0.61 per 2.5 ns and
+  is 7.13 above the experimental range at 40 ns; point 1 allows 8.4. Both systems go on to
+  50 ns.
 - The count of passages at a length is not the count at a shorter length plus the new ones.
   The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
   and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
   10 ns, 1.50 nm at 20 ns; fourth replica: 1.52 and 1.77 nm). The passage back of the second
   replica at 10 to 15 ns is none with the threshold of 17.5 and 20 ns. Point 4 takes the count
   at the length that is judged, as the rule says.
+  - A2A at 40 ns, first replica: the minimum of the profile is at s = 0.717 nm, next to the
+    lower wall (0.700 nm); to 37.5 ns it was at 1.167 nm. The threshold is then 1.017 nm, the
+    walkers do not start below it, and the count is 0 out and 1 back where it was 4 and 1.
+    Its walkers have been in the unbound window (four of them by 35 ns): "a walker that
+    reached the unbound window" of point 3 is read from the trajectories, not from this count.
+  - A2A, second replica: two passages back with the threshold of 37.5 ns (1.517 nm), none with
+    the threshold of 40 ns (1.500 nm). Those two walkers came back to within 0.017 nm of the
+    threshold.
 
 **What the choice means.** The setting is chosen on these two systems with their experimental
 values in view. Its agreement with experiment there is the outcome of the choice, not a
