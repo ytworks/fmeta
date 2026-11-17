@@ -231,6 +231,56 @@ def backbone_listing(incomplete) -> list[str]:
     return [f"{label(residue)} ({', '.join(missing)})" for residue, missing in incomplete]
 
 
+# How far apart (nm) two backbone atoms of consecutive residues can be when a peptide bond joins
+# the residues, by the number of bonds from one atom to the other: C-N; C-CA and CA-N; CA-CA, N-N
+# and C-C; N-CA and CA-C; N-C. Measured on 1192 bonded pairs of four structures: at most 0.138,
+# 0.254, 0.391, 0.505 and 0.617 nm. About 0.05 nm is added (the bond itself: GAP_NM).
+REACH_NM = {1: GAP_NM, 2: 0.30, 3: 0.44, 4: 0.55, 5: 0.67}
+_ALONG = {"N": 0, "CA": 1, "C": 2}
+
+
+def _can_be_bonded(last, residue, positions: np.ndarray) -> bool:
+    """Whether a peptide bond from ``last`` to ``residue`` is possible, judged from the backbone
+    atoms that are there: the last one of ``last`` and the first one of ``residue``."""
+    ends = [pick((atom for atom in group.atoms() if atom.name in _ALONG),
+                 key=lambda atom: _ALONG[atom.name], default=None)
+            for pick, group in ((max, last), (min, residue))]
+    if None in ends:
+        return True
+    reach = REACH_NM[3 + _ALONG[ends[1].name] - _ALONG[ends[0].name]]
+    return float(np.linalg.norm(positions[ends[0].index] - positions[ends[1].index])) <= reach
+
+
+def split_at_breaks(topology: app.Topology, positions: np.ndarray) -> app.Topology:
+    """A copy of the topology in which a chain ends where two consecutive amino acids cannot be
+    bonded (residues are missing between them), without the bond OpenMM makes over the gap.
+
+    For the repair of backbone atoms, which are missing when ``build_model`` would find the
+    gap from C and N: an atom built in a chain that runs over a gap is placed towards the
+    residue behind it. The C of a residue stood 0.28 nm from the N behind a gap of 0.447 nm,
+    and no cap had room (review of PR #1)."""
+    def amino(residue):
+        return (residue.name.strip().upper() in AMINO_ACIDS
+                or BACKBONE <= {atom.name for atom in residue.atoms()})
+
+    new, copies, cut = app.Topology(), {}, set()
+    new.setPeriodicBoxVectors(topology.getPeriodicBoxVectors())
+    for chain in topology.chains():
+        target, last = new.addChain(chain.id), None
+        for residue in chain.residues():
+            if last is not None and amino(last) and amino(residue) and not _can_be_bonded(last, residue, positions):
+                target = new.addChain(chain.id)
+                cut.add(frozenset((last, residue)))
+            copy = new.addResidue(residue.name, target, residue.id, residue.insertionCode)
+            for atom in residue.atoms():
+                copies[atom] = new.addAtom(atom.name, atom.element, copy, atom.id)
+            last = residue
+    for bond in topology.bonds():
+        if frozenset((bond[0].residue, bond[1].residue)) not in cut:
+            new.addBond(copies[bond[0]], copies[bond[1]], bond.type, bond.order)
+    return new
+
+
 def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
                 keep_water: bool = False, names: dict | None = None) -> ProteinInput:
     """The protein of a structure as it will be simulated.

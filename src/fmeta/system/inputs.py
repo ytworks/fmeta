@@ -18,6 +18,7 @@ from .protein import (
     incomplete_backbone,
     read_states,
     scan_pdb,
+    split_at_breaks,
 )
 
 
@@ -150,9 +151,10 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     incomplete, rebuilt = backbone_listing(incomplete_backbone(topology)), []
     if incomplete and use_fixer:
         # which residues follow each other, and where a chain is split and capped, is read
-        # from the backbone atoms: they have to be there before the model is made
-        modeller, rebuilt = _fix_with_pdbfixer(app.Modeller(topology, positions * unit.nanometer),
-                                               atoms_only=True)
+        # from the backbone atoms: they have to be there before the model is made. A chain
+        # ends where residues are missing: no atom is built towards a bond over the gap
+        modeller, rebuilt = _fix_with_pdbfixer(
+            app.Modeller(split_at_breaks(topology, positions), positions * unit.nanometer), atoms_only=True)
         topology, positions = modeller.topology, _nm(modeller.positions)
         rebuilt.insert(0, "backbone atoms missing in the file, rebuilt before the chains were split: "
                        + ", ".join(incomplete))
@@ -200,14 +202,24 @@ def _fix_with_pdbfixer(modeller: app.Modeller, atoms_only: bool = False) -> tupl
             notes.append("non-standard residues replaced: " + ", ".join(swaps))
             fixer.replaceNonstandardResidues()
     fixer.findMissingAtoms()
+    ends = set()
     if atoms_only:
-        fixer.missingTerminals = {}
+        # a residue at the end of a chain is rebuilt with its OXT, which is taken away again.
+        # Without it PDBFixer has no template for the residue, so no bonds or angles, and a
+        # rebuilt C stays where the overlay of the whole residue put it (0.107 nm off its place
+        # on the test protein)
+        fixer.missingTerminals = {residue: atoms for residue, atoms in fixer.missingTerminals.items()
+                                  if residue in fixer.missingAtoms}
+        ends = {residue.index for residue in fixer.missingTerminals}
     n_missing = (sum(len(atoms) for atoms in fixer.missingAtoms.values())
                  + sum(len(atoms) for atoms in fixer.missingTerminals.values()))
     if n_missing:
-        notes.append(f"{n_missing} missing heavy atoms rebuilt")
+        notes.append(f"{n_missing - len(ends)} missing heavy atoms rebuilt")
         fixer.addMissingAtoms()
-    return app.Modeller(fixer.topology, fixer.positions), notes
+    fixed = app.Modeller(fixer.topology, fixer.positions)
+    fixed.delete([atom for residue in fixed.topology.residues() if residue.index in ends
+                  for atom in residue.atoms() if atom.name == "OXT"])
+    return fixed, notes
 
 
 def complete_hydrogens(modeller: app.Modeller, forcefield: app.ForceField, ph: float,

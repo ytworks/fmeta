@@ -570,6 +570,26 @@ def test_residue_without_a_backbone_atom_is_rebuilt_not_dropped(inputs, tmp_path
     assert np.linalg.norm(atom_position(topology, positions, index, name) - atoms_of(inputs[0])[index, name]) < 0.05
 
 
+def test_backbone_atom_next_to_a_gap_is_not_rebuilt_towards_the_residue_behind_the_gap(inputs, tmp_path, amber):
+    """ARG 14 lacks its C and the three residues behind it are missing. In a chain that runs
+    over the gap (OpenMM bonds ARG 14 to ALA 18) the C was built 0.28 nm from the N of ALA 18,
+    where 0.447 nm lie between the two, and no cap had room. The chain ends at the gap before
+    the atom is built, and the end is built with the bonds and angles of a chain end (measured:
+    0.040 nm from its place; 0.107 nm without them, and the caps had no room next to the
+    hydrogens)."""
+    pytest.importorskip("pdbfixer")
+    path = edited(tmp_path / "gap.pdb", inputs[0], skip=lambda atom: atom.residue.index in (14, 15, 16)
+                  or (atom.residue.index == 13 and atom.name == "C"))
+    topology, positions, protein = modelled(path, amber, fix=True)
+    names = [residue.name for residue in topology.residues()]
+    assert topology.getNumChains() == 2 and len(names) == 34 and names[14:16] == ["NME", "ACE"]
+    assert np.linalg.norm(atom_position(topology, positions, 13, "C") - atoms_of(inputs[0])[13, "C"]) < 0.06
+    (gap,) = protein.info["gaps_capped"]
+    assert (gap["after"], gap["before"], gap["caps"]) == ("A:ARG14", "A:ALA18", ["NME", "ACE"])
+    assert gap["c_n_nm"] == pytest.approx(0.447, abs=0.05)
+    assert protein.info["backbone_rebuilt"] == ["A:ARG14 (C)"]
+
+
 @pytest.mark.parametrize("stated", ["OXT", "H3"])
 def test_chain_end_stated_by_the_input_is_not_capped(inputs, tmp_path, amber, stated):
     """Two chains under one identifier with the numbering going on (a file from an MD
