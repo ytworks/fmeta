@@ -198,6 +198,20 @@ on the first N ns of the files; at the length of the run they are the output of
   replica values are 17.7 apart at 5 ns and 28.8 apart at 10 ns. Both systems go on in steps
   of 10 ns (points 5 and 6).
 
+- TYK2 to 20 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 12.5 | −69.24 | −91.11 to −47.37 | 21.87 | 21.94 | −88.7, −57.8, −68.7, −61.7 | 3/0, 4/0, 2/0, 5/1 |
+  | 15 | −66.20 | −87.12 to −45.27 | 20.93 | 18.90 | −85.5, −58.0, −63.5, −57.8 | 3/1, 4/0, 3/0, 5/1 |
+  | 17.5 | −62.96 | −81.18 to −44.75 | 18.21 | 15.66 | −79.8, −57.3, −60.0, −54.7 | 4/1, 4/0, 3/0, 5/1 |
+  | 20 | −60.61 | −77.00 to −44.23 | 16.39 | 13.31 | −75.4, −56.9, −58.5, −51.6 | 4/1, 4/0, 3/0, 5/3 |
+
+  No part of the rule is met at 15 or at 20 ns, so no length up to 20 ns qualifies whatever
+  A2A gives. Walkers came back into the site for the first time on TYK2, in two replicas of
+  four (the first between 10 and 12.5 ns). The mean moves towards experiment by 2.3 to 4.0
+  per 2.5 ns and the half-width goes down with it.
+
 **What the choice means.** The setting is chosen on these two systems with their experimental
 values in view. Its agreement with experiment there is the outcome of the choice, not a
 validation of the method, and the READMEs and FM-D19 say so. The package defaults do not
