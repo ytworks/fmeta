@@ -9,6 +9,10 @@ ALL PASSED the result is written to
 ``bench/results/<date>-<commit>-gpu-gates.json`` and added to ``bench/results/index.json``;
 commit both. Procedure: docs/gpu-runbook.md.
 
+A run whose test runs used the cuPotential plugin (``--backend``, FM-D18) is a record of its
+own, ``<date>-<commit>-cupotential-gpu-gates.json``: it holds the verdicts and the accuracy, and
+no speed and no duration (``PLUGIN_WITHHELD`` of scripts/verify_bench_results.py).
+
 Evidence is recorded only inside the official image built from the repository's lock (run
 this script through scripts/in_docker.sh). ``--quick`` and runs on a CPU platform exercise the
 steps but are never recorded.
@@ -24,8 +28,11 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
+
+from verify_bench_results import PLUGIN_WITHHELD, record_name
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "bench" / "results"
@@ -93,39 +100,50 @@ def environment(root: Path = ROOT, image_lock: Path = IMAGE_LOCK,
 
 def run_gpu_tests(root: Path = ROOT) -> dict:
     """``pytest -m gpu`` as one gate. It passes only if tests actually ran."""
+    start = time.time()
     result = subprocess.run([sys.executable, "-m", "pytest", "-q", "-m", "gpu", "tests"], cwd=root,
                             capture_output=True, text=True)
-    tail = (result.stdout.strip().splitlines() or [""])[-1]
+    seconds = round(time.time() - start, 1)
+    tail = re.sub(r" in [0-9.]+s\b.*$", "", (result.stdout.strip().splitlines() or [""])[-1])
     passed = re.search(r"(\d+) passed", tail)
     n_passed = int(passed.group(1)) if passed else 0
     return dict(name="gpu-tests", passed=result.returncode == 0 and n_passed > 0,
-                metrics=dict(summary=tail, n_passed=n_passed),
+                metrics=dict(summary=tail, n_passed=n_passed, seconds=seconds),
                 criteria="pytest -m gpu: every GPU test passes and at least one runs")
 
 
 def make_record(items, extra_gates, commit: str, dirty: bool, date: str, gpus: int, gpu_name: str,
-                platform: str, openmm_version: str, criteria: dict, environment: dict) -> dict:
-    """The evidence record: one gate per check item. A skipped item is not a pass."""
-    gates = list(extra_gates)
+                platform: str, openmm_version: str, criteria: dict, environment: dict,
+                backend: str = "openmm") -> dict:
+    """The evidence record: one gate per check item. A skipped item is not a pass.
+
+    ``backend`` names what the test runs were made with. The record of cuPotential leaves out the
+    speeds and the durations (``PLUGIN_WITHHELD``); they stay in the directory of the test runs."""
+    withheld = PLUGIN_WITHHELD if backend == "cupotential" else ()
+    gates = [dict(gate) for gate in extra_gates]
     for item in items:
-        gates.append(dict(name=item.name, passed=item.status == "PASS",
-                          metrics=dict(status=item.status, detail=item.detail,
-                                       seconds=round(item.seconds, 1)),
+        metrics = dict(status=item.status, detail=item.detail, seconds=round(item.seconds, 1))
+        if item.performance:
+            metrics["performance"] = item.performance
+        gates.append(dict(name=item.name, passed=item.status == "PASS", metrics=metrics,
                           criteria=criteria[item.name]))   # every gate states its criterion
+    for gate in gates:
+        gate["metrics"] = {key: value for key, value in gate["metrics"].items() if key not in withheld}
     return dict(date=date, commit=commit, dirty=dirty, gpus=gpus, gpu_name=gpu_name,
-                platform=platform, openmm=openmm_version, environment=environment,
+                platform=platform, openmm=openmm_version, backend=backend, environment=environment,
                 all_passed=all(gate["passed"] for gate in gates), gates=gates)
 
 
 def write_record(record: dict, results: Path = RESULTS) -> Path:
-    """Write the record and update index.json (a rerun of the same commit replaces its entry)."""
+    """Write the record and update index.json. A rerun of the same commit with the same back end
+    replaces its entry; the two back ends of one commit are two records."""
     results.mkdir(parents=True, exist_ok=True)
-    name = f"{record['date']}-{record['commit'][:9]}-gpu-gates.json"
+    name = record_name(record)
     (results / name).write_text(json.dumps(record, indent=1, allow_nan=False) + "\n")
     index_path = results / "index.json"
     index = json.loads(index_path.read_text()) if index_path.exists() else {"entries": []}
     entry = dict(file=name, **{key: record[key] for key in
-                               ("date", "commit", "dirty", "gpus", "gpu_name", "all_passed")})
+                               ("date", "commit", "dirty", "gpus", "gpu_name", "all_passed", "backend")})
     index["entries"] = [e for e in index["entries"] if e["file"] != name] + [entry]
     index_path.write_text(json.dumps(index, indent=1, allow_nan=False) + "\n")
     return results / name
@@ -140,6 +158,9 @@ def main() -> int:
     parser.add_argument("--gpus", help="comma-separated device indices (tests the multi-GPU launcher)")
     parser.add_argument("--quick", action="store_true", help="minimal run lengths; not recorded")
     parser.add_argument("--skip-tests", action="store_true", help="skip pytest -m gpu; not recorded")
+    parser.add_argument("--backend", choices=("auto", "cupotential", "openmm"),
+                        help="the back end of the test runs (default: that of a new configuration); "
+                             "a run with cupotential and one with openmm are two records")
     args = parser.parse_args()
 
     import openmm
@@ -156,14 +177,15 @@ def main() -> int:
         print(f"[{'PASS' if gate['passed'] else 'FAIL'}] gpu-tests            {gate['metrics']['summary']}",
               flush=True)
         extra.append(gate)
-    checker = Checker(args.out, args.platform, args.precision, args.device, gpus, args.quick)
+    checker = Checker(args.out, args.platform, args.precision, args.device, gpus, args.quick,
+                      backend=args.backend)
     checker.run_all()
 
     platform = checker.platform.getName() if checker.platform is not None else "none"
     record = make_record(checker.items, extra, commit, dirty,
                          datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
                          len(gpus) if gpus else 1, checker.device_name or platform, platform,
-                         openmm.__version__, CRITERIA, where)
+                         openmm.__version__, CRITERIA, where, backend=checker.backend_used)
     failed = [gate["name"] for gate in record["gates"] if not gate["passed"]]
     recordable = platform in GPU_PLATFORMS and not args.quick and not args.skip_tests and official
     if record["all_passed"] and recordable:

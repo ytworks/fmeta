@@ -30,12 +30,12 @@ def test_progress_log_budget():
     assert any("lines" in p for p in check_progress_size.problems_in(good + "x\n" * 200))
 
 
-def record(items):
+def record(items, backend="openmm"):
     criteria = {item.name: f"criterion of {item.name}" for item in items}
-    tests = dict(name="gpu-tests", passed=True, metrics=dict(summary="2 passed", n_passed=2),
+    tests = dict(name="gpu-tests", passed=True, metrics=dict(summary="2 passed", n_passed=2, seconds=5.0),
                  criteria="pytest -m gpu")
     return gpu_gates.make_record(items, [tests], COMMIT, False, "2026-11-15", 2, "Test GPU", "CUDA",
-                                 "8.6.1", criteria, WHERE)
+                                 "8.6.1", criteria, WHERE, backend=backend)
 
 
 def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
@@ -72,6 +72,35 @@ def test_recorded_evidence_is_accepted_and_tampering_is_caught(tmp_path):
     errors, _ = verify_bench_results.verify(tmp_path)
     assert any("not strict JSON" in e for e in errors)
     assert verify_bench_results.verify(tmp_path / "empty") == ([], -1)   # no evidence yet is fine
+
+
+def test_the_two_back_ends_of_a_commit_are_two_records_and_the_one_of_cupotential_holds_no_speed(tmp_path):
+    """A speed measured with the cuPotential plugin goes to no tracked file (owner, 2026-11-17)."""
+    items = [Item("forces", "PASS", "energy 7e-06", 1.0),
+             Item("benchmark", "PASS", "24062 atoms", 9.0, "1410 ns/day plain")]
+    stock, plugin = (gpu_gates.write_record(record(items, backend), tmp_path) for backend in ("openmm", "cupotential"))
+    assert plugin.name == "2026-11-15-012345678-cupotential-gpu-gates.json" and stock.name != plugin.name
+    assert verify_bench_results.verify(tmp_path) == ([], 2)
+    kept = json.loads(stock.read_text())["gates"][2]["metrics"]
+    assert kept["performance"] == "1410 ns/day plain" and kept["seconds"] == 9.0
+    data = json.loads(plugin.read_text())
+    assert [gate["metrics"] for gate in data["gates"]] == [
+        dict(summary="2 passed", n_passed=2), dict(status="PASS", detail="energy 7e-06"),
+        dict(status="PASS", detail="24062 atoms")]
+
+    def rejected(change, message="holds no speed"):
+        edited = json.loads(plugin.read_text())
+        change(edited)
+        plugin.write_text(json.dumps(edited))
+        errors, _ = verify_bench_results.verify(tmp_path)
+        plugin.write_text(json.dumps(data))
+        return any(message in error for error in errors)
+
+    assert rejected(lambda edited: edited["gates"][2]["metrics"].update(performance="as fast as it gets"))
+    assert rejected(lambda edited: edited["gates"][1]["metrics"].update(seconds=1.0))
+    assert rejected(lambda edited: edited["gates"][2]["metrics"].update(detail="24062 atoms, 1410 ns/day"))
+    # ... and a record cannot be passed off as one of the other back end
+    assert rejected(lambda edited: edited.update(backend="openmm"), "backend differs")
 
 
 def test_only_the_image_built_from_the_repository_lock_is_official(tmp_path, monkeypatch):
