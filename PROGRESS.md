@@ -85,7 +85,9 @@ that PR.
   2026-11-17): in the `docker` job `test_toy_binding_free_energy_end_to_end` (20 ns, seed 12)
   gives −5.955 kJ/mol from the samples, 1.0015 from the exact value against its tolerance of
   1.0; both `cpu` jobs pass. The same code and packages give −5.295 on the GPU machine: the
-  trajectory of the fixed seed depends on the CPU. Not fixed in this commit.
+  trajectory of the fixed seed depends on the CPU. Fixed by the FM-D12 amendment of 2026-11-17:
+  the tolerances of that test are 2.0 (samples) and 3.0 (bias), from its scatter over 48 seeds
+  (−0.28 ± 0.52 and +0.10 ± 0.72 kJ/mol). CI on that commit: not read yet.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
@@ -108,12 +110,18 @@ that PR.
   `main` (second wave, 47e84f7, 2026-11-16):
   88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8 replicas under MPS;
   the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5.
-- Blockers: CI of PR #3 is red (the toy test above). NVIDIA MPS works on this host (driver 595.99.02, below the R615 of CUDA 13.4)
+- Blockers: none known; CI of PR #3 was red on the toy test above, and a run on its fix is not
+  read yet. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of CUDA 13.4)
   with the MPS programs of the image (FM-D13, second amendment of 2026-11-17); the host driver
   is not raised (owner, 2026-11-17). With stock OpenMM in the new image, 4 replicas on one GPU
   under MPS: 925 to 934 ns/day each (soluble test system, 24062 atoms).
 
 ## Change Log
+
+### 2026-11-17 — [amendment] FM-D12: the tolerances of the default 20 ns toy test come from its measured scatter (2.0 and 3.0 kJ/mol, before 1.0 and 2.0)
+- What: `tests/test_analysis.py::test_toy_binding_free_energy_end_to_end` (20 ns, seed 12, Reference) now allows 2.0 kJ/mol from the samples and 3.0 from the bias, the pair of the gate's toy item; before: 1.0 and 2.0. The criteria of the gate (10 ns: 2.0 / 3.0) and of the `slow` test (4 × 40 ns: each 1.5, mean 0.75) are unchanged, and so is the contract table. Measured on the GPU machine, seeds 1 to 48, error against the exact value: from the samples −0.28 ± 0.52 kJ/mol (−1.32 to +1.06; beyond 1.0: 6 of 48, beyond 1.5: none), from the bias +0.10 ± 0.72 (−1.49 to +1.34; beyond 1.0: 9, beyond 1.5: none); 51 to 70 rebinding events, no run reported as no binding, no diagnostic. Verified: `ruff`, `pytest` (default selection) in the image. Not verified here: CI on this commit; the scatter of the estimate from the samples at the 10 ns of the gate is still not measured.
+- Why: the test failed in the `docker` job of CI on cc789b3 and 565b359 with −5.955 kJ/mol from the samples (1.0015 from the exact value), while the same code in the image of the same lock gives −5.295 on the GPU machine: the trajectory of a fixed seed depends on the CPU, so the former tolerance of 1.0 (1.4 standard deviations on the nearer side) made the verdict a draw that 6 of 48 runs of a correct implementation miss. The test policy asks for tolerances from measured scatter and a verdict that depends only on the code. The new pair is 3.3 and 4.0 standard deviations on the nearer side.
+- Refs: FM-D12, amendment of 2026-11-17 (`docs/design/engine.md`); `tests/test_analysis.py`, `README.md`; CI runs 44029977738, 44033031759.
 
 ### 2026-11-17 — [progress] GPU gates and the slow tests pass in the image with the MPS programs, on stock OpenMM (565b359); CI is red on a toy test
 - What: `scripts/gpu_gates.py` on clean 565b359 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded, back end `openmm`, ended 06:46 UTC): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 1.2e-06 nm, wall energy 1.4e-10 kJ/mol; `toy_free_energy` −4.76 (samples) and −4.34 (bias) against −4.95 kJ/mol, the values of abd4548. The membrane test system has 37422 atoms. Speed of stock OpenMM (a diagnostic): 1481 ns/day plain, 1406 with the bias, membrane 932 (abd4548: 1413, 1410, 967). `pytest -m slow` in the same image: 7 passed. This closes "Not run in the new image" of the entry below. CI is red on cc789b3 and 565b359 (`docker` job; both `cpu` jobs pass): `test_toy_binding_free_energy_end_to_end` (20 ns, seed 12) gives −5.955 kJ/mol from the samples, 1.0015 from the exact value against a tolerance of 1.0; the same code and packages give −5.295 on the GPU machine, so the trajectory of the fixed seed depends on the CPU. Not fixed in this commit.

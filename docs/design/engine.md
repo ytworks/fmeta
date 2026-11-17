@@ -25,7 +25,10 @@ of the input stand in the chain before a missing backbone atom is rebuilt); FM-D
 CUDA 13.4 and the CUDA compatibility libraries; and again the same day: the image holds the MPS
 programs of the driver of those libraries, so NVIDIA MPS works on a host driver below R615);
 FM-D18 added (2026-11-17, owner request: the cuPotential plugin as the back end of a run, an
-option until its configuration and its accuracy are measured).
+option until its configuration and its accuracy are measured); FM-D12 amended (2026-11-17: the
+tolerances of the default 20 ns toy test come from its measured scatter over 48 seeds, after a
+CI failure by 0.0015 kJ/mol on another CPU; the criteria of the gate and of the `slow` test are
+unchanged).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -400,6 +403,29 @@ numerics (toy system, numpy references, Reference platform, the order of the sch
 decisions). Not decided by this amendment, and unchanged until the owner decides: the sentence
 of the test policy that the default `pytest` passes on a CPU-only machine, and the `cpu` job
 of CI.
+Amendment (2026-11-17): the tolerances of the default 20 ns toy test are taken from its
+measured scatter. The criteria of the gate (10 ns) and of the `slow` test (4 × 40 ns) are
+unchanged. `tests/test_analysis.py::test_toy_binding_free_energy_end_to_end` (20 ns, seed 12,
+Reference platform) failed in the `docker` job of CI on cc789b3 and on 565b359: −5.955 kJ/mol
+from the samples against the exact −4.954, an error of 1.0015 against the tolerance of 1.0. The
+same code in the image of the same lock gives −5.295 on the GPU machine. The trajectory of a
+fixed seed depends on the CPU, so the verdict of the test on another machine is a new draw. The
+run was repeated with seeds 1 to 48 on the GPU machine (Reference, the present estimators; a
+diagnostic in the image). Error against the exact value, kJ/mol:
+
+| 20 ns, 48 seeds | Mean ± standard deviation | Smallest and largest | Beyond 1.0 | Beyond 1.5 |
+|---|---|---|---|---|
+| from the samples (`dG_reweighted`) | −0.28 ± 0.52 | −1.32, +1.06 | 6 of 48 | none |
+| from the bias (`dG_plateau`) | +0.10 ± 0.72 | −1.49, +1.34 | 9 of 48 | none |
+
+Every run had 51 to 70 rebinding events, none was reported as no binding and none had a
+diagnostic. The former tolerances were 1.0 from the samples and 2.0 from the bias: 6 of the 48
+runs of a correct implementation miss the first. The test now has the pair of the gate's toy
+item, 2.0 kJ/mol from the samples and 3.0 from the bias: 3.3 and 4.0 standard deviations from
+the measured mean on the nearer side (a miss in about 1 draw of 2000, for errors that are
+normally distributed). The tight check of the estimate stays the mean over replicas of the
+`slow` test. Not measured: the scatter of the present estimate from the samples at the 10 ns
+of the gate (the table of the first amendment is of the former reweighting).
 Why: the development machine has no GPU; correctness has to be established where it can be
 (exact answers on CPU) and the rest gated on the machine that runs production.
 
