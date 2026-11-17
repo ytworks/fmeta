@@ -2,7 +2,8 @@
 the conversion of a System, and a run that keeps the back end it began with.
 
 NVIDIA's plugin is not needed here: a stand-in with its three entry points takes its place. What
-the plugin itself computes is checked on a GPU (``fmeta check``, item ``backend``)."""
+the plugin itself computes is checked on a GPU (``fmeta check``, item ``backend``). The one test
+that asks the plugin itself (``gpu``) holds the rule of the constraints to its integrator."""
 
 import sys
 import types
@@ -14,8 +15,19 @@ import yaml
 
 from fmeta.config import Config, RunConfig
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings, backend
-from fmeta.engine.backend import CONFIGURATION, Backend, build, integrator_only, resolve, settle, unmet
+from fmeta.engine.backend import (
+    CONFIGURATION,
+    Backend,
+    build,
+    integrator_only,
+    resolve,
+    settle,
+    unavailable,
+    unmet,
+    unsolved_constraints,
+)
 from fmeta.engine.hills import read_hills
+from fmeta.engine.platform import available_platforms
 from fmeta.testing.toy import make_simulation, make_toy
 from fmeta.workflow import run_stage
 
@@ -183,6 +195,83 @@ def test_the_box_of_the_run_decides_and_not_the_box_the_system_was_built_with(st
     assert "narrower" in unmet("CUDA", "mixed", system, box=cube(2.9) * unit.nanometer)
     system.setDefaultPeriodicBoxVectors(*cube(2.9))
     assert unmet("CUDA", "mixed", system, box=cube(4.0) * unit.nanometer) is None
+
+
+# ---- the constraints the integrator of the plugin solves ----------------------
+
+H, C, O = 1.008, 12.011, 15.999
+ETHANE = (C, C, H, H, H, H, H, H)
+ETHANE_HYDROGENS = tuple((carbon, hydrogen, 0.109) for carbon, hydrogens in ((0, (2, 3, 4)), (1, (5, 6, 7)))
+                         for hydrogen in hydrogens)
+CHAIN = ((0, 1, 0.15), (1, 2, 0.15), (2, 3, 0.15))
+# The masses of the particles, the constraints (particle, particle, length in nm), and how many of
+# the constraints the integrator of the plugin does not solve: the number it names when it refuses
+# the system (the test on the GPU below holds this table to the plugin).
+CONSTRAINTS = {
+    "one bond": ((C, H), ((0, 1, 0.109),), 0),
+    "three hydrogens": ((C, H, H, H), tuple((0, i, 0.109) for i in (1, 2, 3)), 0),
+    "four hydrogens": ((C, H, H, H, H), tuple((0, i, 0.109) for i in (1, 2, 3, 4)), 4),
+    "partners of two lengths": ((C, H, H), ((0, 1, 0.109), (0, 2, 0.110)), 2),
+    "partners of two masses": ((C, H, 2.014), ((0, 1, 0.109), (0, 2, 0.109)), 2),
+    "water": ((O, H, H), ((0, 1, 0.09572), (0, 2, 0.09572), (1, 2, 0.15139)), 0),
+    "water of two hydrogen masses": ((O, H, 2.014), ((0, 1, 0.09572), (0, 2, 0.09572), (1, 2, 0.15139)), 0),
+    "triangle of three lengths": ((O, H, H), ((0, 1, 0.09572), (0, 2, 0.1), (1, 2, 0.15139)), 3),
+    "chain of four": ((C, C, C, C), CHAIN, 3),
+    "massless chain of four": ((0.0, 0.0, 0.0, 0.0), CHAIN, 0),
+    "ethane, bonds to hydrogen": (ETHANE, ETHANE_HYDROGENS, 0),
+    "ethane, all bonds": (ETHANE, ETHANE_HYDROGENS + ((0, 1, 0.153),), 7),
+    "bonds to hydrogen beside a chain of four": (
+        (C, C, C, C, C, H, H), CHAIN + ((4, 5, 0.109), (4, 6, 0.109)), 3),
+}
+
+
+def constrained(name):
+    """The case ``name`` of the table as a system with a PME force."""
+    masses, constraints, _ = CONSTRAINTS[name]
+    system = mm.System()
+    for mass in masses:
+        system.addParticle(mass)
+    system.setDefaultPeriodicBoxVectors(*cube(4.0))
+    for constraint in constraints:
+        system.addConstraint(*constraint)
+    add_pme(system)
+    return system
+
+
+def test_constraints_the_plugin_integrator_does_not_solve_keep_a_run_from_it(stand_in):
+    """The integrator of the plugin refuses such a system when the Context is made. With constraints
+    on all bonds, a run under ``auto`` got the plugin and did not start (review of PR #3)."""
+    system = constrained("ethane, all bonds")
+    fallback = resolve("auto", "CUDA", "mixed", system)
+    assert fallback.name == "openmm" and fallback.reason.startswith("7 of the 7 constraints")
+    with pytest.raises(ValueError, match="7 of the 7 constraints"):
+        resolve("cupotential", "CUDA", "mixed", system)
+    # OpenMM's integrator solves them: a run that began with the force of the plugin alone goes on
+    assert resolve("auto", "CUDA", "mixed", system, parts=("force",)) == Backend("cupotential", ("force",))
+    assert resolve("auto", "CUDA", "mixed", constrained("ethane, bonds to hydrogen")).name == "cupotential"
+
+
+@pytest.mark.parametrize("name", CONSTRAINTS)
+def test_the_constraints_outside_the_groups_the_plugin_integrator_solves_are_counted(name):
+    assert unsolved_constraints(constrained(name)) == CONSTRAINTS[name][2]
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("name", CONSTRAINTS)
+def test_the_plugin_integrator_refuses_exactly_the_constraints_that_are_counted(name):
+    """The table above is the rule of the plugin itself: its integrator takes a system where the
+    number is zero, and names the number where it refuses."""
+    missing = unavailable("CUDA", "mixed") if "CUDA" in available_platforms() else "no CUDA platform"
+    if missing:
+        pytest.skip(missing)
+    system, unsolved = constrained(name), CONSTRAINTS[name][2]
+    integrator = build(Backend("cupotential", ("force", "integrator")), system, 300.0, 1.0, 0.002, seed=1)
+    platform = mm.Platform.getPlatformByName("CUDA")
+    if unsolved == 0:
+        mm.Context(system, integrator, platform, dict(Precision="mixed"))
+    else:
+        with pytest.raises(mm.OpenMMException, match=f"does not support {unsolved} constraint"):
+            mm.Context(system, integrator, platform, dict(Precision="mixed"))
 
 
 # ---- the conversion of a system ----------------------------------------------

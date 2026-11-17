@@ -32,7 +32,9 @@ unchanged); FM-D13 amended a third time (2026-11-17: the MPS daemon runs with pr
 the daemon of the default protocol stopped answering at about 50 client starts); FM-D18 in
 force as the default (2026-11-17: `run.backend` is `auto`; a benchmark set names the back end
 of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended to follow, and
-the GPU gates of the final code passed with both back ends (1c09775, one record each).
+the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
+review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
+of `auto`).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1137,10 +1139,11 @@ Status: **Accepted** (2026-11-17, owner request). In force as the default: `run.
 `docs/plans/2026-11-17-cupotential-backend.md`, 2026-11-17; until then an option, with `openmm`
 as the default). The parts the plugin provides for each kind of system are chosen from
 measurements (M2), and `fmeta check` has the items of the back end with their criteria (M3).
-The GPU gates of the final code (1c09775, 2026-11-17) passed with both back ends, all 20 each
+The GPU gates of 1c09775 (2026-11-17) passed with both back ends, all 20 each
 (the GPU tests and the 19 items): `bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`
 (the default, which gave cuPotential) and `bench/results/2026-11-17-1c0977590-gpu-gates.json`
-(`--backend openmm`).
+(`--backend openmm`). The amendments from the review of PR #3 (2026-11-17, at the end of this
+decision) change the code after that commit: the gates of the code with them are not run yet.
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
@@ -1154,7 +1157,8 @@ place that makes the Context of a run goes through this module: `fmeta run`, and
 Conditions, checked by name before a run (`unmet`): the CUDA platform; single or mixed
 precision; the plugin is installed and its libraries load; exactly one `NonbondedForce`, with
 PME, an Ewald error tolerance of 5e-4 and no mesh set by hand; a box of at least 3 cutoffs
-along x, y and z. With `cupotential` an unmet condition is an error before a file is touched.
+along x, y and z; constraints that its integrator solves (the amendment of 2026-11-17 below).
+With `cupotential` an unmet condition is an error before a file is touched.
 With `auto` the run is made with OpenMM, and the condition is written to the log, to `run.yaml`
 and to `device.json` (`backend_reason`). An error of the plugin that has no name here stops the
 run: it is never turned into a run with OpenMM.
@@ -1291,6 +1295,29 @@ of a calculation, and the restraints and stages there would need their own verif
 changing the back end of a run that has begun (its bias would be a sum of hills from two sets
 of forces); a silent run with OpenMM where cuPotential was asked for (a calculation slower than
 planned without a word, and a default that could pass every gate without using the plugin).
+Amendment (2026-11-17, review of PR #3): the constraints of the System are a condition where
+the plugin provides the integrator. Its `LangevinMiddleIntegrator` solves two kinds of groups
+of constraints, where no atom of a group has a constraint to an atom outside: three atoms
+constrained in pairs with at most two different lengths (rigid three-site water), and one atom
+with one to three partners of one length and one mass (the bonds to hydrogen, but for an atom
+with four hydrogens); a constraint between two massless particles is left alone. Every other
+constraint it refuses when the Context is made, with their number ("does not support N
+constraint(s) that require CCMA"). `unmet` counts them (`unsolved_constraints`) and names the
+count as the condition: under `auto` such a system runs with OpenMM, with the reason on record;
+`cupotential` by name is an error before a file is touched; a run that began with the plugin's
+force alone goes on, since OpenMM's integrator solves them.
+- Before: a System with constraints on all bonds got the plugin under `auto`, and the run ended
+  with the plugin's error when its Context was made. No number came of it (an error of the
+  plugin stops the run), but the default did not run a system that OpenMM runs.
+- What fmeta builds (`system/builder.py`: constraints on the bonds to hydrogen, rigid water) is
+  inside the rule, but for a heavy atom with four hydrogens (methane, an ammonium ion): such a
+  system now runs with OpenMM under `auto`. A System made elsewhere enters through
+  `prepare_from_system` with the constraints it was made with.
+- The rule is read from the source of the plugin (0.3.5, `ConstraintClusters.hpp`) and held to
+  its integrator by a test on the GPU (`tests/test_backend.py`, `gpu`): for 13 small systems the
+  integrator takes the System where the count is zero and names the count where it refuses.
+  On the A2A example (221152 atoms, 193402 constraints) the count is zero and takes 1.2 s, once
+  per run process.
 Why: owner request of 2026-11-17, to make fmeta faster with cuPotential and to make it the
 default. The plugin is early-access software under NVIDIA's licence, which may end: `openmm`
 stays a complete path with its own gate record, and `auto` gives OpenMM, with the reason, when

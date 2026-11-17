@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import openmm as mm
 import openmm.unit as unit
 import yaml
@@ -33,6 +34,7 @@ CONFIGURATION = {"soluble": ("force", "integrator", "barostat"), "membrane": ("f
 EWALD_TOLERANCE = 5e-4      # the only tolerance the plugin sizes its mesh for
 BOX_CUTOFFS = 3.0           # the plugin needs a box of at least this many cutoffs
 COM_INTERVAL = 100          # steps between removals of centre-of-mass motion by the plugin's integrator
+SAME_VALUE = 1e-8           # relative: within it, the plugin's integrator takes two lengths or masses as one
 
 
 @dataclass(frozen=True)
@@ -84,11 +86,68 @@ def unavailable(platform: str, precision: str) -> Optional[str]:
     return None
 
 
-def unmet(platform: str, precision: str, system: mm.System, box=None) -> Optional[str]:
+def unsolved_constraints(system: mm.System) -> int:
+    """How many constraints of ``system`` the integrator of the plugin does not solve. It refuses
+    such a system when the Context is made, and names this number.
+
+    It solves two kinds of groups, where no atom of a group has a constraint to an atom outside:
+    three atoms constrained in pairs with at most two different lengths (rigid water), and one
+    atom with one to three partners of one length and one mass (constraints on the bonds to
+    hydrogen, but for an atom with four hydrogens). A constraint between two massless particles
+    is left alone. The rule is read from the source of the plugin (0.3.5) and held to its
+    integrator by a test on the GPU (``tests/test_backend.py``)."""
+    masses: dict = {}
+
+    def mass(atom: int) -> float:
+        if atom not in masses:
+            masses[atom] = system.getParticleMass(atom).value_in_unit(unit.dalton)
+        return masses[atom]
+
+    def one_value(values) -> bool:
+        return all(abs(value - values[0]) <= SAME_VALUE * abs(values[0]) for value in values)
+
+    partners: dict = {}
+    for index in range(system.getNumConstraints()):
+        first, second, length = system.getConstraintParameters(index)
+        if mass(first) == 0.0 and mass(second) == 0.0:
+            continue
+        length = length.value_in_unit(unit.nanometer)
+        partners.setdefault(first, []).append((second, length))
+        partners.setdefault(second, []).append((first, length))
+
+    unsolved, seen = 0, set()
+    for start in partners:
+        if start in seen:
+            continue
+        seen.add(start)
+        group, waiting = [], [start]
+        while waiting:
+            atom = waiting.pop()
+            group.append(atom)
+            for other, _ in partners[atom]:
+                if other not in seen:
+                    seen.add(other)
+                    waiting.append(other)
+        degrees = [len(partners[atom]) for atom in group]
+        constraints = sum(degrees) // 2
+        if degrees == [2, 2, 2]:
+            solved = len({np.float32(length) for atom in group for _, length in partners[atom]}) < 3
+        else:
+            outer = partners[max(group, key=lambda atom: len(partners[atom]))]
+            solved = (constraints == len(outer) <= 3 and one_value([length for _, length in outer])
+                      and one_value([mass(atom) for atom, _ in outer]))
+        if not solved:
+            unsolved += constraints
+    return unsolved
+
+
+def unmet(platform: str, precision: str, system: mm.System, box=None, parts: Optional[tuple] = None) -> Optional[str]:
     """The first condition of the plugin that a run does not meet, as text (None: all hold).
 
-    ``box`` holds the periodic box vectors the run starts from (default: those of ``system``).
-    These are the settings the plugin refuses by name; the box rule is from its documentation."""
+    ``box`` holds the periodic box vectors the run starts from (default: those of ``system``);
+    ``parts`` holds what the plugin is to provide (default: what a new run of such a system
+    gets). These are the settings the plugin refuses by name; the box rule is from its
+    documentation, and the rule of the constraints, which is for its integrator, from its source."""
     reason = unavailable(platform, precision)
     if reason is not None:
         return reason
@@ -110,6 +169,12 @@ def unmet(platform: str, precision: str, system: mm.System, box=None) -> Optiona
     if min(widths) < BOX_CUTOFFS * cutoff:
         return (f"the box ({' x '.join(f'{w:.2f}' for w in widths)} nm along x, y, z) is narrower than "
                 f"{BOX_CUTOFFS:g} cutoffs of {cutoff:g} nm")
+    if "integrator" in (parts or CONFIGURATION[_kind(system)]):
+        unsolved = unsolved_constraints(system)
+        if unsolved:
+            return (f"{unsolved} of the {system.getNumConstraints()} constraints are outside what the integrator "
+                    "of cuPotential solves (rigid three-site water, and one atom with up to three partners of "
+                    "one length and one mass, as the bonds to hydrogen)")
     return None
 
 
@@ -126,9 +191,10 @@ def resolve(requested: str, platform: str, precision: str, system: mm.System, bo
         raise ValueError(f"run.backend must be one of {BACKENDS}, not {requested!r}")
     if requested == "openmm":
         return Backend("openmm")
-    reason = unmet(platform, precision, system, box)
+    chosen = tuple(parts) if parts else CONFIGURATION[_kind(system)]
+    reason = unmet(platform, precision, system, box, chosen)
     if reason is None:
-        return Backend("cupotential", tuple(parts) if parts else CONFIGURATION[_kind(system)])
+        return Backend("cupotential", chosen)
     if requested == "cupotential":
         raise ValueError(f"the cupotential back end cannot run this: {reason}. "
                          "Use run.backend: openmm (or auto, for a new run).")
