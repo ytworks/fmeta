@@ -39,7 +39,17 @@ record stores the UUIDs, which identify the physical GPUs.
    `conda-linux-64.lock`, `Dockerfile` or `.dockerignore` differ from it. Run the gates in the
    main checkout, not in a `git worktree`: the script reads the commit with git in the
    container, where the git directory of a worktree is not mounted, and stops at once.
-2. `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`:
+2. Run the gates once per back end (FM-D18), one after the other: both runs write `gates_work/`
+   and the index.
+
+   ```bash
+   scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1
+   scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1 --backend openmm
+   ```
+
+   Without `--backend` the test runs use the back end of a new configuration (`run.backend:
+   auto`), which is NVIDIA's cuPotential plugin in the official image; `--backend openmm` uses
+   OpenMM's own forces and integrator. Each run is:
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
      `forces`, `toy_restart`, `toy_free_energy`, `pdb_sdf_openff`, `pdb_sdf_gaff`, `prepare`,
@@ -51,10 +61,15 @@ record stores the UUIDs, which identify the physical GPUs.
    skipped when `nvidia-smi` reports no memory in use for the GPU (then the device of a replica
    cannot be confirmed), and off a GPU platform.
    While iterating use `fmeta check --quick` or `scripts/gpu_gates.py --quick` (not recorded).
-3. On ALL PASSED the script writes `bench/results/<date>-<commit>-gpu-gates.json` and updates
-   `bench/results/index.json`. The record names the image, the hash of the lock and the UUIDs of
-   the GPUs. Commit both files (CI validates the index), and update `PROGRESS.md` → Current
-   Status if the gate status changed.
+3. On ALL PASSED a run writes its record and updates `bench/results/index.json`:
+   `bench/results/<date>-<commit>-cupotential-gpu-gates.json` for the cuPotential back end,
+   `bench/results/<date>-<commit>-gpu-gates.json` for OpenMM's. The record names the back end
+   its test runs were made with, the image, the hash of the lock and the UUIDs of the GPUs. A
+   record of the cuPotential back end holds no speed and no duration: the licence of the plugin
+   forbids the disclosure of performance data without NVIDIA's permission (FM-D13), the script
+   leaves them out, and `scripts/verify_bench_results.py` refuses a record that has them. They
+   stay in `gates_work/`, which Git does not track. Commit the two records and the index (CI
+   validates the index), and update `PROGRESS.md` → Current Status if the gate status changed.
 4. On failure: `gates_work/gpu-gates-not-recorded.json` lists every item with its detail, and
    `gates_work/<item>.traceback.txt` holds the traceback. Never relax a criterion to pass; a
    criterion changes only by a design amendment recorded in `docs/design/` and `PROGRESS.md`.
@@ -85,7 +100,8 @@ old lock does not cover the new image.
 ## Diagnostics
 
 Wall time and the `benchmark` item (ns/day with and without the bias over the same stretch of
-the test system, and the cost of a checkpoint) are recorded but never decide a verdict.
+the test system, and the cost of a checkpoint) never decide a verdict. They are recorded for
+OpenMM's back end and left out of a record of the cuPotential back end (step 3).
 `scripts/in_docker.sh --gpus 6 fmeta doctor` prints the platforms, the optional packages and
 the cost of a bias table update without running anything long.
 
@@ -119,8 +135,15 @@ the scheduler terminates its child processes before it returns, and `runs/tb/sch
 records what ran where. Running the same `fmeta run` command again continues from the last
 checkpoints. Look at
 `runs/tb/prepared/funnel.pdb` with the structure before spending GPU time. Record the outcome
-(`summary.json`, the commit, the image, the value with its interval and the diagnostics) in the
-example's README and in `PROGRESS.md`.
+(`summary.json`, the commit, the image, the back end, the value with its interval and the
+diagnostics) in the example's README and in `PROGRESS.md`.
+
+The production run uses the cuPotential plugin by default (`run.backend: auto`). `fmeta status`
+names the back end of every replica; `run.yaml` and `device.json` of a replica also hold the
+parts the plugin provided (`backend_parts`), or the reason why OpenMM's own was used
+(`backend_reason`). `--backend openmm` (or `run: {backend: openmm}`) asks for OpenMM's. A run
+keeps the back end it was started with. A speed measured with the plugin goes to no tracked
+file, commit message or GitHub text (`.claude/rules/docker-execution.md`).
 
 ### Several replicas on one GPU (NVIDIA MPS)
 

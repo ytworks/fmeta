@@ -34,6 +34,9 @@ Owner rule (2026-11-15): everything except CI is executed and tested in Docker. 
 - The image holds NVIDIA's software under NVIDIA's licences (`/opt/fmeta/licenses`). A speed
   measured with the cuPotential plugin goes to no tracked file, commit message or GitHub text
   until NVIDIA permits it (owner, 2026-11-17).
+- Runs use the plugin by default (`run.backend: auto`, FM-D18); `--backend openmm` asks for
+  OpenMM's own forces and integrator. The GPU gates are taken once per back end, and the record
+  of cuPotential holds no speed and no duration.
 - The CUDA runtime of the image (13.4) needs a host driver of R615 or newer; on an older one
   the compatibility libraries of the image are used, and with them the MPS programs of the
   image: an MPS daemon and the CUDA driver library of its clients must be of one driver version.
@@ -44,6 +47,7 @@ Owner rule (2026-11-15): everything except CI is executed and tested in Docker. 
 ```bash
 scripts/in_docker.sh pytest                                  # builds the image on first use
 scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1
+scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1 --backend openmm
 scripts/in_docker.sh --gpus 0,1,2,3 --detach --name run1 fmeta run runs/run1 --gpus 0,1,2,3
 ```
 

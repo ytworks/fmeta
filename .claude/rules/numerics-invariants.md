@@ -89,9 +89,11 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
 ## Change gate
 
 - A change under `src/fmeta/` to forces, bias, runner, system building or platform handling is
-  verified on a GPU machine before merge: `python scripts/gpu_gates.py` on a clean commit.
-  Commit the result file and the index entry (`bench/results/`) and note a status change in
-  `PROGRESS.md`. CI cannot run these; say so in the PR if it has not been done yet.
+  verified on a GPU machine before merge: `python scripts/gpu_gates.py` on a clean commit, once
+  per back end (as it is, which is cuPotential in the image, and with `--backend openmm`;
+  FM-D18). Commit the two result files and their index entries (`bench/results/`) and note a
+  status change in `PROGRESS.md`. CI cannot run these; say so in the PR if it has not been done
+  yet.
 - A new CV, restraint or estimator gets a case on the toy system, where the exact answer is
   known, before it is used on a real system.
 
