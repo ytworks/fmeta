@@ -153,6 +153,9 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
    applies if none qualifies up to 40 ns. 40 ns is the owner's limit of 2026-11-16 for any run;
    a longer one needs their word. The runs go on in steps of 10 ns (TYK2, then A2A) and stop
    at the first length that qualifies.
+6. Amended 2026-11-17 on the owner's second word, with no round 2 reading made in between: the
+   limit of point 5 is 100 ns. The lengths of point 2 go on in steps of 5 ns to 100 ns, and
+   point 3 applies if none qualifies up to 100 ns. Nothing else of the rule changes.
 
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
