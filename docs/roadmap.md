@@ -99,11 +99,12 @@ Verified on CPU only (see `PROGRESS.md`).
   `fmeta check` has 19 items; `backend` and `membrane_backend` measure the accuracy of both
   back ends on the two test systems. The gates of the final code (1c09775) passed with each
   back end: `bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json` and
-  `bench/results/2026-11-17-1c0977590-gpu-gates.json`. The TYK2 example ran by the steps of its
-  README with the default (5 replicas of 1 ns; every `device.json` names cuPotential). Speeds
-  measured with the plugin are in no tracked file until NVIDIA permits it (owner, 2026-11-17);
-  the parts were chosen from them by the rule of FM-D18. Plan:
-  `docs/plans/2026-11-17-cupotential-backend.md`.
+  `bench/results/2026-11-17-1c0977590-gpu-gates.json`. The TYK2 example and the A2A example
+  ran by the steps of their READMEs with the default (5 replicas of 1 ns each; every
+  `device.json` names cuPotential, and every replica ended with return code 0). Not done: a
+  run of full length with the plugin. Speeds measured with the plugin are in no tracked file
+  until NVIDIA permits it (owner, 2026-11-17); the parts were chosen from them by the rule of
+  FM-D18. Plan: `docs/plans/2026-11-17-cupotential-backend.md`.
 
 ## Next
 
