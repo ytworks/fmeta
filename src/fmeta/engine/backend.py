@@ -238,9 +238,12 @@ def settle(requested: str, directory, workdir) -> tuple:
     ``directory`` continues (None: a new run, or one made with OpenMM). Reads only.
 
     A run that continues keeps its back end: ``auto`` follows its ``run.yaml``, and another back
-    end by name is refused (``RuntimeError``) before a device or a file is touched. A new run
-    under ``auto`` follows the other runs of ``workdir``, so that the replicas of one calculation
-    are made with one back end; a back end by name is taken as asked."""
+    end by name is refused (``RuntimeError``) before a device or a file is touched. A new walker
+    is made with the back end of the walkers of its replica that hold hills, since it adds their
+    hills to its bias and they add its hills to theirs: ``auto`` follows them, and another back
+    end by name is refused in the same way. Any other new run under ``auto`` follows the other
+    runs of ``workdir``, so that the replicas of one calculation are made with one back end; a
+    back end by name is taken as asked."""
     directory, workdir = Path(directory), Path(workdir)
     if (directory / "checkpoint.zip").exists() and (directory / "run.yaml").exists():
         own = _recorded(directory)
@@ -249,8 +252,20 @@ def settle(requested: str, directory, workdir) -> tuple:
                                f"continued with {requested}. Use a new directory, or run.backend: "
                                f"{own['backend']} (or auto).")
         return own["backend"], own["parts"]
+    beside = set()                                      # the back ends of the walkers that share its bias
+    if directory.parent.resolve() != workdir.resolve():
+        beside = {_recorded(path.parent)["backend"] for path in directory.parent.glob("w*/run.yaml")
+                  if path.parent.resolve() != directory.resolve() and (path.parent / "HILLS").exists()}
+    if len(beside) > 1 or (requested != "auto" and beside - {requested}):
+        advice = f"run.backend: {min(beside)} (or auto), or " if len(beside) == 1 else ""
+        raise RuntimeError(f"{directory.parent} holds hills of walkers made with the "
+                           f"{' and the '.join(sorted(beside))} back end. The walkers of a replica share one "
+                           f"bias and are made with one back end: {directory.name} is not run with {requested}. "
+                           f"Use {advice}a new directory.")
     if requested != "auto":
         return requested, None
+    if beside:
+        return beside.pop(), None
     others = {_recorded(path.parent)["backend"] for pattern in ("rep*/run.yaml", "rep*/w*/run.yaml")
               for path in workdir.glob(pattern) if path.parent.resolve() != directory.resolve()}
     return (others.pop() if len(others) == 1 else "auto"), None

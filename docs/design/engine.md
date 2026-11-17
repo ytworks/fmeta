@@ -34,7 +34,7 @@ force as the default (2026-11-17: `run.backend` is `auto`; a benchmark set names
 of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended to follow, and
 the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
 review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
-of `auto`).
+of `auto`; the walkers of a replica are made with one back end).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1318,6 +1318,27 @@ force alone goes on, since OpenMM's integrator solves them.
   integrator takes the System where the count is zero and names the count where it refuses.
   On the A2A example (221152 atoms, 193402 constraints) the count is zero and takes 1.2 s, once
   per run process.
+Amendment (2026-11-17, review of PR #3, second): the walkers of a replica are made with one
+back end. A new walker is settled against the walkers of its replica that hold hills (a
+`run.yaml` and a HILLS file), before the other runs of the work directory: under `auto` it
+follows them, and another back end by name is refused before a device is chosen or a file is
+touched, as for a run that continues (`settle`). A replica whose walkers already differ takes
+no new walker.
+- Before: a back end by name was taken as asked for every new run. `fmeta run WORK --replica 0
+  --walker 2 --backend cupotential`, after `run.walkers` went from 2 to 3 in a replica made
+  with OpenMM, was not refused: the check of the walker conditions (FM-D14) is made by the
+  scheduler, which a call for one walker does not pass. The new walker adds the hills of the
+  others to its bias, and they add its hills to theirs: the bias of the replica would have been
+  a sum of hills from two sets of forces, which this decision rules out for one run. Under
+  `auto` the new walker followed the work directory, and beside replicas of two back ends it got
+  the default instead of the back end of its own replica.
+- Replicas stay as they were: they share nothing, a back end by name is taken as asked, and
+  replicas of more than one back end are a diagnostic of a report (above).
+- The check reads what is on disk when the walker starts. Walkers of a new replica that are
+  started by hand at the same moment under different names are not seen by it; the scheduler
+  gives every walker of a replica the same back end.
+- Not run: a walker added to a replica on the GPU. The test is on the records (`settle`, and
+  `run_stage` up to its refusal), on the code before the fix and after it.
 Why: owner request of 2026-11-17, to make fmeta faster with cuPotential and to make it the
 default. The plugin is early-access software under NVIDIA's licence, which may end: `openmm`
 stays a complete path with its own gate record, and `auto` gives OpenMM, with the reason, when

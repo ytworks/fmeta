@@ -397,6 +397,29 @@ def test_a_new_run_under_auto_follows_the_runs_beside_it(tmp_path):
     assert settle("auto", new, tmp_path) == ("auto", None)             # they disagree: nothing to follow
 
 
+def test_a_new_walker_is_made_with_the_back_end_of_the_walkers_whose_bias_it_shares(tmp_path):
+    """``fmeta run WORK --replica 0 --walker 2`` after ``run.walkers`` went from 2 to 3: the new walker
+    reads the hills of the two others, whatever the other replicas were made with."""
+    replica, new = tmp_path / "rep0", tmp_path / "rep0" / "w2"
+    for walker in ("w0", "w1"):
+        write_run(replica / walker)                             # made with OpenMM
+        (replica / walker / "HILLS").write_text("")
+    write_run(tmp_path / "rep1", Backend("cupotential", ("force",)).record())
+    files = sorted(path for path in tmp_path.rglob("*") if path.is_file())
+    before = [path.read_bytes() for path in files]
+    with pytest.raises(RuntimeError, match="hills of walkers made with the openmm back end"):
+        run_stage(Config(run=RunConfig(backend="cupotential", walkers=3)), tmp_path, replica=0, walker=2)
+    assert before == [path.read_bytes() for path in files]
+    assert settle("openmm", new, tmp_path) == ("openmm", None)
+    assert settle("auto", new, tmp_path) == ("openmm", None)    # its replica, not the work directory
+
+    write_run(replica / "w3", Backend("cupotential", ("force",)).record(), checkpoint=False)
+    assert settle("auto", new, tmp_path) == ("openmm", None)    # no hills: nothing of w3 enters the bias
+    (replica / "w3" / "HILLS").write_text("")
+    with pytest.raises(RuntimeError, match="made with the cupotential and the openmm back end"):
+        settle("auto", new, tmp_path)
+
+
 def test_the_record_of_a_run_names_its_back_end_and_another_one_is_refused_before_any_file_changes(tmp_path):
     """The workflow refuses before it reads the prepared system (there is none here) or takes a device."""
     def toy_run(directory, conditions, hills):
