@@ -238,6 +238,20 @@ on the first N ns of the files; at the length of the run they are the output of
   and the passages back (three replicas of four) do not meet the rule at 25 or at 30 ns. The
   two middle replicas have stayed within 1.6 of their values of 20 ns; the lowest rises
   (−75.4 to −63.9) and the highest rises (−51.6 to −43.3).
+- A2A to 30 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 22.5 | −23.71 | −43.95 to −3.48 | 20.23 | 3.29 | −32.3, −19.4, −35.4, −7.7 | 4/1, 4/0, 3/0, 7/2 |
+  | 25 | −22.76 | −43.07 to −2.44 | 20.32 | 4.24 | −30.9, −19.7, −34.4, −6.1 | 4/1, 5/0, 3/0, 7/2 |
+  | 27.5 | −22.45 | −41.62 to −3.28 | 19.17 | 4.55 | −29.6, −20.5, −33.4, −6.3 | 4/1, 5/0, 5/0, 7/2 |
+  | 30 | −21.95 | −39.03 to −4.87 | 17.08 | 5.05 | −28.4, −20.7, −31.3, −7.3 | 4/1, 6/0, 5/0, 7/2 |
+
+  The rule is not met at 25 or at 30 ns: half-width 17.08 at 30 ns, two replicas of four
+  with a passage back. The mean is 5.05 above the experimental range at 30 ns (within the
+  8.4 of point 1) and rises by 0.3 to 0.5 per 2.5 ns after 25 ns, a third of the rate before.
+  The half-width goes down after 25 ns: the highest replica has stopped rising (−6.1 at 25 ns,
+  −7.3 at 30 ns) and the two lowest go on rising. Both systems go on to 40 ns.
 - The count of passages at a length is not the count at a shorter length plus the new ones.
   The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
   and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
