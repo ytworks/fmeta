@@ -164,7 +164,7 @@ run:
 - レプリカは子プロセスとして起動します。`Ctrl-C` や `docker stop` で止めると、子プロセスも一緒に終わります。同じコマンドをもう一度実行すると、最後のチェックポイントから続きます。
 - どのレプリカがどの GPU でいつ走ったかは `schedule.jsonl` に、各レプリカが実際に使った GPU は `device.json` に残ります。`fmeta status run1` で進み具合を確認できます。
 - Docker では、コンテナに渡した GPU が「見えている GPU」です。`scripts/in_docker.sh --gpus 0,1,2,3 … fmeta run run1 --mode parallel` は、ホストの GPU 0〜3 だけを使います。
-- 1 枚の GPU に複数のレプリカを同時に載せるには、`run.per_gpu`（または `--per-gpu`）と NVIDIA MPS を使います。`scripts/mps.sh start` でデーモンを起動し、`scripts/in_docker.sh --mps --gpus 0,1 … fmeta run run1 --gpus 0,1 --per-gpu 4` のように実行します。88k 原子の系では、1 枚に 4 本で合計の速度が 2.1 倍、6 本で 2.5 倍でした。MPS なしでは速くなりません。
+- 1 枚の GPU に複数のレプリカを同時に載せるには、`run.per_gpu`（または `--per-gpu`）と NVIDIA MPS を使います。`scripts/mps.sh start` でデーモンを起動し、`scripts/in_docker.sh --mps --gpus 0,1 … fmeta run run1 --gpus 0,1 --per-gpu 4` のように実行します。88k 原子の系では、1 枚に 4 本で合計の速度が 2.1 倍、6 本で 2.5 倍でした。MPS なしでは速くなりません。デーモンは必ず `scripts/mps.sh` で起動してください。このスクリプトは MPS のプロトコル 3 でデーモンを起動します。ドライバ R615 のデーモンを既定のプロトコルで起動すると、クライアントを約 50 個起動したところでデーモンとクライアントが止まったままになります（FM-D13）。デーモンのログは `docker logs fmeta-mps` で読めます。
 
 ### Python から
 

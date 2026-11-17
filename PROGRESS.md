@@ -34,8 +34,8 @@ FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended sin
 machine can run has run, three review rounds fixed). In progress on branch
 `claude/cupotential-backend` (draft PR #3): NVIDIA cuPotential as the default back end (owner
 request 2026-11-17; plan `docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4). M0 and M1
-are done, NVIDIA MPS included; M2 is being measured; the owner: everything is developed in
-that PR.
+are done, NVIDIA MPS included; M2 is measured and its choice of parts is not yet in the code;
+the accuracy for M3 is being measured; the owner: everything is developed in that PR.
 
 | Milestone | Status |
 |---|---|
@@ -49,8 +49,8 @@ that PR.
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
 | Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e (the code of c59ec99): 17 passed, 232 entries of the calling user, `fmeta` imported from the image. The same on 4f976cb, the final code with the review fixes: 17 passed, 234 entries of the calling user, `fmeta` imported from the image. The same on 7c731c5 (second review round) and on d4041f9, the final code with the fix of the third review round: 17 passed, 234 entries of the calling user each time; only documents and evidence changed after d4041f9. The CI job `docker` passed on 4f976cb, 5e03c02, 97bcd70 and d30d1e6; the publish workflow has never run |
-| cuPotential plan M0: the image with the plugin (FM-D13, two amendments of 2026-11-17) | On the branch, not on `main`. Image 648480d3… of lock ee32ef34…: OpenMM 8.4.0, CUDA 13.4, `nv-openmm-plugin` 0.3.5, the MPS programs of driver 615.71.10; on this host (driver 595.99.02) a container loads the compatibility `libcuda` 615.71.10 and takes the MPS programs of the image. In it: `ruff check .` passes, `pytest` 193 passed; NVIDIA MPS works: 4 replicas at once on one GPU as clients of the daemon of `scripts/mps.sh`, with each back end (0.5 ns, exit 0); an MPS client has no OpenCL platform. In the image of the former lock 0b6c344f… (the same packages, without the MPS programs): `pytest -m slow` (7 passed), `openmm.testInstallation` (4 platforms); directories of OpenMM 8.6.1 load and run; a Context with the plugin steps on the rhombic dodecahedron and on a membrane box with the funnel forces and the bias; the parameters of the TYK2 ligand are identical to the old image (OpenFF and GAFF); GPU gates with stock OpenMM: all 18 passed on abd4548. In the image of the new lock: `pytest -m slow` 7 passed, and the GPU gates with stock OpenMM: all 18 passed on 565b359 |
-| cuPotential plan M1: the back end as an option (FM-D18) | On the branch. `run.backend` (`openmm` by default, `cupotential`, `auto`), `src/fmeta/engine/backend.py`; a run keeps its back end, recorded in `run.yaml` and `device.json`; one gate record per back end, the one of cuPotential without speeds. With `run.backend: cupotential` (force and integrator of the plugin) the soluble test system (24062 atoms, 2 replicas on 2 GPUs) and the membrane test system (37401 atoms, built in the old image) ran, went on, were stopped by `docker stop` and went on to 1.5 ns (1503 lines in every HILLS); `--backend openmm` on them is refused (exit 1, no file changed). `ruff check .` passes, `pytest` 193 passed (the plugin is not used by the default tests). Not run on this code with the plugin: the GPU gates (they run on the final code, for both back ends). M2: in progress, on the TYK2 and A2A examples built in the new image (88479 and 221068 atoms); M3, M4: not started |
+| cuPotential plan M0: the image with the plugin (FM-D13, three amendments of 2026-11-17) | On the branch, not on `main`. Image 648480d3… of lock ee32ef34…: OpenMM 8.4.0, CUDA 13.4, `nv-openmm-plugin` 0.3.5, the MPS programs of driver 615.71.10; on this host (driver 595.99.02) a container loads the compatibility `libcuda` 615.71.10 and takes the MPS programs of the image. In it: `ruff check .` passes, `pytest` 193 passed; NVIDIA MPS works: 4 replicas at once on one GPU as clients of the daemon of `scripts/mps.sh`, with each back end (0.5 ns, exit 0); an MPS client has no OpenCL platform. The daemon runs with MPS protocol 3 (third amendment: with the default protocol it stopped answering at about 50 client starts): 120 replica processes on one daemon, up to 64 at once, every call of `fmeta run` with exit 0. In the image of the former lock 0b6c344f… (the same packages, without the MPS programs): `pytest -m slow` (7 passed), `openmm.testInstallation` (4 platforms); directories of OpenMM 8.6.1 load and run; a Context with the plugin steps on the rhombic dodecahedron and on a membrane box with the funnel forces and the bias; the parameters of the TYK2 ligand are identical to the old image (OpenFF and GAFF); GPU gates with stock OpenMM: all 18 passed on abd4548. In the image of the new lock: `pytest -m slow` 7 passed, and the GPU gates with stock OpenMM: all 18 passed on 565b359 |
+| cuPotential plan M1: the back end as an option (FM-D18) | On the branch. `run.backend` (`openmm` by default, `cupotential`, `auto`), `src/fmeta/engine/backend.py`; a run keeps its back end, recorded in `run.yaml` and `device.json`; one gate record per back end, the one of cuPotential without speeds. With `run.backend: cupotential` (force and integrator of the plugin) the soluble test system (24062 atoms, 2 replicas on 2 GPUs) and the membrane test system (37401 atoms, built in the old image) ran, went on, were stopped by `docker stop` and went on to 1.5 ns (1503 lines in every HILLS); `--backend openmm` on them is refused (exit 1, no file changed). `ruff check .` passes, `pytest` 193 passed (the plugin is not used by the default tests). Not run on this code with the plugin: the GPU gates (they run on the final code, for both back ends). M2: measured on the TYK2 and A2A examples built in the new image (88479 and 221068 atoms; the speeds of the plugin are in no tracked file), the parts for each kind of system not yet set in the code; M3: the accuracy is being measured, no check item yet; M4: not started |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -87,7 +87,8 @@ that PR.
   1.0; both `cpu` jobs pass. The same code and packages give −5.295 on the GPU machine: the
   trajectory of the fixed seed depends on the CPU. Fixed by the FM-D12 amendment of 2026-11-17:
   the tolerances of that test are 2.0 (samples) and 3.0 (bias), from its scatter over 48 seeds
-  (−0.28 ± 0.52 and +0.10 ± 0.72 kJ/mol). CI on that commit: not read yet.
+  (−0.28 ± 0.52 and +0.10 ± 0.72 kJ/mol). **Green on that commit, 150b1c2** (run 44036243018,
+  all three jobs).
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
@@ -105,18 +106,25 @@ that PR.
   with the estimate from the samples its error is 0.19 kJ/mol for the gate's seed in the
   present image (1.00 in the image of `main`), and the scatter of that estimate over seeds at
   10 ns is not measured.
-- GPUs (owner, 2026-11-16: all 8 are for this task): the measurement of M2 of the cuPotential
-  plan runs on them (short runs, the MPS daemon is up). Speed of stock OpenMM in the image of
-  `main` (second wave, 47e84f7, 2026-11-16):
+- GPUs (owner, 2026-11-16: all 8 are for this task): the measurements of M3 of the cuPotential
+  plan run on them (short runs; the MPS daemon is stopped). Speed of stock OpenMM in the image
+  of `main` (second wave, 47e84f7, 2026-11-16):
   88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8 replicas under MPS;
-  the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5.
-- Blockers: none known; CI of PR #3 was red on the toy test above, and a run on its fix is not
-  read yet. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of CUDA 13.4)
-  with the MPS programs of the image (FM-D13, second amendment of 2026-11-17); the host driver
-  is not raised (owner, 2026-11-17). With stock OpenMM in the new image, 4 replicas on one GPU
-  under MPS: 925 to 934 ns/day each (soluble test system, 24062 atoms).
+  the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5. Stock OpenMM in the
+  new image (M2, short runs with the bias): the TYK2 example 628 alone, 1425 / 1569 / 1609 with
+  4 / 6 / 8 (8 again, 4 runs: 1585 to 1609); the A2A example 302 alone, 526 / 528 / 524.
+- Blockers: none known. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
+  CUDA 13.4) with the MPS programs of the image (FM-D13, second amendment of 2026-11-17) and a
+  daemon started by `scripts/mps.sh` (protocol 3, third amendment); the host driver is not
+  raised (owner, 2026-11-17). With stock OpenMM in the new image, 4 replicas on one GPU under
+  MPS: 925 to 934 ns/day each (soluble test system, 24062 atoms).
 
 ## Change Log
+
+### 2026-11-17 — [amendment] FM-D13: the MPS daemon runs with protocol 3; with the default protocol it stopped answering at about 50 client starts
+- What: `scripts/mps.sh start` starts `nvidia-cuda-mps-control -f --protocol 3`; the image, the lock and the clients are unchanged, and the log of the daemon is `docker logs fmeta-mps`. With the default protocol (2) the control program of driver 615.71.10 stops reading the pipe of its log at the first record of a client; the pipe is full (64 KiB) after about 50 client starts, and the daemon and every client that starts after that wait for ever: the measurements of M2 stopped that way, with the GPUs idle. Verified on this host with one daemon on all 8 GPUs: 20 calls of `fmeta run` with 4, 6 or 8 replicas on one GPU (88479 and 221068 atoms, both back ends), up to 64 replicas at once, 120 replica processes and 480 client contexts: every call with exit 0, every replica at its end, the pipe at 0 of 65536 bytes afterwards, the control program at 2 threads. CI is green on 150b1c2, the commit of the FM-D12 amendment below (run 44036243018, all three jobs). Not verified: a host with a driver of R615 or newer and its own MPS programs. No test covers MPS: CI has no GPU.
+- Why: a run with `run.per_gpu` above 1 starts one client per replica and a benchmark set hundreds on one daemon; a daemon that stops at about 50 takes every run of the machine with it.
+- Refs: FM-D13, third amendment of 2026-11-17 (`docs/design/engine.md`); `scripts/mps.sh`, `docs/gpu-runbook.md`, `README.md`.
 
 ### 2026-11-17 — [amendment] FM-D12: the tolerances of the default 20 ns toy test come from its measured scatter (2.0 and 3.0 kJ/mol, before 1.0 and 2.0)
 - What: `tests/test_analysis.py::test_toy_binding_free_energy_end_to_end` (20 ns, seed 12, Reference) now allows 2.0 kJ/mol from the samples and 3.0 from the bias, the pair of the gate's toy item; before: 1.0 and 2.0. The criteria of the gate (10 ns: 2.0 / 3.0) and of the `slow` test (4 × 40 ns: each 1.5, mean 0.75) are unchanged, and so is the contract table. Measured on the GPU machine, seeds 1 to 48, error against the exact value: from the samples −0.28 ± 0.52 kJ/mol (−1.32 to +1.06; beyond 1.0: 6 of 48, beyond 1.5: none), from the bias +0.10 ± 0.72 (−1.49 to +1.34; beyond 1.0: 9, beyond 1.5: none); 51 to 70 rebinding events, no run reported as no binding, no diagnostic. Verified: `ruff`, `pytest` (default selection) in the image. Not verified here: CI on this commit; the scatter of the estimate from the samples at the 10 ns of the gate is still not measured.

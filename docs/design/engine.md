@@ -28,7 +28,8 @@ FM-D18 added (2026-11-17, owner request: the cuPotential plugin as the back end 
 option until its configuration and its accuracy are measured); FM-D12 amended (2026-11-17: the
 tolerances of the default 20 ns toy test come from its measured scatter over 48 seeds, after a
 CI failure by 0.0015 kJ/mol on another CPU; the criteria of the gate and of the `slow` test are
-unchanged).
+unchanged); FM-D13 amended a third time (2026-11-17: the MPS daemon runs with protocol 3, after
+the daemon of the default protocol stopped answering at about 50 client starts).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -541,6 +542,36 @@ above: `run.per_gpu` above 1 works with a host driver older than R615.
 Why: several replicas on one GPU are where the throughput of a GPU is (FM-D14), and the driver of
 a host is not the project's to change. The other ways were measured and fail: the daemon of the
 host with a client on the compatibility library, and a client on the library of the host.
+Amendment (2026-11-17, third: the daemon runs with MPS protocol 3): `scripts/mps.sh start` starts
+the daemon as `nvidia-cuda-mps-control -f --protocol 3`. The image, the lock and the clients are
+unchanged, and a client needs no setting for it.
+- What failed: on one daemon of the second amendment (the default protocol of the control
+  program, 2) the measurements of FM-D18 stopped after about 50 client starts. New clients waited
+  at their start for ever with the GPUs idle, and the daemon answered no command.
+- The mechanism, read from the stopped processes: under protocol 2 the control program of
+  driver 615.71.10 stops reading the pipe of its log (`log` in the pipe directory) at the first
+  record of a client. Every client that starts adds records; when the pipe is full (64 KiB) the
+  daemon and every process that writes to the pipe block for good. It is a count of client
+  starts, not a load: 4 replicas at once worked (the second amendment) because they were the
+  first clients of their daemon.
+- With protocol 3 the pipe is read: the log of the daemon and of its servers is `docker logs` of
+  the daemon's container (`fmeta-mps`).
+- Measured on this host (driver 595.99.02, image 648480d3…, the daemon of `scripts/mps.sh start`
+  on all 8 GPUs): 20 calls of `fmeta run` with 4, 6 or 8 replicas on one GPU (soluble 88479
+  atoms and membrane 221068 atoms, both back ends, 0.5 or 1 ns each), 8 calls and up to 64
+  replicas at the same time: 120 replica processes, 480 client contexts in the log of the daemon,
+  every call with exit 0 and every replica at its end. During the 64 replicas and after the last
+  one the pipe held 0 of 65536 bytes and the control program had 2 threads. The log holds, for
+  every client context that ends, the two error-level lines "Server failed to receive command …
+  assuming client … has exited" and "Message receive failed, assuming the other end is dead"
+  (480 each), and once, 4 ms before the start of the first server, "Dropping connection with
+  failed handshake": no run failed with them.
+- Not verified: a host with a driver of R615 or newer, where `scripts/mps.sh` starts the MPS
+  programs of the host: a control program that does not know `--protocol` would not start.
+- No test covers this: CI has no GPU and no MPS. The check is the runs above.
+Why: a run with `run.per_gpu` above 1 starts one client per replica, a benchmark set starts
+hundreds on one daemon, and a daemon that stops answering after about 50 of them takes every
+run on the machine with it.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by

@@ -138,6 +138,15 @@ scripts/mps.sh stop                              # ends every client: stop the r
 Only containers started with `--mps` are clients of the daemon. If the MPS server of a GPU
 fails, all its clients end; the same `fmeta run` command continues from the checkpoints.
 
+`scripts/mps.sh` starts the daemon with MPS protocol 3 (`nvidia-cuda-mps-control -f --protocol
+3`); a client needs no setting for it. Do not start the daemon of driver R615 by hand with its
+default protocol: it stops reading its log pipe at the first client, the pipe is full after
+about 50 client starts, and the daemon and every client that starts after that wait for ever
+(FM-D13, third amendment of 2026-11-17). The log of the daemon and of its servers is `docker
+logs fmeta-mps`. Clients that hang at their start with the GPUs idle are the sign of a daemon
+that was started another way: stop the runs, `scripts/mps.sh stop`, `scripts/mps.sh start`, and
+run the same commands again.
+
 The daemon, its server and the CUDA driver library of a client must be of one driver version.
 With a host driver of R615 or newer they are all the host's. With an older one the containers
 load the compatibility libraries of the image (615.71.10), and the entry of the image
