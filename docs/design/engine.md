@@ -34,7 +34,8 @@ force as the default (2026-11-17: `run.backend` is `auto`; a benchmark set names
 of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended to follow, and
 the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
 review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
-of `auto`; the walkers of a replica are made with one back end).
+of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
+with these amendments passed with both back ends (80d7dc7, one record each).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1139,11 +1140,13 @@ Status: **Accepted** (2026-11-17, owner request). In force as the default: `run.
 `docs/plans/2026-11-17-cupotential-backend.md`, 2026-11-17; until then an option, with `openmm`
 as the default). The parts the plugin provides for each kind of system are chosen from
 measurements (M2), and `fmeta check` has the items of the back end with their criteria (M3).
-The GPU gates of 1c09775 (2026-11-17) passed with both back ends, all 20 each
-(the GPU tests and the 19 items): `bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`
-(the default, which gave cuPotential) and `bench/results/2026-11-17-1c0977590-gpu-gates.json`
-(`--backend openmm`). The amendments from the review of PR #3 (2026-11-17, at the end of this
-decision) change the code after that commit: the gates of the code with them are not run yet.
+The GPU gates of the final code 80d7dc7 (2026-11-17) passed with both back ends, all 20 each
+(the GPU tests and the 19 items): `bench/results/2026-11-17-80d7dc789-cupotential-gpu-gates.json`
+(the default, which gave cuPotential) and `bench/results/2026-11-17-80d7dc789-gpu-gates.json`
+(`--backend openmm`). That commit holds the amendments from the review of PR #3 (2026-11-17, at
+the end of this decision); the records of 1c09775, the code before them, passed in the same way
+(`bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`,
+`bench/results/2026-11-17-1c0977590-gpu-gates.json`).
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
@@ -1174,8 +1177,9 @@ system, force and integrator for a membrane system. For the soluble system the s
 without the plugin's barostat are not separated at their best number of replicas per GPU (4
 repeats each): the set with the barostat is the largest by the rule, and it is ahead beyond the
 scatter with one replica per GPU, the default `run.per_gpu`. The choice was to stand only with
-the gates of the final code: they passed with these parts (the record of cuPotential on
-1c09775; its items `backend` and `membrane_backend` name the parts of each kind of system).
+the gates of the final code: they passed with these parts (the records of cuPotential on
+1c09775 and on 80d7dc7; their items `backend` and `membrane_backend` name the parts of each kind
+of system).
 Its integrator removes the motion of the centre of mass itself, every 100 steps unless it is
 told otherwise. Where the System holds a `CMMotionRemover`, that force leaves the System and
 the plugin's integrator does its work (`COM_INTERVAL`); where the System holds none, the
@@ -1252,10 +1256,14 @@ values would decide by the frame and not by the code; the items are there for th
 another model (a lost exception, another cutoff, the mesh of another box), not for the last
 digit of the mesh. In the runs of the items with the three settings of `--backend`: OpenMM
 within 3.1e-5 and 8.0e-4, cuPotential within 2.8e-6 and 4.5e-4, the funnel groups identical.
-In the gate records of the final code (1c09775; energy, force): the record of cuPotential has
+In the gate records of 1c09775 (energy, force): the record of cuPotential has
 OpenMM at 1.9e-5, 7.2e-4 and cuPotential at 2.6e-6, 4.1e-4 on the soluble system, 1.1e-6,
 7.3e-4 and 5.8e-7, 3.1e-4 on the membrane system, the funnel groups identical in both; the
 record of OpenMM has 3.7e-5, 6.6e-4 and 2.9e-6, 7.1e-4.
+In the gate records of the final code (80d7dc7, with the amendments from the review of PR #3):
+the record of cuPotential has OpenMM at 1.9e-5, 6.8e-4 and cuPotential at 1.7e-6, 4.0e-4 on the
+soluble system, 6.4e-6, 7.2e-4 and 1.2e-6, 3.0e-4 on the membrane system, the funnel groups
+identical in both; the record of OpenMM has 1.1e-5, 7.5e-4 and 1.1e-5, 6.5e-4.
 The toy items run with the integrator that a run of a real system gets (`integrator_only`): the
 toy system has no PME force, so the plugin's force cannot take part, and under `cupotential`
 and `auto` on CUDA the plugin's integrator moves the particle. Their criteria are unchanged
@@ -1341,7 +1349,9 @@ no new walker.
   started by hand at the same moment under different names are not seen by it; the scheduler
   gives every walker of a replica the same back end.
 - Not run: a walker added to a replica on the GPU. The test is on the records (`settle`, and
-  `run_stage` up to its refusal), on the code before the fix and after it.
+  `run_stage` up to its refusal), on the code before the fix and after it. The GPU gates of the
+  code with both amendments passed with both back ends (80d7dc7, the Status lines above); their
+  item `walkers` runs the two walkers of a new replica from the scheduler and adds none.
 Why: owner request of 2026-11-17, to make fmeta faster with cuPotential and to make it the
 default. The plugin is early-access software under NVIDIA's licence, which may end: `openmm`
 stays a complete path with its own gate record, and `auto` gives OpenMM, with the reason, when
