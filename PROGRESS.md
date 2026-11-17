@@ -32,7 +32,8 @@ Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D17 Accept
 FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
 scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
-ended and every check of it that this machine can run has run. Open: the result of CI.
+ended and every check of it that this machine can run has run. Open: the result of CI on the
+review fixes; the replies on the review threads.
 
 | Milestone | Status |
 |---|---|
@@ -45,7 +46,7 @@ ended and every check of it that this machine can run has run. Open: the result 
 | M6 Membrane | Complete on CPU: real `addMembrane` build (POPC, 108 lipids) and a short run; membrane-plane fit on synthetic helix bundles only |
 | M7 Replicas, walkers, figures, `fmeta check` | Complete on CPU |
 | Harness: CPU CI + GPU gates | Introduced 2026-11-15 (PR #1) |
-| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e, the final code: 17 passed, 232 entries of the calling user, `fmeta` imported from the image; only `README.md` and `PROGRESS.md` changed after it. The result of the CI job `docker` is not checked here; the publish workflow has never run |
+| Official image, Docker-only execution (FM-D13) | In use on the GPU machine. The image built from 783ecff runs without the mounted source: `fmeta check --quick` on CUDA passed (17 items) and the 232 files and directories it wrote belong to the calling user (a check, not evidence; the same on 47e84f7). The same on 384538e (the code of c59ec99): 17 passed, 232 entries of the calling user, `fmeta` imported from the image. The same on 4f976cb, the final code with the review fixes: 17 passed, 234 entries of the calling user, `fmeta` imported from the image; only documents and evidence changed after it. The result of the CI job `docker` is not checked here; the publish workflow has never run |
 | GPU plan M0: first gate record (R1) | Complete: all 16 gates on 2c4ad4e; the fmeta inside the image runs without the mounted source (quick check on CUDA, not evidence) |
 | GPU plan M1: run modes and the scheduler (R7, FM-D14) | Complete: all 18 gates on 8d1f10a; `docker stop` and continuation checked on the trypsin run |
 | GPU plan M3: official presets and the configuration reference (R9, FM-D16) | Merged: `fmeta init --preset`, `preset:` in a configuration, `docs/configuration.md`. GPU gates passed on 47e84f7 |
@@ -56,14 +57,14 @@ ended and every check of it that this machine can run has run. Open: the result 
 | GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. Run again from its README with the defaults (5 × 40 ns, 47e84f7, 221101 atoms, the five replicas on one GPU with MPS at 106–107 ns/day each, exit 0, one `docker stop` and the same command): dG0 −18.64 kJ/mol (−4.45 kcal/mol), 95% interval −33.31 to −3.97, replicas −33.60 to −4.60, rebinding events 2, 7, 1, 3, 9; the measurement on the simulated construct is −33.0 kJ/mol, all measurements −33.0 to −27.0, inside the interval at its lower end. The site is closed for a 0.3 nm probe in the crystal structure; theophylline left and came back in every replica. R3 is closed. Reported as measured in the README |
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets ran with the defaults from 47e84f7 in fresh work directories (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns, 90 replicas, every one to its end, both exit 0); reports by the code of 7386d28: `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol, fmeta / FEP+. TYK2: MUE 3.60 / 0.37, offset removed 1.81 / 0.35, Pearson r 0.15 / 0.96; every ligand above experiment (+1.0 to +6.9); experiment inside the 95% interval for 5 of 10; 47 of 50 replicas with a return to the site. A2A: MUE 4.34 / 0.74, offset removed 3.49 / 0.79, Pearson r 0.57 / 0.79; 6 of 8 below experiment (4d −12.0, 4e D −9.3); experiment inside the interval for 7 of 8; 25 of 40 replicas without a return. Intervals 4.3 to 16.4 (TYK2) and 7.0 to 28.9 kcal/mol (A2A) wide against experimental spans of 4.3 and 3.2. R10 is closed. Reported as measured (set READMEs, `README.md`) |
 
-- GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 7386d28,
-  the final code: it is the code of c59ec99 (the fix of the cross-check from the samples, which
-  `toy_free_energy` reads); only documents changed after it (CUDA, mixed precision, 2 GPUs, in
-  the image): `bench/results/2026-11-16-7386d2881-gpu-gates.json` (dated in UTC).
-  `toy_free_energy`: from the samples −3.95, from the bias −3.46, against the exact −4.95 kJ/mol,
-  criteria 2.0 and 3.0. `replicas_sequential` and `replicas_parallel` ran real child processes
-  on the GPUs (FM-D14). Speed values (1351 ns/day plain, 1304 with the bias, 925 membrane)
-  decide nothing. The record before it: d4bbcc6, the code before that fix.
+- GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 4f976cb,
+  the final code with the six review fixes; only documents and evidence changed after it (CUDA,
+  mixed precision, 2 GPUs, in the image): `bench/results/2026-11-17-4f976cbdf-gpu-gates.json`
+  (dated in UTC). `toy_free_energy`: from the samples −3.95, from the bias −3.46, against the
+  exact −4.95 kJ/mol, criteria 2.0 and 3.0 (the values of 7386d28). `replicas_sequential` and
+  `replicas_parallel` ran real child processes on the GPUs (FM-D14). Speed values (1256 ns/day
+  plain, 1260 with the bias, 775 membrane; the image check ran on two other GPUs in the first
+  2 min) decide nothing. The record before it: 7386d28, the code before the review fixes.
 - Review of PR #1 (2026-11-16, 6 findings on ec27496): fixed one commit each. A walker
   without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
   restart under other conditions is refused (FM-D5); the protein of a split complex keeps the
@@ -71,8 +72,8 @@ ended and every check of it that this machine can run has run. Open: the result 
   SMILES of the ligand (FM-D11); an amino acid without a backbone atom is rebuilt before the
   chains are split, never dropped (FM-D15); a sample of a walker is weighted with the bias
   that walker had, rebuilt from its `SYNC` record (FM-D9, FM-D10). The replies on the review
-  threads are not posted (no GitHub write access in the session). The code after 7386d28 has
-  no gate record yet: the gates and the image check run once on this last fix.
+  threads are not posted (no GitHub write access in the session). The gates and the image
+  check ran on 4f976cb, the last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -82,13 +83,14 @@ ended and every check of it that this machine can run has run. Open: the result 
   ("機能ごとの動作確認"). The sequential trypsin run has ended. Its analysis showed one defect,
   fixed in c59ec99: the cross-check from the samples was missing for a replica whose weights
   span more than the digits of a float (the headline from the bias is not affected).
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 161 passed on
-  c59ec99. The image check without the mounted source passed on 384538e, the same code (the
-  image row above). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
+- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 169 passed on
+  4f976cb, with the two slow walker tests (`-m slow tests/test_walkers.py`, 2 passed). The
+  image check without the mounted source passed on 4f976cb (the image row above). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
   FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
   source of 2c4ad4e and are not rerun.
-- CI: green on 171220a. The commits after it were pushed on 2026-11-16; the result of CI on
-  them, with the first run of the job `docker`, is not checked here.
+- CI: green on 171220a (read here). The owner's review of 2026-11-16 states that CI passed on
+  ec27496 (not read here). The result on the commits of the review fixes (6fa7cd2 and later)
+  is not checked here.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
@@ -122,6 +124,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-17 — [progress] GPU gates and the image check pass on the code with the six review fixes (4f976cb)
+- What: `scripts/gpu_gates.py` on clean 4f976cb (2 GPUs, in the image, 00:39 to 00:43 UTC): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 9.4e-07 nm, wall energy 1.1e-03 kJ/mol; `toy_free_energy` −3.95 (samples) and −3.46 (bias) against −4.95 kJ/mol, the values of 7386d28; `walkers` passed with the `SYNC` record. Speed (a diagnostic; the image check ran on two other GPUs at the same time): 1256 ns/day plain, 1260 with the bias, membrane 775. The image built from 4f976cb passed `fmeta check --quick` on CUDA with an empty directory as `/work` (00:39 to 00:41 UTC): 17 passed, 0 failed, 0 skipped; 234 entries, all of the calling user; `fmeta` imported from the image. A check, not gate evidence. This closes "Not run on this code: GPU gates and the image check" of the entries on the review fixes. Not verified here: the result of CI on 6fa7cd2 and later; `pytest -m slow` beyond the two walker tests; the replies on the review threads are not posted (no GitHub write access in the session).
+- Why: the change gate: the review fixes changed the runner, the workflow, the system building and the analysis, and the gates run once on the last of them.
+- Refs: `bench/results/2026-11-17-4f976cbdf-gpu-gates.json`, `bench/results/index.json`, `README.md`; commits 6fa7cd2, a4b09b1, 5792001, 3e652e0, ab8f906, 4f976cb.
 
 ### 2026-11-17 — [amendment] FM-D9, FM-D10: a sample of a walker is weighted with the bias that walker had, rebuilt from a record of the hills it had read
 - What: every walker writes `SYNC` (one line per read of the other HILLS files: its own hill count, and per walker the rows read with their checksum); it is flushed with the checkpoint and cut or removed with HILLS on a restart. The estimates from the samples (`dG_reweighted`, `dG_second_half`) slice each walker on its own time axis and take the bias from its own hills and the recorded rows (`fmeta.analysis.walkers`). A sample whose rows are no longer on disk is left out and counted; walkers without a record get neither estimate. The headline from the bias and the estimates of a run without walkers are unchanged (identical to the last digit on two replicas of the examples). Toy system, Reference: the rebuilt bias of every sample is 3e-7 kJ/mol from COLVAR (test: 1e-5); one walker after the other, 12 pairs of 2 × 10 ns: `dG_reweighted` −0.17 ± 0.19 kJ/mol from exact, standard deviation 0.67 (former rule: 1.63). The slow test's criterion fails by value under the former code (−2.28, 0.14, 1.74, −2.10 on its four pairs); the two fast tests need the new record and cannot run there. `ruff` passes, `pytest` 169 passed, the two slow walker tests passed. Not run on this code: GPU gates and the image check (next, once).
