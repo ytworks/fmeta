@@ -59,68 +59,51 @@ PR #1 are fixed (below); the final code is 7c731c5.
 
 - GPU gates: **all 18 passed** (`gpu-tests` and the 17 items of `fmeta check`) on clean 7c731c5,
   the final code with the fixes of both review rounds; only documents and evidence changed after
-  it (CUDA, mixed precision, 2 GPUs, in the image):
-  `bench/results/2026-11-17-7c731c5b9-gpu-gates.json` (dated in UTC). `toy_free_energy`: from
-  the samples −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0
-  (the values of 4f976cb). `replicas_sequential` and `replicas_parallel` ran real child
-  processes on the GPUs (FM-D14). Speed values (1312 ns/day plain, 1293 with the bias, 937
-  membrane) decide nothing. The record before it: 4f976cb, the code of the first review round.
-- Review of PR #1, first round (2026-11-16, 6 findings on ec27496): fixed one commit each. A
-  walker without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
-  restart under other conditions is refused (FM-D5); the protein of a split complex keeps the
-  protonation states its residue names state (5792001); a complex is split only with the
-  SMILES of the ligand (FM-D11); an amino acid without a backbone atom is rebuilt before the
-  chains are split, never dropped (FM-D15); a sample of a walker is weighted with the bias
-  that walker had, rebuilt from its `SYNC` record (FM-D9, FM-D10). Second round (2026-11-17, 2
-  findings on 81bc9af): the set of walkers of a replica may only grow (97bcd70; FM-D5, FM-D10);
-  a chain ends at a gap before a missing backbone atom is rebuilt (7c731c5; FM-D15).
+  it (CUDA, mixed precision, 2 GPUs, in the image, dated in UTC):
+  `bench/results/2026-11-17-7c731c5b9-gpu-gates.json`. `toy_free_energy`: from the samples
+  −3.95, from the bias −3.46, against the exact −4.95 kJ/mol, criteria 2.0 and 3.0.
+  `replicas_sequential` and `replicas_parallel` ran real child processes on the GPUs (FM-D14).
+  Speed (1312 ns/day plain, 1293 with the bias, 937 membrane) decides nothing. Before it: 4f976cb.
+- Review of PR #1: first round (2026-11-16, 6 findings on ec27496) fixed one commit each
+  (6fa7cd2, a4b09b1, 5792001, 3e652e0, ab8f906, 4f976cb; FM-D5, FM-D9, FM-D10, FM-D11, FM-D15;
+  Change Log and archive). Second round (2026-11-17, 2 findings on 81bc9af): the set of walkers
+  of a replica may only grow (97bcd70; FM-D5, FM-D10); a chain ends at a gap before a missing
+  backbone atom is rebuilt (7c731c5; FM-D15). Replies posted on all 8 threads; all resolved.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
-  every function of this development that the gates do not reach has run once: walkers on
-  trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
-  from a YAML, `fmeta init`, the input routes (`--complex`, two files, GAFF, `--membrane`),
-  `fmeta split --drop`, `fmeta doctor`, `fmeta analyze --plot` / `--discard-ns`,
-  `fmeta benchmark status` / `report` with the current analysis. Table: `README.md`
-  ("機能ごとの動作確認"). The sequential trypsin run has ended. Its analysis showed one defect,
-  fixed in c59ec99: the cross-check from the samples was missing for a replica whose weights
-  span more than the digits of a float (the headline from the bias is not affected).
+  every function of this development that the gates do not reach has run once (walkers with
+  `docker stop` and restart, extension, `fmeta auto`, `fmeta init`, the input routes,
+  `fmeta split --drop`, `fmeta doctor`, `fmeta analyze`, `fmeta benchmark`). Table: `README.md`
+  ("機能ごとの動作確認"). One defect found and fixed in c59ec99: the cross-check from the samples
+  was missing for a replica whose weights span more than the digits of a float.
 - Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 171 passed on
-  7c731c5; the two slow walker tests (`-m slow tests/test_walkers.py`, 2 passed) last ran on
-  4f976cb. The image check without the mounted source passed on 7c731c5 (the image row above). Operation on a CPU platform is not guaranteed (owner, 2026-11-16,
-  FM-D12): `pytest -m slow` (6 passed) and `fmeta check --platform CPU` were last run on the
-  source of 2c4ad4e and are not rerun.
+  7c731c5; the two slow walker tests (`-m slow tests/test_walkers.py`) last ran on 4f976cb.
+  Operation on a CPU platform is not guaranteed (owner, 2026-11-16, FM-D12): `pytest -m slow`
+  (6 passed) and `fmeta check --platform CPU` last ran on the source of 2c4ad4e.
 - CI: green on 97bcd70 and on a1504a9, the code of 7c731c5 plus documents (both `cpu` jobs and
   `docker`; read with `gh` on 2026-11-17; the run of 7c731c5 itself was cancelled by the next
-  push). Green from 5cda44c on. The run of 6fa7cd2 was
-  cancelled by the push of 5cda44c 25 s later (`cancel-in-progress`), which holds its change.
+  push). Green from 5cda44c on.
 - Not verified yet:
   - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
     the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
-    value depends on the bias setting;
-    TYK2 with ejm_46: −26.6 to −3.1 kJ/mol, 32 kJ/mol above experiment; A2A with
-    theophylline: −33.3 to −4.0 kJ/mol, 14 kJ/mol above the measurement on the construct;
-    the 18 ligands of the benchmark sets: intervals 18 to 121 kJ/mol wide);
+    value depends on the bias setting; TYK2 with ejm_46: −26.6 to −3.1, 32 kJ/mol above
+    experiment; A2A with theophylline: −33.3 to −4.0, 14 kJ/mol above the measurement on the
+    construct; the 18 ligands of the benchmark sets: intervals 18 to 121 kJ/mol wide);
   - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
-    owner until everything is shown to work; walkers operate on trypsin, their accuracy is not
-    measured;
-  - reading HILLS with PLUMED itself;
-  - the publish workflow (never run).
+    owner until everything is shown to work; the accuracy of walkers on trypsin is not measured;
+  - reading HILLS with PLUMED itself; the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
-  must be prepared again; the gate `toy_free_energy` had 0.04 kJ/mol to spare with
-  the former reweighting, where about 1 run in 30 of its 10 ns missed the criterion on every
-  platform (FM-D12); with the estimate from the samples (FM-D9, first amendment) its error is
-  1.00 kJ/mol for the gate's seed, and the scatter of that estimate over seeds at 10 ns is not
-  measured.
+  must be prepared again; the gate `toy_free_energy` had 0.04 kJ/mol to spare with the former
+  reweighting (about 1 run in 30 of its 10 ns missed the criterion on every platform, FM-D12);
+  with the estimate from the samples its error is 1.00 kJ/mol for the gate's seed, and the
+  scatter of that estimate over seeds at 10 ns is not measured.
 - GPUs (owner, 2026-11-16: all 8 are for this task): no run is in progress, the GPUs are free
-  and the MPS daemon is stopped. The second wave ran from 47e84f7 with the defaults, every GPU
-  with several replicas under NVIDIA MPS (`run.per_gpu`, FM-D14 amendment), from 06:41 to
-  18:54 UTC on 2026-11-16: the three examples (ended at 10:08, 13:43 and 16:11 UTC), the TYK2
-  set (18:54 UTC) and the A2A set (18:51 UTC); 105 replicas of 40 ns, every command exit 0.
-- Speed (measured: 88k atoms 606 ns/day alone and 1283 / 1541 / 1620 ns/day per GPU with
-  4 / 6 / 8 replicas under MPS; A2A set system about 1015 ns/day per GPU with 6 replicas, A2A
-  example about 506 with 5): both full sets and the three examples at 5 × 40 ns took 12 h
-  13 min on 8 GPUs, with the function checks in between.
+  and the MPS daemon is stopped. The second wave (47e84f7, the defaults, several replicas per
+  GPU under NVIDIA MPS, FM-D14 amendment) ran on 2026-11-16 from 06:41 to 18:54 UTC: the three
+  examples and both benchmark sets, 105 replicas of 40 ns, every command exit 0 (12 h 13 min on
+  8 GPUs). Speed: 88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8
+  replicas under MPS; the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5.
 - Blockers: none. Pushes from the GPU machine work since 2026-11-16 (the `gh` login of the
   machine as the git credential; the owner added the `workflow` scope).
 
