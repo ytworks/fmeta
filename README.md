@@ -66,22 +66,23 @@ OpenMM 同梱の 35 残基タンパク質にベンゼンを置いた小さな系
 
 | 項目 | 確認内容 |
 |---|---|
-| `platform` | GPU プラットフォームが使えること |
+| `platform` | GPU プラットフォームが使えること。`run.backend` が cuPotential になる条件では、プラグインで小さな PME の系（512 イオン）を 100 ステップ進める |
 | `forces` | ファネルの壁とバイアスの力・エネルギー・集団変数が Reference プラットフォームと一致（6 配置） |
-| `toy_restart` | トイ系での実行とチェックポイントからの再開 |
+| `toy_restart` | トイ系での実行と、バイナリのチェックポイントからの再開（実系の run と同じバックエンドの積分器で） |
 | `toy_free_energy` | 結合定数が厳密に求まるトイ系で、10 ns の fun-metaD が厳密な ΔG° を 2 kJ/mol 以内で再現 |
 | `pdb_sdf_openff`, `pdb_sdf_gaff` | PDB と SDF だけの既定経路: OpenFF / GAFF でリガンド力場を自動生成して系を構築（未インストールなら SKIP） |
 | `prepare` | 溶媒和とファネルの自動配置・検証 |
 | `equilibrate` | 段階的平衡化と、ファネルが結合状態に仕事をしていないこと |
+| `backend`, `membrane_backend` | バックエンド（FM-D18）: `run.backend: auto` が、プラグインを使える条件で cuPotential になること。平衡化した系（可溶性の箱、膜の箱）の非結合エネルギーと力を、OpenMM の PME と run のバックエンドのそれぞれで、Ewald 許容誤差 1e-6・倍精度の参照と比較（分子を格子ベクトルでずらした座標を含む。相対でエネルギー 1e-4、力 2e-3 以内）。集団変数、壁、バイアスが両バックエンドで一致すること |
 | `periodic_images` | 溶媒和した実系で、GPU が複合体を別の周期セルへ移しても、またファネルの先端が箱の最も狭い方向を向いても、集団変数と壁のエネルギーが座標から計算した値と一致する |
-| `production` | レプリカ 2 本の本計算、チェックポイントからの継続、集団変数に飛びがないこと |
+| `production` | レプリカ 2 本の本計算、バイナリのチェックポイントからの継続、集団変数に飛びがないこと。テストの run すべて（この項目、`walkers`、`replicas_*`、`membrane_run`）で、`device.json` のバックエンドが指定どおりであること |
 | `walkers` | 2 ウォーカーでのバイアス共有 |
 | `replicas_sequential`, `replicas_parallel` | 実行モード: 子プロセスとして起動したレプリカが、1 枚の GPU で順に、2 枚の GPU で同時に走ること。割り当ての記録 `schedule.jsonl`、各レプリカの `device.json`、割り当てた GPU でのメモリ使用の増加を確認（GPU がなければ SKIP、`replicas_parallel` は GPU 2 枚が必要） |
 | `analysis` | 解析と図の出力 |
 | `benchmark` | バイアスあり／なしの ns/day、チェックポイント 1 回の時間、既定の長さ（`run.length_ns`）のレプリカにかかる日数の見積もり（参考値で、合否には使わない） |
 | `membrane_build`, `membrane_run` | `Modeller.addMembrane` による POPC 膜の構築と、半等方バロスタットでの平衡化・本計算 |
 
-所要時間は、RTX PRO 6000 Blackwell 2 枚のマシンで約 4 分でした（17 項目の合計 234 秒）。`fmeta check --quick` は同じ手順を最短の長さで流す動作確認です。追加で `pytest -m gpu` も用意してあります。
+所要時間は、RTX PRO 6000 Blackwell 2 枚のマシンで約 4 分でした（`backend` と `membrane_backend` を加える前の 17 項目、標準の OpenMM での合計 234 秒）。`fmeta check --quick` は同じ手順を最短の長さで流す動作確認です。追加で `pytest -m gpu` も用意してあります。
 
 結果を証跡としてリポジトリに残すときは `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1` を使います。GPU テストと `fmeta check` の全項目を実行し、すべて通ると `bench/results/<日付>-<コミット>-gpu-gates.json` と `index.json` を書き出します。記録にはイメージの識別子、ロックのハッシュ、GPU の UUID が入り、公式イメージの外で実行した場合は記録しません（手順は `docs/gpu-runbook.md`）。
 

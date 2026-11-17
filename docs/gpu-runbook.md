@@ -43,8 +43,9 @@ record stores the UUIDs, which identify the physical GPUs.
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
      `forces`, `toy_restart`, `toy_free_energy`, `pdb_sdf_openff`, `pdb_sdf_gaff`, `prepare`,
-     `equilibrate`, `periodic_images`, `production`, `walkers`, `replicas_sequential`,
-     `replicas_parallel`, `analysis`, `benchmark`, `membrane_build`, `membrane_run`.
+     `equilibrate`, `backend`, `periodic_images`, `production`, `walkers`, `replicas_sequential`,
+     `replicas_parallel`, `analysis`, `benchmark`, `membrane_build`, `membrane_run`,
+     `membrane_backend` (19 items; `backend` and `membrane_backend` since FM-D18).
    A skipped item is not a pass. The two `replicas_*` items (FM-D14) run real child processes
    and check their record `schedule.jsonl`, their hills and their `device.json`; they are
    skipped when `nvidia-smi` reports no memory in use for the GPU (then the device of a replica
