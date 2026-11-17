@@ -18,6 +18,7 @@ from fmeta.benchmark import (
     REFERENCE_COLUMNS,
     agreement,
     code_version,
+    configuration_hash,
     fetch_inputs,
     format_status,
     load_set,
@@ -28,6 +29,7 @@ from fmeta.benchmark import (
     sdf_charge,
     sdf_coordinates,
     sdf_records,
+    set_config,
     set_statistics,
     status_rows,
 )
@@ -85,6 +87,23 @@ def test_the_sets_of_the_repository_are_valid(directory):
     assert benchmark.name == directory.name
     assert all(source.url.startswith("https://") for source in benchmark.files.values())      # nothing local
     assert {item.fep_kind for item in benchmark.reference.values()} == {"relative"}
+
+
+@pytest.mark.parametrize("name", ["tyk2", "a2a"])
+def test_the_back_end_belongs_to_the_configuration_of_a_set_and_openmm_keeps_the_hash_of_its_report(name):
+    """The work directories of a set are bound to the hash of its configuration. With OpenMM the
+    hash is the one from before ``run.backend`` existed (FM-D18), which the report of the set
+    recorded: its ligands go on. Another back end is another configuration. (After a change of the
+    configuration of a set, on purpose, this test names the report made with the new one.)"""
+    benchmark = load_set(EXAMPLES / name)
+    report = json.loads((ROOT / "bench" / "reports" / f"2026-11-16-7386d2881-{name}.json").read_text())
+    hashes = {}
+    for backend in ("openmm", "cupotential", "auto"):
+        config = set_config(benchmark)
+        config.run.backend = backend
+        hashes[backend] = configuration_hash(benchmark, config)
+    assert hashes["openmm"] == report["definition"]["configuration_sha256"]
+    assert len(set(hashes.values())) == 3
 
 
 def test_a_set_keeps_the_order_of_its_ligands_and_gives_each_a_directory(tmp_path, inputs):

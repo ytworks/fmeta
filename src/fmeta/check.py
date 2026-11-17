@@ -38,8 +38,10 @@ import openmm.unit as unit
 from .analysis import analyze_run
 from .config import Config, RunConfig
 from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
+from .engine.backend import build, resolve
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
+from .engine.runner import system_conditions
 from .funnel.geometry import compute_cvs, funnel_frame
 from .scheduler import read_schedule, verify_schedule
 from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
@@ -104,6 +106,7 @@ class Item:
     status: str
     detail: str
     seconds: float
+    performance: Optional[str] = None      # speeds, apart from the result: a record can leave them out
 
 
 class Skip(Exception):
@@ -112,11 +115,13 @@ class Skip(Exception):
 
 class Checker:
     def __init__(self, workdir, platform: str = "auto", precision: str = "mixed",
-                 device: Optional[int] = None, gpus: Optional[list] = None, quick: bool = False):
+                 device: Optional[int] = None, gpus: Optional[list] = None, quick: bool = False,
+                 backend: Optional[str] = None):
         self.workdir = Path(workdir).resolve()
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.requested = platform
         self.precision = precision
+        self.backend = backend or RunConfig().backend      # what the test runs ask for (run.backend)
         self.device = device if device is not None else (gpus[0] if gpus else None)
         # the devices of the replicas: those given, or the one device given, or the default one
         self.gpus = gpus if gpus else ([device] if device is not None else None)
@@ -126,24 +131,33 @@ class Checker:
         self.platform: Optional[mm.Platform] = None
         self.properties: dict = {}
         self.device_name: Optional[str] = None
+        self.backends: set[str] = set()         # what the test runs were made with (their device.json)
+
+    @property
+    def backend_used(self) -> str:
+        """The back end these checks are a record of: cuPotential when a test run was made with it."""
+        return "cupotential" if "cupotential" in self.backends else "openmm"
 
     # ---- plumbing ---------------------------------------------------------
-    def run(self, name: str, function: Callable[[], str], needs: tuple = ()) -> None:
-        start = time.time()
+    def run(self, name: str, function: Callable[[], object], needs: tuple = ()) -> None:
+        """Run one check. It returns its result as text, or the result and its speeds as two texts."""
+        start, performance = time.time(), None
         missing = [n for n in needs if n not in self.done]
         try:
             if missing:
                 raise Skip(f"needs {', '.join(missing)}")
-            detail, status = function(), PASS
+            result, status = function(), PASS
+            detail, performance = result if isinstance(result, tuple) else (result, None)
             self.done.add(name)
         except Skip as skip:
             detail, status = str(skip), SKIP
         except Exception as error:   # a failed check must not stop the others
             detail, status = f"{type(error).__name__}: {error}", FAIL
             (self.workdir / f"{name}.traceback.txt").write_text(traceback.format_exc())
-        item = Item(name, status, detail, time.time() - start)
+        item = Item(name, status, detail, time.time() - start, performance)
         self.items.append(item)
-        print(f"[{status}] {name:<20s} {detail}  ({item.seconds:.0f} s)", flush=True)
+        text = "; ".join(filter(None, [detail, performance]))
+        print(f"[{status}] {name:<20s} {text}  ({item.seconds:.0f} s)", flush=True)
 
     def config(self, **overrides) -> Config:
         p = self.profile
@@ -152,7 +166,8 @@ class Checker:
             "equilibration": dict(p["equil"], seed=3),
             "run": {"length_ns": p["run_ps"] / 1000.0, "replicas": 2, "pace_ps": p["pace_ps"],
                     "checkpoint_ps": p["run_ps"] / 2.0, "trajectory_ps": p["run_ps"] / 2.0,
-                    "seed": 11, "platform": self.platform.getName(), "precision": self.precision},
+                    "seed": 11, "platform": self.platform.getName(), "precision": self.precision,
+                    "backend": self.backend},
         }
         for section, values in overrides.items():
             if section == "input" or section == "membrane":
@@ -327,6 +342,17 @@ class Checker:
                 f"({'ok' if summary['wall_ok'] else 'above 0.1 kT'}); box "
                 + " x ".join(f"{v:.2f}" for v in summary["box_lengths"]) + " nm")
 
+    def _integrator(self, system, config: Config, state, bias=None, seed: int = 0):
+        """The integrator of a test that makes its own Context of ``system`` (with its barostat and
+        funnel forces in it), with the back end of the test runs, and what a run records about it."""
+        box = state.getPeriodicBoxVectors()
+        backend = resolve(config.run.backend, self.platform.getName(), self.precision, system, box)
+        self.backends.add(backend.name)
+        conditions = dict(backend.record(), system=system_conditions(system))
+        integrator = build(backend, system, config.system.temperature, 1.0, config.run.timestep_fs / 1000.0,
+                           seed, box=box, bias=bias)
+        return integrator, conditions
+
     def check_pbc(self) -> str:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
@@ -337,12 +363,8 @@ class Checker:
         system = prepared.system
         add_barostat(system, config.system.temperature, config.system.pressure, False)
         bias = FunnelBias(system, funnel, config.metad, platform=self.platform.getName())
-        integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
-                                                 1.0 / unit.picosecond,
-                                                 config.run.timestep_fs * unit.femtosecond)
-        integrator.setRandomNumberSeed(1)
+        integrator = self._integrator(system, config, state, bias, seed=1)[0]
         context = mm.Context(system, integrator, self.platform, self.properties)
-        bias.exclude_probe(integrator)
 
         # A platform moves whole molecules between periodic images. The forces of the CVs join
         # the ligand and the anchors into one, and the CVs rely on that.
@@ -411,6 +433,8 @@ class Checker:
                 "of the values from the coordinates")
 
     def _verify_run(self, directory: Path, expected: int, funnel) -> str:
+        with open(directory / "device.json") as handle:
+            self.backends.add(json.load(handle).get("backend", "openmm"))
         hills = read_hills(directory / "HILLS")
         colvar = read_colvar(directory / "COLVAR")
         if len(hills) != expected:
@@ -424,7 +448,7 @@ class Checker:
         speed = (directory / "run.log").read_text().strip().splitlines()[-1].split("speed")[-1].strip()
         return speed
 
-    def check_production(self) -> str:
+    def check_production(self) -> tuple:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
         funnel = load_prepared(work).funnel
@@ -437,8 +461,8 @@ class Checker:
             self._verify_run(work / f"rep{i}", longer, funnel)
         if not (work / "rep0" / "HILLS").read_text().startswith(first):
             raise AssertionError("continuing the run changed hills that were already written")
-        return (f"2 replicas x {self.n_hills} hills, then continued to {longer} from their "
-                f"checkpoints; {speeds[0]}")
+        return (f"2 replicas x {self.n_hills} hills, then continued to {longer} from their checkpoints",
+                speeds[0])
 
     def _fresh_copy(self, name: str, **run) -> tuple[Config, Path]:
         """A new work directory ``name`` with the prepared and equilibrated system of ``soluble``."""
@@ -550,7 +574,7 @@ class Checker:
         return (f"analysis of {summary['n_replicas']} replicas ran (far too short for a value that "
                 f"means something: diagnostics on {noted} of them){figures}")
 
-    def check_benchmark(self) -> str:
+    def check_benchmark(self) -> tuple:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
         with open(work / "equil" / "state.xml") as handle:
@@ -567,8 +591,7 @@ class Checker:
             metad = BiasSettings(temperature=config.system.temperature, pace=pace)
             bias = (FunnelBias(system, prepared.funnel, metad, platform=self.platform.getName())
                     if label == "biased" else None)
-            integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
-                                                     1.0 / unit.picosecond, dt * unit.picosecond)
+            integrator, conditions = self._integrator(system, config, state, bias)
             simulation = app.Simulation(prepared.topology, system, integrator, self.platform,
                                         self.properties)
             simulation.context.setState(state)
@@ -585,7 +608,7 @@ class Checker:
                 directory = self.workdir / "benchmark"
                 shutil.rmtree(directory, ignore_errors=True)
                 run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group,
-                                      RunSettings(checkpoint_hills=10**9))
+                                      RunSettings(checkpoint_hills=10**9), conditions=conditions)
                 run.run(1)
                 start = time.time()
                 run.run(1 + hills)                    # ends with a checkpoint ...
@@ -600,11 +623,12 @@ class Checker:
         length = RunConfig().length_ns                 # the default, not the short run of the check
         hours = 24.0 * length / speeds["biased"]
         grid = bias.grid.values.size
-        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, "
-                f"{hills} ps each: {speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day "
-                f"with funnel metadynamics (overhead {overhead:.1f}%, {grid} grid points, 1 hill/ps, "
-                f"checkpoints excluded: {1e3 * checkpoint:.0f} ms each); "
-                f"a replica of the default {length:.0f} ns takes about {hours:.1f} hours")
+        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, {hills} ps each "
+                f"with and without funnel metadynamics ({grid} grid points, 1 hill/ps), back end "
+                f"{conditions['backend']}",
+                f"{speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day with funnel "
+                f"metadynamics (overhead {overhead:.1f}%, checkpoints excluded: {1e3 * checkpoint:.0f} ms "
+                f"each); a replica of the default {length:.0f} ns takes about {hours:.1f} hours")
 
     def check_membrane_build(self) -> str:
         directory = self.workdir / "inputs"
@@ -625,7 +649,7 @@ class Checker:
                 f"{prepared.topology.getNumAtoms()} atoms, box " + " x ".join(f"{v:.2f}" for v in box)
                 + " nm; funnel points into water and clears the membrane")
 
-    def check_membrane_run(self) -> str:
+    def check_membrane_run(self) -> tuple:
         work = self.workdir / "membrane"
         config = Config.load(work / "config.yaml")
         summary = equilibrate_stage(config, work, self.device)
@@ -635,7 +659,7 @@ class Checker:
         speed = self._verify_run(work / "rep0", self.n_hills, load_prepared(work).funnel)
         return (f"equilibrated with the semi-isotropic barostat (area per lipid "
                 f"{summary['area_per_lipid']:.2f} nm2 incl. the protein footprint), "
-                f"{self.n_hills} hills of production; {speed}")
+                f"{self.n_hills} hills of production", speed)
 
     # ---- driver -----------------------------------------------------------
     def run_all(self) -> bool:
@@ -661,7 +685,8 @@ class Checker:
                   for status in (PASS, FAIL, SKIP)}
         gpu = self.platform is not None and self.platform.getName() in GPU_PLATFORMS
         report = dict(platform=None if self.platform is None else self.platform.getName(),
-                      gpu=gpu, counts=counts, items=[asdict(item) for item in self.items])
+                      gpu=gpu, backend=self.backend_used, counts=counts,
+                      items=[asdict(item) for item in self.items])
         with open(self.workdir / "check_report.json", "w") as handle:
             json.dump(report, handle, indent=2)
         print(f"\n{counts[PASS]} passed, {counts[FAIL]} failed, {counts[SKIP]} skipped"

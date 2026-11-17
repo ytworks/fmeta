@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from .config import PRESETS, Config, preset_text
+from .engine.backend import BACKENDS
 from .engine.platform import MODES, check_devices, resolve_devices
 
 
@@ -136,6 +137,8 @@ def cmd_equilibrate(args) -> None:
 def cmd_run(args) -> None:
     from .workflow import run_replicas, run_stage
     config = Config.load(Path(args.workdir) / "config.yaml")
+    if args.backend:
+        config.run.backend = args.backend
     if args.replica is not None:
         run_stage(config, args.workdir, args.replica, args.device, args.length_ns, args.walker)
     else:
@@ -165,7 +168,7 @@ def cmd_check(args) -> None:
     if gpus == "all":
         gpus = resolve_devices("parallel", "all", args.platform or "auto")
     checker = Checker(args.out, args.platform or "auto", args.precision, args.device, gpus,
-                      args.quick)
+                      args.quick, backend=args.backend)
     if not checker.run_all():
         sys.exit(1)
 
@@ -361,6 +364,9 @@ def main(argv=None) -> None:
                      help="for this run: replicas that share one GPU at a time (default: run.per_gpu; "
                           "above 1 start the container with scripts/in_docker.sh --mps)")
     sub.add_argument("--length-ns", type=float, help="total length per replica")
+    sub.add_argument("--backend", choices=BACKENDS,
+                     help="for this run: what computes the nonbonded forces and moves the atoms "
+                          "(default: run.backend)")
     sub.set_defaults(func=cmd_run)
 
     sub = commands.add_parser("status", help="how far every replica is, and on which device")
@@ -390,6 +396,8 @@ def main(argv=None) -> None:
                      help="device numbers such as 0,1, or all: two or more also test replicas side by side")
     sub.add_argument("--quick", action="store_true",
                      help="minimal run lengths (a dry run of the steps, not a validation)")
+    sub.add_argument("--backend", choices=BACKENDS,
+                     help="the back end of the test runs (default: that of a new configuration)")
     sub.set_defaults(func=cmd_check)
 
     sub = commands.add_parser("doctor", help="quick look at platforms and optional packages")

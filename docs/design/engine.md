@@ -22,7 +22,9 @@ FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chai
 before a missing backbone atom is rebuilt); from its third round (2026-11-17): FM-D15 (the caps
 of the input stand in the chain before a missing backbone atom is rebuilt); FM-D13 amended
 (2026-11-17, owner request: the image holds NVIDIA's cuPotential plugin, with OpenMM 8.4.0 on
-CUDA 13.4 and the CUDA compatibility libraries; open: NVIDIA MPS on a host driver below R615).
+CUDA 13.4 and the CUDA compatibility libraries; open: NVIDIA MPS on a host driver below R615);
+FM-D18 added (2026-11-17, owner request: the cuPotential plugin as the back end of a run, an
+option until its configuration and its accuracy are measured).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -962,3 +964,63 @@ is marked "no binding" when its value (the mean of its replicas) is within 1 kT 
 funnel; it stays in the statistics. The notes on single replicas are listed as diagnostics.
 Why: choosing ligands by a check that almost no replica of 40 ns passes would describe a
 subset picked by noise.
+
+### FM-D18 — The back end of a run: NVIDIA's cuPotential plugin in place of OpenMM's nonbonded force and integrator
+Status: **Accepted** (2026-11-17, owner request). In force as an option: `run.backend` is
+`openmm` unless a configuration says otherwise. Open until measured (plan
+`docs/plans/2026-11-17-cupotential-backend.md`, M2 to M4): which parts the plugin provides for
+each kind of system, the accuracy criteria of a gate item for the back end, and `auto` as the
+default.
+`run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
+`openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
+of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
+(cuPotential where its conditions hold, OpenMM otherwise). FM-D1 stands: the engine is OpenMM,
+and the plugin replaces objects inside an OpenMM System. `src/fmeta/engine/backend.py` does
+that in memory, just before the Context of a run is made: `prepared/system.xml` stays as OpenMM
+wrote it, the forces of the funnel (CVs, walls, bias; FM-D2 to FM-D4) are OpenMM's own under
+every back end, and the build, the equilibration and the analysis do not use the plugin. Every
+place that makes the Context of a run goes through this module: `fmeta run`, and the items of
+`fmeta check` that run dynamics on a solvated system.
+Conditions, checked by name before a run (`unmet`): the CUDA platform; single or mixed
+precision; the plugin is installed and its libraries load; exactly one `NonbondedForce`, with
+PME, an Ewald error tolerance of 5e-4 and no mesh set by hand; a box of at least 3 cutoffs
+along x, y and z. With `cupotential` an unmet condition is an error before a file is touched.
+With `auto` the run is made with OpenMM, and the condition is written to the log, to `run.yaml`
+and to `device.json` (`backend_reason`). An error of the plugin that has no name here stops the
+run: it is never turned into a run with OpenMM.
+What the plugin provides is one set of parts for each kind of system (soluble, membrane), out
+of the force, the integrator and the isotropic barostat (`CONFIGURATION`); it has no
+replacement of the membrane barostat. Its integrator removes the motion of the centre of mass
+itself, so the `CMMotionRemover` leaves the System with it. The plugin sizes its mesh and its
+cell list when the Context is made, from the default box of the System: the box of the
+equilibrated state is made that box before the Context exists, also when a run continues, so
+every Context of a run has the same mesh. The probe of the CVs (FM-D4) is taken out of the
+integration before the Context exists.
+One run keeps the back end and the parts it began with: its hills and samples are then those
+of one set of forces. `run.yaml` and `device.json` name them (`backend`, `backend_parts`); a
+`run.yaml` without the entry is a run with OpenMM, and what `run.yaml` states about the system
+(particles, barostat) is read before forces are replaced. A run that continues under `auto`
+follows its record; another back end by name is refused before a device is chosen or a file is
+touched (`settle`), and with walkers before any walker is rolled back. A new replica under
+`auto` follows the replicas that are in the work directory. `fmeta status` shows the back end
+beside the device; `fmeta run --backend` and `fmeta check --backend` set it for one call.
+Benchmark sets (FM-D17): the back end is part of the hash of the configuration; with `openmm`
+the hash is the one from before the key existed, so the work directories of the reported sets
+go on.
+Evidence: a gate record is labelled with the back end its test runs used, and the two back ends
+of one commit are two records (`<date>-<commit>-gpu-gates.json` and
+`<date>-<commit>-cupotential-gpu-gates.json`). The record of cuPotential holds the verdicts and
+the accuracy, and neither a speed nor a duration: NVIDIA's licence of the plugin forbids the
+disclosure of benchmark results without permission (clause 2.12; owner, 2026-11-17: no speed
+measured with the plugin in a tracked file, a commit message or a text on GitHub).
+`scripts/verify_bench_results.py` rejects such a record with a speed, in CI; with NVIDIA's
+permission the switch is `PLUGIN_WITHHELD` there.
+Not done: the plugin in the equilibration or inside `addMembrane` (1 to 2.5% of the GPU time
+of a calculation, and the restraints and stages there would need their own verification);
+changing the back end of a run that has begun (its bias would be a sum of hills from two sets
+of forces); a silent run with OpenMM where cuPotential was asked for (a calculation slower than
+planned without a word, and a default that could pass every gate without using the plugin).
+Why: owner request of 2026-11-17, to make fmeta faster with cuPotential and to make it the
+default. The plugin is early-access software under NVIDIA's licence, which may end: `openmm`
+stays a complete path with its own gate record, and `auto` gives OpenMM, with the reason, when
+the plugin is not there.

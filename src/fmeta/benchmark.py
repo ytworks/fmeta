@@ -518,6 +518,8 @@ def configuration_hash(benchmark: BenchmarkSet, config: Config) -> str:
     (``run.length_ns``, ``run.replicas``), which may grow while the results stay comparable."""
     data = config.to_dict()
     del data["input"]
+    if data["run"]["backend"] == "openmm":      # the hash of a configuration from before the key (FM-D18)
+        del data["run"]["backend"]
     for option in ("mode", "gpus", "per_gpu", "length_ns", "replicas"):
         del data["run"][option]
     data["system"]["ligand_xml"] = [_sha256(path) for path in data["system"]["ligand_xml"]]

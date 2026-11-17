@@ -15,6 +15,7 @@ from typing import Optional
 
 import yaml
 
+from .engine.backend import BACKENDS
 from .engine.equilibration import EquilibrationSettings
 from .engine.grid import BiasSettings
 from .engine.platform import check_devices
@@ -76,6 +77,7 @@ class RunConfig:
     pace_ps: float = 1.0                     # time between hills
     platform: str = "auto"                   # auto, CUDA, OpenCL, HIP, CPU, Reference
     precision: str = "mixed"
+    backend: str = "openmm"                  # auto, cupotential, openmm (FM-D18)
     mode: str = "auto"                       # auto, parallel (one replica per GPU), sequential (one GPU)
     gpus: Optional[list | str] = None        # device numbers, or "all": every GPU that is visible
     per_gpu: int = 1                         # replicas that share one GPU at a time (above 1: with NVIDIA MPS)
@@ -103,6 +105,8 @@ class Config:
         if self.run.timestep_fs > 2.0 and not self.system.hydrogen_mass:
             raise ValueError("a time step above 2 fs needs system.hydrogen_mass (e.g. 1.5)")
         check_devices(self.run.mode, self.run.gpus, self.run.per_gpu)
+        if self.run.backend not in BACKENDS:
+            raise ValueError(f"run.backend must be one of {BACKENDS}, not {self.run.backend!r}")
         # the ligand force field is named, so that a saved configuration says which one was used
         if self.system.ligand_forcefield is None:
             self.system.ligand_forcefield = DEFAULT_FORCEFIELD.get(self.system.ligand_method)

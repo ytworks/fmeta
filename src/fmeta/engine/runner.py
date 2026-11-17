@@ -64,13 +64,17 @@ class MetadynamicsRun:
 
     def __init__(self, simulation: app.Simulation, bias: FunnelBias, workdir,
                  restraint_group: Optional[int] = None, settings: Optional[RunSettings] = None,
-                 restart: bool = True):
+                 restart: bool = True, conditions: Optional[dict] = None):
+        """``conditions`` holds entries of ``run.yaml`` that the caller states in place of what is
+        read from the simulation: the back end, and the system as it was before a back end
+        replaced forces in it (FM-D18)."""
         self.simulation = simulation
         self.bias = bias
         self.workdir = Path(workdir)
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.restraint_group = restraint_group
         self.settings = settings or RunSettings()
+        self.conditions = dict(conditions or {})
         self.dt = simulation.integrator.getStepSize().value_in_unit(unit.picosecond)
         bias.check_platform(simulation.context)
         bias.exclude_probe(simulation.integrator)
@@ -108,10 +112,11 @@ class MetadynamicsRun:
 
     # ---- bookkeeping ----------------------------------------------------
     def _metadata(self) -> str:
+        stated = dict(self.conditions)
+        system = stated.pop("system", None) or system_conditions(self.simulation.system)
         data = dict(funnel=self.bias.funnel.to_dict(), bias=self.bias.settings.to_dict(),
-                    grid=self.bias.grid.spec(), timestep_ps=self.dt,
-                    system=_system_conditions(self.simulation.system),
-                    settings=asdict(self.settings))
+                    grid=self.bias.grid.spec(), timestep_ps=self.dt, system=system,
+                    settings=asdict(self.settings), **stated)
         if data["settings"]["walker_dirs"] is not None:
             data["settings"]["walker_dirs"] = [str(d) for d in data["settings"]["walker_dirs"]]
         if data["settings"]["trajectory_atoms"] is not None:
@@ -247,7 +252,7 @@ class MetadynamicsRun:
                 writer.close()
 
 
-def _system_conditions(system: mm.System) -> dict:
+def system_conditions(system: mm.System) -> dict:
     """What a run holds fixed about its system: the particle count and the barostat."""
     record = dict(particles=system.getNumParticles(), barostat=None, pressure_bar=None)
     for force in system.getForces():
@@ -276,7 +281,9 @@ def check_same_run(workdir, now: dict) -> None:
     device, the checkpoint interval and how often walkers read each other may change. The set of
     walkers may only grow: the workflow refuses a run that leaves a walker with hills out."""
     stored = load_run_metadata(workdir)
-    judged = [(key, key, stored, now) for key in ("funnel", "bias", "grid", "timestep_ps", "system")]
+    if "backend" in now:
+        stored.setdefault("backend", "openmm")      # a run.yaml from before the entry existed
+    judged = [(key, key, stored, now) for key in ("funnel", "bias", "grid", "timestep_ps", "system", "backend")]
     judged += [(f"settings.{key}", key, stored.get("settings", {}), now.get("settings", {}))
                for key in ("trajectory_hills", "trajectory_atoms")]    # one trajectory file has one layout
     differences = [line for name, key, there, here in judged if key in there and key in here
