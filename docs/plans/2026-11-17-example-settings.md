@@ -212,6 +212,26 @@ on the first N ns of the files; at the length of the run they are the output of
   four (the first between 10 and 12.5 ns). The mean moves towards experiment by 2.3 to 4.0
   per 2.5 ns and the half-width goes down with it.
 
+- A2A to 20 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 12.5 | −29.91 | −48.75 to −11.08 | 18.84 | 0.00 | −36.4, −18.3, −43.2, −21.8 | 4/0, 4/1, 3/0, 4/1 |
+  | 15 | −28.47 | −47.92 to −9.02 | 19.45 | 0.00 | −35.8, −19.5, −41.8, −16.8 | 4/0, 4/1, 3/0, 4/1 |
+  | 17.5 | −26.81 | −46.73 to −6.88 | 19.93 | 0.19 | −34.7, −20.3, −39.7, −12.6 | 4/0, 4/0, 3/0, 6/2 |
+  | 20 | −25.25 | −45.64 to −4.86 | 20.39 | 1.75 | −33.6, −19.7, −37.7, −9.9 | 4/1, 4/0, 3/0, 6/2 |
+
+  The rule is not met at 15 or at 20 ns: the half-width stays at 18.8 to 20.4 (8.4 asked
+  for), and two replicas of four have a passage back. The mean is inside the experimental
+  range from 10 to 15 ns and 1.75 above it at 20 ns; it rises by 1.1 to 1.7 per 2.5 ns, and
+  one replica (−9.9 at 20 ns) rises faster than the other three. Both systems go on to 30 ns.
+- The count of passages at a length is not the count at a shorter length plus the new ones.
+  The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
+  and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
+  10 ns, 1.50 nm at 20 ns; fourth replica: 1.52 and 1.77 nm). The passage back of the second
+  replica at 10 to 15 ns is none with the threshold of 17.5 and 20 ns. Point 4 takes the count
+  at the length that is judged, as the rule says.
+
 **What the choice means.** The setting is chosen on these two systems with their experimental
 values in view. Its agreement with experiment there is the outcome of the choice, not a
 validation of the method, and the READMEs and FM-D19 say so. The package defaults do not
