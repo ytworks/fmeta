@@ -54,12 +54,44 @@ CUDA error.
 | B | 5 | 0.5 | yes | yes |
 | C | 5 | 1.5 | yes | |
 | D | 3 | 1.5 | yes | |
+| F (added) | 10 | 0.2 | yes | yes |
+| G (added) | 10 | 0.05 | yes | |
 
 One replica has no interval. An arm goes on by what its surface shows (passages back into the
 site summed over the walkers, the bias in the site against the bias in the unbound window, how
 the value moves between 10 and 20 ns), with the experimental value in view. This is a
 judgment; it is recorded with the numbers of every arm. A further arm (another bias factor,
 height or number of walkers) is added when round 1 points to it, and recorded the same way.
+
+**Round 1, judgments and added arms** (2026-11-17; numbers: largest bias in the site, kJ/mol).
+
+- Arm D (TYK2) stopped at 7.25 ns: no walker left the site; the bias was 49 at 0.5 ns, 60 at
+  5 ns and 61 at 7 ns. With the bias factor 3 it grows too slowly to reach the level at which
+  walkers of the other arms left.
+- Arm C (TYK2) stopped at 7.5 ns: one walker of 8 left (at 2.2 ns, bias 90) and reached the
+  unbound window at 7 ns; the seven others stayed while the bias went from 81 (0.5 ns) to 97.
+- The first walkers left at a lower bias where the bias grew more slowly. TYK2: at 90 in arm C
+  (2.2 ns), at 115 to 125 in arm A (0.2 to 0.5 ns). A2A: at 45 to 51 in arm B (0.3 to 0.7 ns),
+  at 68 to 82 in arm A (0.1 to 0.3 ns). In arm A the bias is 104 (TYK2) and 68 (A2A) after the
+  first 0.1 ns: 8 walkers add hills to the site 8 times as fast as one walker, faster than the
+  ligand moves. What is put into the site beyond the level of leaving has to be made up outside
+  before the surface gives a difference.
+- Added for this reason, with the bias factor 10 of the defaults and a lower height:
+  arm F (`height` 0.2, about the rate of one walker with 1.5) and arm G (`height` 0.05).
+  Expected from the growth of arm A: G has the bias of arm A's first 0.1 ns after about 3 ns.
+- Arm G (TYK2) stopped at 4.75 ns: walkers left the site from 2.3 ns on, at a bias of 88 to 91
+  (the level of arm C), and stayed within 0.5 nm of the site for the next 2.5 ns; none reached
+  the unbound window. The bias outside grows with the height as well: in arm A it follows
+  `22.4 ln(1 + 5.3 t)` kJ/mol, t in ns after the first walker reached the window (34.7 at
+  0.7 ns, 61.6 at 2.7 ns). With the height 0.05 that is about 17 ns for 31 kJ/mol, the bias
+  outside at which a site filled to 93 would give the experimental value. G cannot be the
+  shortest; its pair of GPUs went to arm F on TYK2.
+- The bias factor 5 is not continued (TYK2 arm B not resumed from 1.75 ns, A2A arm B stopped
+  at 4.5 ns), because the setting is common: on TYK2 one walker of 8 left in 7.5 ns with the
+  bias factor 5 and 3 times the height of arm B (arm C), and the bias outside would then grow
+  by 10 instead of 22.4 kJ/mol per factor e of time. A2A arm B itself: walkers left from 0.7 ns
+  on at a bias of 45 to 62, one reached the unbound window (3 ns), the headline was −48.7 at
+  4.5 ns. Its pair of GPUs went to arm F on A2A.
 
 **Round 2, the measurement.** 4 independent replicas of 8 walkers of the setting (or two
 settings) from round 1, on both systems. The first N ns of a run are the run of N ns, so the
@@ -75,6 +107,15 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
    10, 15, 20 ns.
 3. If none qualifies up to 20 ns: the one with the smallest half-width (the larger of the two
    systems) is the example setting, and the READMEs say that the rule was not met.
+4. Added 2026-11-17, before a round 2 run was started, from a fact of round 1: replicas in
+   which no walker had left the site gave a headline with a block error of 0.7 to 2 kJ/mol
+   (arms B, C, D, G). That value is the level to which the site is filled; it moves with the
+   length of the run, and a set of such replicas would have a narrow interval. So a length
+   qualifies under point 1 only if in every replica of both systems walkers have gone from the
+   site to the unbound window and back into the site by that length (at least one passage each
+   way, summed over the walkers and counted as the product analysis counts them). Point 3
+   chooses among the lengths at which every replica has a walker that reached the unbound
+   window.
 
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
