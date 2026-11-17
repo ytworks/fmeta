@@ -334,7 +334,8 @@ run1/prepared/   system.xml  topology.cif  funnel.yaml  funnel.pdb  report.json
 run1/equil/      state.xml  equil.json  equilibrated.cif
 run1/schedule.jsonl  rep0.log ...   レプリカの割り当ての記録と、子プロセスごとのログ
 run1/rep0/ ...   run.yaml  HILLS  COLVAR  checkpoint.zip  traj.dcd  device.json  result.json  fes.npz  analysis.png
-run1/rep0/w0 ... （ウォーカーを使うとき。HILLS などはウォーカーごと、result.json はレプリカに 1 つ）
+run1/rep0/w0 ... （ウォーカーを使うとき。HILLS などはウォーカーごと、result.json はレプリカに 1 つ。
+                  SYNC は、そのウォーカーが他のウォーカーの HILLS を何行まで読んだかの記録で、解析が各サンプルのバイアスを復元するのに使う）
 run1/summary.json  summary.png
 ```
 

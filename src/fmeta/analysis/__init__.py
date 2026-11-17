@@ -15,6 +15,7 @@ from ..funnel.geometry import KB, Funnel
 from .binding import BindingEstimate, binding_free_energy, default_unbound_window, empty_funnel_free_energy
 from .convergence import count_transitions, dg_time_series, plateau_statistics, summarize_replicas
 from .fes import free_energy_surface, projection_profile, reweighted_profile, sliced_log_weights
+from .walkers import SharedBias, hills_on_grid
 
 KCAL = 4.184
 
@@ -30,41 +31,59 @@ MAX_ROUGHNESS = 2.0      # kJ/mol, unbound-window flatness
 MAX_REWEIGHT_GAP = 4.0   # kJ/mol, between two estimates of the same run
 MIN_BINDING_EXCESS = 1.0  # kT by which dG must beat an empty funnel of the same shape
 
-# The reweighting treats the run as a sequence of time slices, each with the bias of its middle.
+# The reweighting treats each walker of a run as a sequence of time slices, each with the bias
+# that walker had at its middle.
 SLICE_PS = 250.0         # width of a slice; wider when a run would need more than MAX_SLICES
-MAX_SLICES = 300
+MAX_SLICES = 300         # of all walkers together
 MAX_SAMPLES = 40000      # more samples than this are thinned evenly
 
 
-def _sample_estimate(colvars: list, hills: Hills, grid: BiasGrid, funnel: Funnel, kT: float,
+def _cycles(colvar: dict, own: Hills) -> np.ndarray:
+    """The number of its walker's own hills that each sample felt (a sample taken at the time
+    of a hill precedes it)."""
+    return np.searchsorted(own.time, colvar["time"], side="left")
+
+
+def _sample_estimate(colvars: list, parts: list, on_grid: list, grid: BiasGrid, funnel: Funnel, kT: float,
                      start: float, **binding_kwargs) -> Optional[float]:
     """dG0 from the samples after ``start`` (ps) alone, or None when they cannot give one.
 
-    The time after ``start`` is cut into slices. Within a slice the bias is taken as constant
-    (the hills up to its middle), which makes the run a set of ensembles with known biases;
-    :func:`sliced_log_weights` then gives every sample its weight in the unbiased ensemble and
-    the weighted histogram along s gives W(s). The hills before ``start`` enter only as part
-    of the bias the later samples felt: nothing assumes that they had filled anything."""
-    end = max((float(colvar["time"][-1]) for colvar in colvars if colvar["time"].size), default=0.0)
-    s, rho, time = (np.concatenate([colvar[key][colvar["time"] > start] for colvar in colvars])
-                    for key in ("s", "rho", "time"))
+    The time of each walker after ``start`` is cut into slices. Within a slice the bias is taken
+    as constant: the hills on the grid of that walker at the middle of the slice, which are its
+    own hills up to then (``parts``) and of the other walkers what it had read by then
+    (``on_grid``, from :func:`hills_on_grid`). That makes the run a set of ensembles with known
+    biases; :func:`sliced_log_weights` then gives every sample its weight in the unbiased
+    ensemble and the weighted histogram along s gives W(s). The hills before ``start`` enter
+    only as part of the bias the later samples felt: nothing assumes that they had filled
+    anything. A sample whose bias cannot be rebuilt is left out."""
+    samples, biases = [], []         # the samples of each walker; (walker, hills on its grid) of each slice
+    for walker, (colvar, own, table) in enumerate(zip(colvars, parts, on_grid)):
+        time = colvar["time"]
+        if not time.size:
+            continue
+        n_slices = int(np.clip(np.ceil((time[-1] - start) / SLICE_PS), 1, max(1, MAX_SLICES // len(colvars))))
+        edges = np.linspace(start, time[-1], n_slices + 1)
+        on = table[np.searchsorted(own.time, 0.5 * (edges[1:] + edges[:-1]), side="right")]
+        index = np.clip(np.searchsorted(edges, time, side="left") - 1, 0, n_slices - 1)
+        keep = (time > start) & (table[_cycles(colvar, own)] >= 0).all(axis=1) & (on[index] >= 0).all(axis=1)
+        samples.append((colvar["s"][keep], colvar["rho"][keep], len(biases) + index[keep]))
+        biases += [(walker, counts) for counts in on]
+    if not samples:
+        return None
+    s, rho, ensemble = (np.concatenate([sample[k] for sample in samples]) for k in range(3))
     if s.size < 100:
         return None
     thin = -(-s.size // MAX_SAMPLES)
-    s, rho, time = s[::thin], rho[::thin], time[::thin]
-    n_slices = int(np.clip(np.ceil((end - start) / SLICE_PS), 1, MAX_SLICES))
-    edges = np.linspace(start, end, n_slices + 1)
-    counts = np.bincount(np.clip(np.searchsorted(edges, time, side="left") - 1, 0, n_slices - 1),
-                         minlength=n_slices)
-    work, done, reduced = grid.empty_copy(), 0, []
-    for middle, count in zip(0.5 * (edges[1:] + edges[:-1]), counts):
-        stop = int(np.searchsorted(hills.time, middle, side="right"))
-        if stop > done:
-            part = hills[done:stop]
-            work.add_hills(part.s, part.rho, part.height)
-            done = stop
-        if count:
-            reduced.append(work.interpolate(s, rho) / kT)
+    s, rho, ensemble = s[::thin], rho[::thin], ensemble[::thin]
+    counts = np.bincount(ensemble, minlength=len(biases))
+    shared, current, reduced = None, None, []
+    for (walker, on), count in zip(biases, counts):
+        if walker != current:
+            shared, current = SharedBias(grid, parts), walker
+        if (on >= 0).all():
+            work = shared.at(on)
+            if count:
+                reduced.append(work.interpolate(s, rho) / kT)
     try:
         log_weights = sliced_log_weights(np.array(reduced), counts[counts > 0])
     except ArithmeticError:
@@ -105,6 +124,9 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     Two cross-checks from the samples stand beside it: ``dG_reweighted``, from the reweighted
     histogram of the samples after the first ``discard_ns`` (of a run shorter than twice that:
     its second half), and ``dG_second_half``, the same from the second half of the run alone.
+    A sample of a walker is weighted with the bias that walker had: its own hills and the hills
+    its ``SYNC`` record says it had read from the others. Samples whose bias cannot be rebuilt
+    are left out, and walkers without a record get neither cross-check.
 
     ``diagnostics`` are notes on what the replica did (rebinding events, the change of dG(t)
     from the bias, the two cross-checks). The bias fills the free-energy surface for as long as
@@ -120,7 +142,8 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
     funnel = Funnel.from_dict(meta["funnel"])
     settings = BiasSettings(**meta["bias"])
     grid = BiasGrid(**meta["grid"])
-    hills = merge_hills([read_hills(d / "HILLS") for d in sources])
+    parts = [read_hills(d / "HILLS") for d in sources]
+    hills = merge_hills(parts)
     colvars = [read_colvar(d / "COLVAR") for d in sources]
     if len(hills) == 0:
         raise ValueError(f"{workdir}/HILLS contains no hills")
@@ -144,9 +167,17 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
 
     half = 0.5 * max((float(colvar["time"][-1]) for colvar in colvars if colvar["time"].size), default=0.0)
     start = min(1000.0 * discard_ns, half)
-    dg_reweighted = _sample_estimate(colvars, hills, grid, funnel, kT, start, **kwargs)
-    dg_second_half = (dg_reweighted if start == half
-                      else _sample_estimate(colvars, hills, grid, funnel, kT, half, **kwargs))
+    # A sample is weighted with the bias its own walker had: walkers read each other's hills as
+    # wall-clock time allows, so the hills of all of them up to a time are not that bias.
+    on_grid = hills_on_grid(sources, parts)
+    dg_reweighted = dg_second_half = None
+    unknown = 0
+    if on_grid is not None:
+        dg_reweighted = _sample_estimate(colvars, parts, on_grid, grid, funnel, kT, start, **kwargs)
+        dg_second_half = (dg_reweighted if start == half
+                          else _sample_estimate(colvars, parts, on_grid, grid, funnel, kT, half, **kwargs))
+        unknown = sum(int((table[_cycles(colvar, own)] < 0).any(axis=1).sum())
+                      for colvar, own, table in zip(colvars, parts, on_grid))
     headline = plateau["mean"]
 
     # Does the answer depend on where the bound region is said to end? For a real
@@ -173,9 +204,17 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
                      f"{100 * plateau_fraction:.0f}% of the run")
     if estimate.unbound_roughness > MAX_ROUGHNESS:
         notes.append(f"unbound region not flat (std {estimate.unbound_roughness:.2f} kJ/mol)")
-    if dg_reweighted is None:
+    if on_grid is None:
+        notes.append("the walkers kept no record of the hills they had read from each other (a run from "
+                     "before the record existed): the bias a sample felt cannot be rebuilt, and dG has no "
+                     "cross-check from the samples")
+    elif dg_reweighted is None:
         notes.append(f"no estimate from the samples after the first {start / 1000.0:.1f} ns (they do "
                      "not cover the unbound region): dG has no cross-check from the samples")
+    if unknown:
+        notes.append(f"{unknown} sample(s) are left out of the estimates from the samples: the bias they felt "
+                     "cannot be rebuilt (a restart removed hills that their walker had read from another, or "
+                     "they were read before the record began)")
     checks = [(f"after the first {start / 1000.0:.1f} ns", dg_reweighted)]
     if start < half:
         checks.append(("of the second half of the run", dg_second_half))

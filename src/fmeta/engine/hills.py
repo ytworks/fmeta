@@ -9,6 +9,7 @@ As in PLUMED, the stored height of a well-tempered hill is multiplied by
 from __future__ import annotations
 
 import os
+import zlib
 from dataclasses import dataclass
 from typing import Optional
 
@@ -20,6 +21,7 @@ HILLS_HEADER = ("#! FIELDS time proj ext sigma_proj sigma_ext height biasf\n"
                 "#! SET multivariate false\n"
                 "#! SET kerneltype gaussian\n")
 COLVAR_HEADER = "#! FIELDS time proj ext bias wall\n"
+SYNC_HEADER = "#! FIELDS n_hills walker:rows:checksum ...\n"
 
 
 def _stored_scale(bias_factor: Optional[float]) -> float:
@@ -73,6 +75,63 @@ class ColvarWriter:
 
     def close(self) -> None:
         self._handle.close()
+
+
+class SyncWriter:
+    """The record of what a walker has on its grid from the other walkers (file ``SYNC``).
+
+    One line after each read of their HILLS files: the walker's own hill count, then for every
+    other walker its directory name, the number of its rows read so far and the checksum of the
+    bytes they were read from. The samples that follow were biased by exactly those rows, and
+    the analysis rebuilds the bias from them (:func:`read_sync`, :func:`row_checksums`)."""
+
+    def __init__(self, path, append: bool = False):
+        self.path = str(path)
+        new = not (append and os.path.exists(self.path))
+        self._handle = open(self.path, "w" if new else "a")
+        if new:
+            self._handle.write(SYNC_HEADER)
+            self._handle.flush()
+
+    def write(self, n_hills: int, followers: list) -> None:
+        seen = " ".join(f"{os.path.basename(os.path.dirname(f.path))}:{f.rows}:{f.crc}" for f in followers)
+        self._handle.write(f"{n_hills} {seen}\n")
+
+    def flush(self) -> None:
+        self._handle.flush()
+        os.fsync(self._handle.fileno())
+
+    def close(self) -> None:
+        self._handle.close()
+
+
+def read_sync(path) -> Optional[tuple]:
+    """The record a :class:`SyncWriter` wrote, as ``(n_hills, seen)``: the own hill count of
+    each line and its ``{walker: (rows, checksum)}``. None when the file does not exist."""
+    if not os.path.exists(path):
+        return None
+    with open(path) as handle:      # a crash can leave a partial last line: it is not read
+        lines = [line.split() for line in handle
+                 if line.endswith("\n") and line.strip() and not line.startswith("#")]
+    seen =[{name: (int(rows), int(crc)) for name, rows, crc in (entry.split(":") for entry in line[1:])}
+            for line in lines]
+    return np.array([int(line[0]) for line in lines], dtype=int), seen
+
+
+def row_checksums(path) -> np.ndarray:
+    """The checksum a :class:`HillsFollower` holds after each data row of a HILLS file (entry
+    ``r - 1`` after ``r`` rows). A record of ``r`` rows with another checksum was read from rows
+    that are no longer in the file: a restart removed them and other hills took their place."""
+    sums, crc = [], 0
+    with open(path, "rb") as handle:
+        for line in handle:
+            if not line.endswith(b"\n"):
+                break
+            crc = zlib.crc32(line, crc)
+            text = line.decode()
+            if text.strip() and not text.startswith("#") and len(text.split()) == 7:
+                sums.append(crc)
+    return np.array(sums, dtype=np.int64)
 
 
 @dataclass
@@ -151,12 +210,16 @@ def truncate_data_file(path, keep_rows: int = None, max_time: float = None) -> i
 
 
 class HillsFollower:
-    """Reads the hills another walker appends to its HILLS file, a batch at a time."""
+    """Reads the hills another walker appends to its HILLS file, a batch at a time.
+
+    ``rows`` counts the hills read so far and ``crc`` is the checksum of the bytes they were
+    read from: together they say which hills of the file are on the reader's grid."""
 
     def __init__(self, path):
         self.path = str(path)
         self.offset = 0
         self.rows = 0
+        self.crc = 0
 
     def read_new(self) -> Optional[Hills]:
         """Hills written since the last call (complete lines only), or ``None``."""
@@ -164,7 +227,7 @@ class HillsFollower:
             return None
         size = os.path.getsize(self.path)
         if size < self.offset:        # the file was rolled back under us: do not re-read
-            self.offset = size
+            self.offset = size        # (rows and crc keep what was read: they match no file any more)
             return None
         with open(self.path, "rb") as handle:
             handle.seek(self.offset)
@@ -173,6 +236,7 @@ class HillsFollower:
         if end < 0:
             return None
         self.offset += end + 1
+        self.crc = zlib.crc32(data[:end + 1], self.crc)
         rows = [line.split() for line in data[:end + 1].decode().splitlines()
                 if line.strip() and not line.startswith("#")]
         rows = [row for row in rows if len(row) == 7]

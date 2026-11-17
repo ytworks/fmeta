@@ -15,6 +15,7 @@ procedure in `docs/gpu-runbook.md`) check them.
 | Bias force (both forms) vs a `Continuous2DFunction` table of the same grid values | energy ≤ 1e-10 relative, forces ≤ 1e-8 (Reference) | `tests/test_engine.py` |
 | Restart: N + N hills vs 2N in one run | HILLS, COLVAR, DCD frames identical (Reference) | `tests/test_engine.py` |
 | Walkers: each walker's grid vs the sum of all HILLS files | ≤ 1e-7 | `tests/test_walkers.py` |
+| Walkers out of step: the bias of every sample, rebuilt from the HILLS files and the walker's `SYNC` record, vs the bias column of COLVAR | ≤ 1e-5 kJ/mol (Reference); one walker after the other, 4 pairs of 2 × 10 ns: `dG_reweighted` each ≤ 2.0, mean ≤ 1.0 kJ/mol from the exact value (`slow`) | `tests/test_walkers.py` |
 | Toy system: dG0 vs the exact value (quadrature) | 10 ns: reweighted ≤ 2.0, plateau ≤ 3.0 kJ/mol (gate); 4 × 40 ns: each ≤ 1.5, mean ≤ 0.75 (`slow`) | gate `toy_free_energy`, `tests/test_analysis.py` |
 | Toy system without a well | reported as no binding (within 1 kT of the empty funnel) | `tests/test_analysis.py` |
 | Automatic funnel on synthetic pockets with a known exit | direction ≤ 10°; with a membrane slab the exit is on the water side | `tests/test_autofunnel.py` |
@@ -55,6 +56,12 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   its own time slice, and the slices are combined by solving for their free energies;
   reweighting with the final bias was wrong by several kJ/mol on the toy system. A difference
   above 4 kJ/mol from the headline is written as a diagnostic, never a reason to pick one.
+- With walkers, a sample is weighted with the bias its own walker had: its own hills plus the
+  rows of the other HILLS files that its `SYNC` record names (rows read and their checksum, one
+  line per read). Walkers read each other as wall-clock time allows; the sum of all hills up to
+  the time of a sample was off by 1.1 and 3.3 kJ/mol for toy walkers out of step (review of
+  PR #1; FM-D9, fourth amendment). A sample whose bias cannot be rebuilt is left out and
+  counted; walkers without a record get no estimate from the samples.
 - The measurement is the set of independent replicas: the mean of their dG0 with its standard
   error and 95% interval. A replica of the default length does not converge on its own, so the
   analysis gives no converged / not converged verdict (owner, 2026-11-16; FM-D9, second
@@ -65,8 +72,8 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
   "no binding", never as a binding free energy.
 - HILLS is the record of the bias (heights stored times `gamma / (gamma - 1)`, as PLUMED does).
   The checkpoint bundle is replaced atomically; a restart rolls HILLS / COLVAR / DCD back to
-  it. With walkers, every walker is rolled back before any of them restarts, and a walker
-  without a checkpoint goes back to the start. A run stops with an error before a value that is
+  it. With walkers, every walker is rolled back before any of them restarts, a walker
+  without a checkpoint goes back to the start, and `SYNC` is cut or removed with HILLS. A run stops with an error before a value that is
   not finite is written to HILLS or COLVAR or added to the grid.
 - One directory holds one run: a restart under another funnel, bias, grid, time step, system
   or trajectory layout than its `run.yaml` states is refused before a file is touched. Every

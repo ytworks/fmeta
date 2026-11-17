@@ -4,6 +4,8 @@ Files written to the work directory:
 
     run.yaml         funnel, bias settings and grid (what the analysis needs)
     HILLS, COLVAR    PLUMED-style text logs
+    SYNC             with walkers: how much of each other walker's HILLS was on the grid, after
+                     each read (what the analysis needs to rebuild the bias a sample felt)
     checkpoint.zip   binary checkpoint + portable State XML + bias grid + counters,
                      replaced atomically so a crash never leaves a mixed state
     traj.dcd         optional trajectory of a subset of atoms
@@ -30,7 +32,15 @@ import openmm.unit as unit
 import yaml
 
 from .bias import FunnelBias
-from .hills import ColvarWriter, HillsFollower, HillsWriter, read_hills, sum_hills, truncate_data_file
+from .hills import (
+    ColvarWriter,
+    HillsFollower,
+    HillsWriter,
+    SyncWriter,
+    read_hills,
+    sum_hills,
+    truncate_data_file,
+)
 from .trajectory import TrajectoryWriter
 
 log = logging.getLogger(__name__)
@@ -85,9 +95,10 @@ class MetadynamicsRun:
             self._write_metadata()
         # With shared bias, start from everything the other walkers have deposited so far
         # (after a restart _restore() has put our own hills on the grid already).
+        self._sync = SyncWriter(self.workdir / "SYNC", append=resume) if self._others else None
         if self._others and self.sync_walkers():
             self.bias.push(simulation.context)
-        self._hills = HillsWriter(self.workdir / "HILLS", bias.settings.bias_factor, append=resume)
+        self._hills =HillsWriter(self.workdir / "HILLS", bias.settings.bias_factor, append=resume)
         self._colvar = ColvarWriter(self.workdir / "COLVAR", append=resume)
         if self.settings.trajectory_hills > 0:
             self._traj = TrajectoryWriter(
@@ -119,10 +130,10 @@ class MetadynamicsRun:
 
     def checkpoint(self) -> None:
         context = self.simulation.context
-        for writer in (self._hills, self._colvar, self._traj):
+        for writer in (self._hills, self._colvar, self._traj, self._sync):
             if writer is not None:
                 writer.flush()
-        state = context.getState(getPositions=True, getVelocities=True, getParameters=True,
+        state =context.getState(getPositions=True, getVelocities=True, getParameters=True,
                                  getIntegratorParameters=True)
         meta = dict(n_hills=self.n_hills, step=int(context.getStepCount()),
                     time_ps=context.getStepCount() * self.dt,
@@ -141,13 +152,16 @@ class MetadynamicsRun:
         os.replace(tmp, path)
 
     def sync_walkers(self) -> int:
-        """Add the hills the other walkers wrote since the last call. Returns how many."""
+        """Add the hills the other walkers wrote since the last call and record how much of each
+        of their files is on the grid now. Returns how many hills were added."""
         added = 0
         for other in self._others:
             hills = other.read_new()
             if hills is not None:
                 self.bias.grid.add_hills(hills.s, hills.rho, hills.height)
                 added += len(hills)
+        if self._others:
+            self._sync.write(self.n_hills, self._others)
         return added
 
     def _restore(self) -> Optional[int]:
@@ -211,7 +225,7 @@ class MetadynamicsRun:
                     self.checkpoint()
                     self._log_progress(start_hills, start_time, n_hills)
         finally:
-            for writer in (self._hills, self._colvar, self._traj):
+            for writer in (self._hills, self._colvar, self._traj, self._sync):
                 if writer is not None:
                     writer.flush()
         if self.n_hills % self.settings.checkpoint_hills:   # not already written in the loop
@@ -228,7 +242,7 @@ class MetadynamicsRun:
             handle.write(line + "\n")
 
     def close(self) -> None:
-        for writer in (self._hills, self._colvar, self._traj):
+        for writer in (self._hills, self._colvar, self._traj, self._sync):
             if writer is not None:
                 writer.close()
 
@@ -272,7 +286,7 @@ def check_same_run(workdir, now: dict) -> None:
 
 
 def rollback_to_checkpoint(workdir) -> dict:
-    """Cut HILLS and COLVAR back to what the last checkpoint knows about and
+    """Cut HILLS, COLVAR and a walker's SYNC back to what the last checkpoint knows about and
     return the checkpoint's counters. Safe to call more than once."""
     workdir = Path(workdir)
     with zipfile.ZipFile(workdir / "checkpoint.zip") as archive:
@@ -282,13 +296,15 @@ def rollback_to_checkpoint(workdir) -> dict:
         raise RuntimeError(f"{workdir}/HILLS has {kept} rows but the checkpoint expects "
                            f"{meta['n_hills']}")
     truncate_data_file(workdir / "COLVAR", max_time=meta["time_ps"])
+    if (workdir / "SYNC").exists():     # its first column is the hill count of the line
+        truncate_data_file(workdir / "SYNC", max_time=int(meta["n_hills"]))
     return meta
 
 
 def discard_run_without_checkpoint(workdir) -> None:
     """Remove the record of a run that never wrote a checkpoint. Such a run starts again from
     nothing, and with walkers no other walker may read the hills it leaves behind."""
-    for name in ("HILLS", "COLVAR", "traj.dcd"):
+    for name in ("HILLS", "COLVAR", "SYNC", "traj.dcd"):
         (Path(workdir) / name).unlink(missing_ok=True)
 
 

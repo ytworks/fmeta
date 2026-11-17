@@ -16,7 +16,8 @@ value of a replica is measured by the published procedure, from the bias), with 
 FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16 and 17): FM-D5 (a
 restart under other conditions is refused), FM-D11 (a complex is split only with the SMILES of
 the ligand), FM-D15 (an amino acid without a backbone atom is rebuilt before the chains are
-split, never dropped).
+split, never dropped), FM-D9 and FM-D10 (a sample of a walker is weighted with the bias that
+walker had, rebuilt from a record of the hills it had read).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -279,10 +280,43 @@ replica whose samples do not reach the unbound region (9 of the 15 replicas of t
 so the headline was of two kinds within one set. Deferred by the same instruction, until
 operation is shown: shared-bias walkers in the defaults, the run length and the bias settings
 (the published runs are 250 ns or longer on one surface).
+Fourth amendment (2026-11-17, review of PR #1; the owner chose the record over giving no
+estimate): with walkers, a sample is weighted with the bias its own walker had, not with the
+sum of all hills up to its time.
+- Walkers read each other's files as wall-clock time allows, so at one simulation time they
+  hold different sums. The bias of a walker after `k` hills of its own is its first `k` hills
+  plus the rows of the other HILLS files that its `SYNC` record names (FM-D10).
+- Each walker is a sequence of time slices on its own time axis, and the slices of all walkers
+  are combined as before (`MAX_SLICES` is shared between them).
+- A sample whose bias cannot be rebuilt is left out and counted in a note. Walkers without a
+  record (a run from before it existed) get neither estimate from the samples, with a note.
+- The headline does not change: it is read from the sum of all hills. The estimates of a run
+  without walkers are the same numbers as before (two replicas of the examples: identical to
+  the last digit).
+Measured on the toy system (Reference). Two walkers out of step (one deposits 30 hills before
+the other starts): the bias of every sample rebuilt against the bias column of COLVAR,
+3e-7 kJ/mol; with all hills up to the time of the sample, 1.1 and 3.3 kJ/mol. One walker ending
+its 10 ns before the other starts, 12 pairs of seeds, error of `dG_reweighted` against the exact
+value in kJ/mol: −0.17 ± 0.19 (mean ± standard error), standard deviation 0.67, largest 1.87;
+with the former rule +0.11 ± 0.47, standard deviation 1.63, largest 2.63.
+Why: the review. The former rule holds only for walkers in lock step, which a set of processes
+on several GPUs is not. No committed result came from a run with walkers.
 
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
 the bias by reading each other's HILLS files.
+Amendment (2026-11-17, review of PR #1): each walker records what it has on its grid from the
+others, in the file `SYNC` of its directory. One line after each read of the other HILLS files
+(at the start or a restart, then after every `sync_hills` hills of its own): its own hill
+count, and for every other walker the number of rows read and the CRC-32 of the bytes they were
+read from. The record is flushed with the checkpoint, cut to the checkpoint with HILLS and
+COLVAR at a restart, and removed with them when a walker without a checkpoint starts again.
+The analysis accepts an entry when the file of the other walker still begins with those rows
+(the same checksum). When a restart removed rows that had been read and other hills took their
+place, the bias of the samples in between cannot be rebuilt (FM-D9, fourth amendment). The
+contract of the grids is unchanged: each walker's grid against the sum of all HILLS files, 1e-7.
+The files alone do not say when a walker read which rows; a count with a checksum is the
+smallest record that does, and it stays right when another walker is rolled back.
 Why: replicas are the honest error bar; walkers shorten wall time on several GPUs without a
 message-passing layer.
 

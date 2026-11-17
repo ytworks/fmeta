@@ -2,10 +2,12 @@
 
 import numpy as np
 import pytest
+from scipy.interpolate import CubicSpline
 
 from fmeta.analysis import analyze_run
+from fmeta.analysis.walkers import SharedBias, hills_on_grid
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
-from fmeta.engine.hills import HillsFollower, merge_hills, read_hills, sum_hills
+from fmeta.engine.hills import HillsFollower, merge_hills, read_colvar, read_hills, sum_hills
 from fmeta.testing.toy import make_simulation, make_toy
 from fmeta.workflow import _rollback_walkers
 
@@ -26,6 +28,29 @@ def make_walker(base, index, n_walkers, seed, **run_kwargs):
 def total_bias(base, grid, n_walkers):
     hills = merge_hills([read_hills(base / f"w{k}" / "HILLS") for k in range(n_walkers)])
     return sum_hills(hills, grid).values, hills
+
+
+def felt_bias(grid, s, rho):
+    """The bias as the force evaluates it: the natural bicubic spline through the grid values."""
+    along_s = CubicSpline(grid.s, grid.values, axis=1, bc_type="natural")(np.clip(s, grid.s_min, grid.s_max))
+    return float(CubicSpline(grid.rho, along_s, bc_type="natural")(min(rho, grid.rho_max)))
+
+
+def rebuilt_and_written(base, grid):
+    """For each of two walkers: the bias of every sample rebuilt from the HILLS files and the
+    record of the walker (NaN where the record says it cannot be rebuilt), and the bias column
+    of its COLVAR."""
+    sources = [base / "w0", base / "w1"]
+    parts = [read_hills(directory / "HILLS") for directory in sources]
+    pairs = []
+    for directory, own, table in zip(sources, parts, hills_on_grid(sources, parts)):
+        colvar = read_colvar(directory / "COLVAR")
+        shared = SharedBias(grid, parts)
+        counts = table[np.searchsorted(own.time, colvar["time"], side="left")]     # own hills before the sample
+        rebuilt = [felt_bias(shared.at(row), s, rho) if row.min() >= 0 else np.nan
+                   for row, s, rho in zip(counts, colvar["s"], colvar["rho"])]
+        pairs.append((np.array(rebuilt), colvar["bias"]))
+    return pairs
 
 
 def test_follower_reads_only_complete_new_lines(tmp_path):
@@ -129,6 +154,79 @@ def test_walkers_stopped_before_a_checkpoint_leave_no_hills_behind(tmp_path, fir
     for walker in (a, b):
         assert np.allclose(walker.bias.grid.values, expected, rtol=1e-7, atol=1e-7)
         walker.close()
+
+
+def test_the_bias_of_a_sample_is_rebuilt_from_what_its_walker_had_read(tmp_path):
+    """Walkers out of step: A deposits 30 hills before B starts, and B is at 10 when A ends. The
+    bias of a sample is the sum of its walker's own hills and of the rows of the other file that
+    the record of the walker names. Without the record there is no estimate from the samples."""
+    _, a = make_walker(tmp_path, 0, 2, seed=1)
+    _, b = make_walker(tmp_path, 1, 2, seed=2)
+    a.run(30)
+    b.run(10)
+    a.run(40)
+    b.run(40)
+    grid = a.bias.grid.empty_copy()
+    a.close()
+    b.close()
+    for rebuilt, written in rebuilt_and_written(tmp_path, grid):
+        # measured: 3e-7 kJ/mol. With all hills up to the time of the sample: 1.1 and 3.3 kJ/mol.
+        assert written.max() > 5.0 and np.abs(rebuilt - written).max() < 1e-5
+
+    (tmp_path / "w1" / "SYNC").unlink()            # a run from before the record existed
+    result = analyze_run(tmp_path, write=False)
+    assert result["dG_reweighted"] is None and result["dG_second_half"] is None
+    assert any("kept no record" in note for note in result["diagnostics"])
+
+
+def test_samples_under_hills_that_a_restart_removed_are_left_out(tmp_path):
+    """B loses 5 hills in a crash after A had read them: the bias of A's samples in between cannot
+    be rebuilt. Those samples are left out and counted; every other sample is rebuilt as before."""
+    _, a = make_walker(tmp_path, 0, 2, seed=1)
+    _, b = make_walker(tmp_path, 1, 2, seed=2)
+    b.run(20)
+    checkpoint = (tmp_path / "w1" / "checkpoint.zip").read_bytes()     # the last one before the crash
+    b.run(25)
+    a.run(20)             # reads the 25 hills of B after its first one
+    a.close()
+    b.close()
+    (tmp_path / "w1" / "checkpoint.zip").write_bytes(checkpoint)
+    _rollback_walkers([tmp_path / "w0", tmp_path / "w1"], CONDITIONS)
+    _, a = make_walker(tmp_path, 0, 2, seed=1)
+    _, b = make_walker(tmp_path, 1, 2, seed=2)
+    a.run(40)
+    b.run(40)
+    grid = a.bias.grid.empty_copy()
+    a.close()
+    b.close()
+
+    (of_a, written_a), (of_b, written_b) = rebuilt_and_written(tmp_path, grid)
+    lost = np.isnan(of_a)
+    assert lost.tolist() == [False] + [True] * 19 + [False] * 20       # A's samples after its hills 1 to 19
+    assert np.abs(of_a - written_a)[~lost].max() < 1e-5 and np.abs(of_b - written_b).max() < 1e-5
+    result = analyze_run(tmp_path, write=False)
+    assert any(note.startswith("19 sample(s) are left out") for note in result["diagnostics"])
+
+
+@pytest.mark.slow
+def test_walkers_far_out_of_step_recover_the_exact_free_energy(tmp_path):
+    """One walker ends its 10 ns before the other starts: half of the samples were taken under a
+    bias far from the sum of the hills up to their time."""
+    errors = []
+    for pair in range(4):
+        base = tmp_path / str(pair)
+        base.mkdir()
+        toy, a = make_walker(base, 0, 2, seed=100 + 2 * pair)
+        _, b = make_walker(base, 1, 2, seed=101 + 2 * pair)
+        a.run(5000)
+        b.run(5000)
+        a.close()
+        b.close()
+        result = analyze_run(base, write=False)
+        errors.append(result["dG_reweighted"] - toy.exact_binding_free_energy(300.0, result["site_max"]))
+    # 12 such pairs: mean -0.17, standard deviation 0.67 kJ/mol. Weighted with all hills up to the
+    # time of a sample: standard deviation 1.63, and -2.28, 0.14, 1.74, -2.10 for these four.
+    assert np.abs(errors).max() < 2.0 and abs(np.mean(errors)) < 1.0
 
 
 @pytest.mark.slow

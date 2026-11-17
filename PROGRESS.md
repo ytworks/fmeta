@@ -29,7 +29,7 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
-FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
 scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
 ended and every check of it that this machine can run has run. Open: the result of CI.
@@ -64,14 +64,15 @@ ended and every check of it that this machine can run has run. Open: the result 
   criteria 2.0 and 3.0. `replicas_sequential` and `replicas_parallel` ran real child processes
   on the GPUs (FM-D14). Speed values (1351 ns/day plain, 1304 with the bias, 925 membrane)
   decide nothing. The record before it: d4bbcc6, the code before that fix.
-- Review of PR #1 (2026-11-16, 6 findings on ec27496): being fixed one commit each. Done: a
-  walker without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
+- Review of PR #1 (2026-11-16, 6 findings on ec27496): fixed one commit each. A walker
+  without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
   restart under other conditions is refused (FM-D5); the protein of a split complex keeps the
   protonation states its residue names state (5792001); a complex is split only with the
   SMILES of the ligand (FM-D11); an amino acid without a backbone atom is rebuilt before the
-  chains are split, never dropped (FM-D15). Open: the bias of asynchronous walkers in the
-  cross-checks. The code after 7386d28 has no gate record yet: the gates and the image check
-  run once on the last fix.
+  chains are split, never dropped (FM-D15); a sample of a walker is weighted with the bias
+  that walker had, rebuilt from its `SYNC` record (FM-D9, FM-D10). The replies on the review
+  threads are not posted (no GitHub write access in the session). The code after 7386d28 has
+  no gate record yet: the gates and the image check run once on this last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -121,6 +122,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-17 — [amendment] FM-D9, FM-D10: a sample of a walker is weighted with the bias that walker had, rebuilt from a record of the hills it had read
+- What: every walker writes `SYNC` (one line per read of the other HILLS files: its own hill count, and per walker the rows read with their checksum); it is flushed with the checkpoint and cut or removed with HILLS on a restart. The estimates from the samples (`dG_reweighted`, `dG_second_half`) slice each walker on its own time axis and take the bias from its own hills and the recorded rows (`fmeta.analysis.walkers`). A sample whose rows are no longer on disk is left out and counted; walkers without a record get neither estimate. The headline from the bias and the estimates of a run without walkers are unchanged (identical to the last digit on two replicas of the examples). Toy system, Reference: the rebuilt bias of every sample is 3e-7 kJ/mol from COLVAR (test: 1e-5); one walker after the other, 12 pairs of 2 × 10 ns: `dG_reweighted` −0.17 ± 0.19 kJ/mol from exact, standard deviation 0.67 (former rule: 1.63). The slow test's criterion fails by value under the former code (−2.28, 0.14, 1.74, −2.10 on its four pairs); the two fast tests need the new record and cannot run there. `ruff` passes, `pytest` 169 passed, the two slow walker tests passed. Not run on this code: GPU gates and the image check (next, once).
+- Why: review of PR #1: walkers read each other as wall-clock time allows, so the sum of all hills up to the time of a sample is not the bias the sample felt (off by 1.1 and 3.3 kJ/mol for toy walkers out of step). The owner chose the record over giving no estimate. No committed result came from a run with walkers.
+- Refs: FM-D9 (fourth amendment), FM-D10 (amendment); `src/fmeta/analysis/walkers.py`, `src/fmeta/analysis/__init__.py`, `src/fmeta/engine/hills.py`, `src/fmeta/engine/runner.py`, `tests/test_walkers.py`, `.claude/rules/numerics-invariants.md`, `README.md`.
 
 ### 2026-11-17 — [amendment] FM-D15: an amino acid without a backbone atom is rebuilt before the chains are split, never dropped
 - What: a residue named as an amino acid that lacks N, CA or C is no longer removed with the non-protein residues. With PDBFixer `read_protein` builds its atoms on the structure as read, before the model is made (missing atoms only: no terminal oxygen, no replacement of non-standard residues); without PDBFixer `prepare` stops and names the residues and atoms. Notes and `info.protein_input.backbone_rebuilt` list what was rebuilt; a file without such a residue is read as before. The new test (LEU1 without CA, ALA16 without C) failed before the fix; rebuilt atoms lie 0.004 to 0.022 nm from the complete file. `ruff` passes, `pytest` 167 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).
