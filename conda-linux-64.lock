@@ -2,6 +2,7 @@
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
 # cuda-compat: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-compat-13-4_615.71.10-1ubuntu1_amd64.deb sha256=f62ed0d30d8939bba3a7b55727e3fd70d657ae4973fa2875e775068a2c305f30
+# cuda-mps: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/libnvidia-compute_615.71.10-1ubuntu1_amd64.deb sha256=19506425f38b84a4f0a60bd9e57f85c18eb0a4fae8de142aff76afd43f25365c
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/linux-64/llvm-openmp-23.1.5-h7148c6a_0.conda#9cce0e7f4ded5b077718d11f9ccb5fa3
 https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-8_kmp_llvm.conda#b4d1b93dd1dab4eea23395fd5e5b357d

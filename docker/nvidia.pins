@@ -1,7 +1,8 @@
 # Files from NVIDIA that conda-forge does not have. scripts/update_lock.sh reads this file and
-# writes both into conda-linux-64.lock (the plugin as a package line, the compatibility
-# libraries as a comment line that the Dockerfile reads), so the lock stays the one description
-# of what the image holds. After a change here: scripts/update_lock.sh.
+# writes them into conda-linux-64.lock (the plugin as a package line, the others as comment
+# lines that the image build reads), so the lock stays the one description of what the image
+# holds. After a change here: scripts/update_lock.sh (with --pins when only the files of the
+# comment lines changed: the packages of the lock then stay as they are).
 #
 # NVIDIA cuPotential, the plugin for OpenMM: the conda channel of a release (the package and its
 # index). The package is the file of the same release that the index names.
@@ -11,3 +12,10 @@ PLUGIN_CHANNEL_SHA256=5689ab3d002bb9b068c802225a810f5342e93f6b9f65ce6b4cbfcb722c
 # them the CUDA 13.4 runtime of the image works on a host driver older than R615.
 CUDA_COMPAT_URL=https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-compat-13-4_615.71.10-1ubuntu1_amd64.deb
 CUDA_COMPAT_SHA256=f62ed0d30d8939bba3a7b55727e3fd70d657ae4973fa2875e775068a2c305f30
+# The NVIDIA MPS programs of the driver the compatibility libraries come from (the same apt
+# repository; the image takes nvidia-cuda-mps-control and nvidia-cuda-mps-server from the
+# package and nothing else). An MPS daemon and the CUDA driver library of its clients must be of
+# one version: where a container uses the compatibility libraries, it uses these programs. The
+# version of this package must be that of CUDA_COMPAT_URL (the image build checks it).
+CUDA_MPS_URL=https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/libnvidia-compute_615.71.10-1ubuntu1_amd64.deb
+CUDA_MPS_SHA256=19506425f38b84a4f0a60bd9e57f85c18eb0a4fae8de142aff76afd43f25365c

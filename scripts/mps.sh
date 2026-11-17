@@ -11,6 +11,10 @@
 # Only containers started with --mps are clients; anything else keeps using the GPUs directly,
 # also on the same GPU. The daemon and its clients run as the calling user. If the MPS server
 # of a GPU fails, all its clients end: run them again and they continue from their checkpoints.
+# The MPS programs are those of the driver whose CUDA library the containers load: the host's,
+# or the image's own where the image's compatibility libraries are in use (a host driver older
+# than R615; the entry of the image chooses, docker/entrypoint.sh). A client then has no OpenCL
+# platform.
 # FMETA_MPS_NAME (default fmeta-mps) names the container, FMETA_MPS_DIR (default
 # /tmp/fmeta-mps-UID) holds its pipe and log directories.
 set -euo pipefail
@@ -28,7 +32,7 @@ case "${1:-}" in
         docker run --detach --name "$NAME" --gpus "$GPUS" --ipc shareable \
             --user "$(id -u):$(id -g)" -v "$DIR/pipe":/tmp/nvidia-mps -v "$DIR/log":/var/log/nvidia-mps \
             -e CUDA_DEVICE_ORDER=PCI_BUS_ID --entrypoint /opt/conda/bin/tini "$IMAGE" \
-            -- nvidia-cuda-mps-control -f > /dev/null
+            -- /usr/local/bin/fmeta-entry nvidia-cuda-mps-control -f > /dev/null
         echo "MPS daemon $NAME started; logs in $DIR/log" ;;
     status)
         docker container inspect --format '{{.Name}} {{.State.Status}} since {{.State.StartedAt}}' "$NAME" ;;

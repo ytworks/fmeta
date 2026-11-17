@@ -11,11 +11,12 @@ PROGRESS.md budget, evidence index, CPU tests, the image build). Criteria:
   (`docker info` lists the `nvidia` runtime). The CUDA runtime of the image is 13.4: with a
   driver of R615 or newer nothing else is needed; with an older one (R595 on the GPU machine)
   the toolkit puts the CUDA compatibility libraries of the image on the loader path (toolkit
-  1.19.1, `cuda-compat-mode = "ldconfig"`), and NVIDIA MPS cannot be used (FM-D13). A gate
-  record names the driver and the `libcuda` that was loaded.
+  1.19.1, `cuda-compat-mode = "ldconfig"`), and NVIDIA MPS runs with the MPS programs of the
+  image (FM-D13; "Several replicas on one GPU" below). A gate record names the driver and the
+  `libcuda` that was loaded.
 - The image. `scripts/in_docker.sh` builds it from `conda-linux-64.lock` on first use (about
-  7.4 GB: the CUDA build of OpenMM, NVIDIA's cuPotential plugin and CUDA compatibility
-  libraries, the ligand-parameter generators `openmmforcefields`, `openff-toolkit` and
+  7.4 GB: the CUDA build of OpenMM, NVIDIA's cuPotential plugin, CUDA compatibility libraries
+  and MPS programs, the ligand-parameter generators `openmmforcefields`, `openff-toolkit` and
   `ambertools`, and the test tools). It refuses an image that was built from another lock;
   `scripts/in_docker.sh --build ...` rebuilds.
 - Two GPUs, and both free: `nvidia-smi --query-compute-apps=pid,process_name --format=csv` shows
@@ -63,14 +64,19 @@ the items and reports them, and records nothing.
 
 ## After a change of the environment
 
-Packages change in `environment.yml`; the release of NVIDIA's cuPotential plugin and the file
-of the CUDA compatibility libraries, each with its sha256, in `docker/nvidia.pins`. Then:
+Packages change in `environment.yml`; the release of NVIDIA's cuPotential plugin, the file of
+the CUDA compatibility libraries and the file of the MPS programs of the same driver, each with
+its sha256, in `docker/nvidia.pins`. Then:
 
 ```bash
 scripts/update_lock.sh                           # solves the lock in a container
 scripts/in_docker.sh --build pytest              # rebuilds the image and runs the CPU tests
 scripts/in_docker.sh pytest -m slow
 ```
+
+When only the compatibility libraries or the MPS programs changed, `scripts/update_lock.sh
+--pins` rewrites their two lines of the lock and leaves the packages as they are. The hash of
+the lock changes either way.
 
 Commit the lock, and rerun the gates on that commit (the procedure above): the evidence of the
 old lock does not cover the new image.
@@ -131,6 +137,15 @@ scripts/mps.sh stop                              # ends every client: stop the r
 
 Only containers started with `--mps` are clients of the daemon. If the MPS server of a GPU
 fails, all its clients end; the same `fmeta run` command continues from the checkpoints.
+
+The daemon, its server and the CUDA driver library of a client must be of one driver version.
+With a host driver of R615 or newer they are all the host's. With an older one the containers
+load the compatibility libraries of the image (615.71.10), and the entry of the image
+(`fmeta-entry`, `docker/entrypoint.sh`) then takes the MPS programs of the same driver from the
+image (`/opt/fmeta/mps/bin`) and hides NVIDIA's OpenCL library from a client: under that daemon
+the OpenCL library of the host does not return from its start, and `import openmm` would wait
+for ever. Such a client has the CUDA platform and no OpenCL platform (FM-D13). A command that
+bypasses the entry (`docker run --entrypoint ...`, `docker exec`) gets neither.
 
 The scheduler starts every replica with one math-library thread (`OMP_NUM_THREADS`,
 `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS`; a value the caller sets is kept). With the default

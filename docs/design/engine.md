@@ -22,7 +22,8 @@ FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chai
 before a missing backbone atom is rebuilt); from its third round (2026-11-17): FM-D15 (the caps
 of the input stand in the chain before a missing backbone atom is rebuilt); FM-D13 amended
 (2026-11-17, owner request: the image holds NVIDIA's cuPotential plugin, with OpenMM 8.4.0 on
-CUDA 13.4 and the CUDA compatibility libraries; open: NVIDIA MPS on a host driver below R615);
+CUDA 13.4 and the CUDA compatibility libraries; and again the same day: the image holds the MPS
+programs of the driver of those libraries, so NVIDIA MPS works on a host driver below R615);
 FM-D18 added (2026-11-17, owner request: the cuPotential plugin as the back end of a run, an
 option until its configuration and its accuracy are measured).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
@@ -467,9 +468,53 @@ built for: OpenMM 8.4.0 on CUDA 13.4 (before: 8.6.1 on CUDA 12.9), Python 3.12. 
   runtime (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). So on this host a process of the new image
   has a GPU context of its own, and several replicas on one GPU at the same time (`run.per_gpu`
   above 1, FM-D14) need a host driver of R615 or newer. Not tried: the MPS programs of driver
-  R615 run in a container on the R595 kernel module.
+  R615 run in a container on the R595 kernel module. (Tried the same day: the next amendment.)
 Why: the plugin has no build for another OpenMM or CUDA version, and one image stays the rule:
 the environment moves as a whole, and its tests and gates are taken again in it.
+Amendment (2026-11-17, owner: the driver of the host is not raised for now, and the MPS programs
+of driver R615 may be tried in a container): the image holds the two NVIDIA MPS programs of the
+driver its compatibility libraries come from (`nvidia-cuda-mps-control` and
+`nvidia-cuda-mps-server` of `libnvidia-compute` 615.71.10, in `/opt/fmeta/mps/bin`), and a
+container uses them exactly when it uses the compatibility libraries. This closes the open point
+above: `run.per_gpu` above 1 works with a host driver older than R615.
+- The rule: an MPS daemon, its server and the CUDA driver library of every client are of one
+  driver version. The entry of the image (`docker/entrypoint.sh`) puts the programs of the image
+  first on `PATH` when the loader resolves `libcuda.so.1` to the compatibility libraries, and
+  `scripts/mps.sh start` starts the daemon through the entry. With a host driver of R615 or
+  newer the compatibility libraries are not used, and the programs are the host's, as before.
+- An MPS client has no OpenCL platform there. Under the R615 daemon a process that loads
+  NVIDIA's OpenCL library of the host (595.99.02) does not return from the start of OpenCL,
+  and `import openmm` loads the OpenCL platform: a client waited for ever. The entry hides the
+  OpenCL vendors (`OCL_ICD_VENDORS` names an empty directory) when the compatibility libraries
+  are in use and the control socket of an MPS daemon is in the container. Such a client has the
+  Reference, CPU and CUDA platforms; a container that is no MPS client keeps OpenCL. A command
+  that bypasses the entry (`docker exec`, another `--entrypoint`) gets neither change.
+- What the lock describes: `docker/nvidia.pins` names the package and its sha256, the lock holds
+  it as a second comment line (`scripts/update_lock.sh --pins` rewrites these lines without a
+  new solve: the packages of the lock are those of the gate record of abd4548), and the image
+  build takes the two programs and the licence text from it and refuses a package whose version
+  is not that of the compatibility libraries. The licence of the package permits the
+  distribution of its unmodified binaries together with its text
+  (`/opt/fmeta/licenses/libnvidia-compute`).
+- Measured on this host (driver 595.99.02). First with the programs mounted from the unpacked
+  package into a container of the former image: the daemon and its server start on the R595
+  kernel module, the server loads the compatibility `libcuda` 615.71.10, and 4 replicas of the
+  soluble test system ran at the same time on one GPU as its clients (`fmeta run --per-gpu 4`
+  with the cuPotential back end, a run and its continuation to 3 ns, both with exit 0).
+  Then with the image built from the lock of this amendment (image 648480d3…, lock ee32ef34…).
+  A container with a GPU finds the two programs of the image on `PATH` and has the platforms
+  Reference, CPU, CUDA and OpenCL; a container without a GPU finds no MPS program. The daemon
+  was started by `scripts/mps.sh start 6,7`. In a client (`scripts/in_docker.sh --mps`)
+  `OCL_ICD_VENDORS` names the empty directory, `import openmm` returns and the platforms are
+  Reference, CPU and CUDA. 4 replicas of the soluble test system (24062 atoms) ran at the same
+  time on one GPU as clients of that daemon, once with the cuPotential back end and once with
+  stock OpenMM (`fmeta run --per-gpu 4`, 0.5 ns each: `nvidia-smi` listed the 4 processes of
+  each GPU as MPS clients, every HILLS has 503 lines, both runs with exit 0; stock OpenMM at 925
+  to 934 ns/day per replica). In that image `ruff check .` passes and `pytest` 193 passed.
+- No test covers this: CI has no GPU and no MPS. The check is the runs above.
+Why: several replicas on one GPU are where the throughput of a GPU is (FM-D14), and the driver of
+a host is not the project's to change. The other ways were measured and fail: the daemon of the
+host with a client on the compatibility library, and a client on the library of the host.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by

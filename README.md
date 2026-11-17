@@ -30,8 +30,8 @@ docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD":/work fmeta \
 
 - イメージのエントリポイントは `fmeta` です。この README に出てくる `fmeta ...` のコマンドは、`docker run ... fmeta` の後ろに続けて書きます。`doctor` を付けると、使えるプラットフォームと同梱パッケージを確認できます。
 - 環境は `conda-linux-64.lock` で固定してあります。`environment.yml` から解いた明示的なロックで、イメージは常にこのロックからビルドします。検証した環境と配布する環境が同じになります。
-- イメージには NVIDIA のソフトウェア（OpenMM 用の cuPotential プラグインと CUDA の互換ライブラリ）が NVIDIA のライセンスで入っています。ライセンス文書はイメージの `/opt/fmeta/licenses` にあります。
-- イメージの CUDA ランタイムは 13.4 です。ホストのドライバが R615 以上ならそのまま動きます。それより古いドライバでは、NVIDIA Container Toolkit がイメージ内の互換ライブラリを有効にします。この場合、NVIDIA MPS（1 枚の GPU で複数のレプリカを同時に走らせる `run.per_gpu`）は使えません。
+- イメージには NVIDIA のソフトウェア（OpenMM 用の cuPotential プラグイン、CUDA の互換ライブラリ、同じドライバの MPS プログラム）が NVIDIA のライセンスで入っています。ライセンス文書はイメージの `/opt/fmeta/licenses` にあります。
+- イメージの CUDA ランタイムは 13.4 です。ホストのドライバが R615 以上ならそのまま動きます。それより古いドライバでは、NVIDIA Container Toolkit がイメージ内の互換ライブラリを有効にします。この場合、NVIDIA MPS（1 枚の GPU で複数のレプリカを同時に走らせる `run.per_gpu`）にはイメージ内の MPS プログラムを使います。切り替えはイメージのエントリが自動で行います。MPS のクライアントになったコンテナでは OpenCL プラットフォームが使えません（CUDA は使えます）。
 - 使う GPU は `--gpus '"device=2,3"'` のように絞れます。コンテナの中では、渡した GPU が 0 から番号づけされます。
 - 長い計算は `--rm` の代わりに `-d --name run1` を付けて切り離します。ログは `docker logs -f run1`、停止は `docker stop run1` です。`docker rm run1` のあと同じコマンドを実行すると、チェックポイントから再開します。
 

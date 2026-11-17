@@ -9,8 +9,9 @@
 # environment the GPU gates were recorded in. Change packages in environment.yml, NVIDIA's files
 # in docker/nvidia.pins, and regenerate the lock with scripts/update_lock.sh.
 #
-# The image holds software of NVIDIA under NVIDIA's licence (the cuPotential plugin and the CUDA
-# compatibility libraries): the texts are in /opt/fmeta/licenses.
+# The image holds software of NVIDIA under NVIDIA's licences (the cuPotential plugin, the CUDA
+# compatibility libraries and the MPS programs of their driver): the texts are in
+# /opt/fmeta/licenses.
 FROM mambaorg/micromamba:2.10.0-ubuntu24.04@sha256:c3897a06f87c1c13f038188b3665a8c4162da62eac5109ae6a939d1e290dcefa
 
 LABEL org.opencontainers.image.source="https://github.com/ytworks/fmeta" \
@@ -28,8 +29,8 @@ USER root
 RUN mkdir -p /etc/OpenCL/vendors \
     && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd \
     && mkdir -p /work && chmod 1777 /work
-# The CUDA compatibility libraries (the file and its sha256 are named in the lock) and the
-# licence texts of NVIDIA's software.
+# The CUDA compatibility libraries and the MPS programs of their driver (the files and their
+# sha256 sums are named in the lock) and the licence texts of NVIDIA's software.
 RUN --mount=type=bind,source=docker/install_nvidia.sh,target=/tmp/install_nvidia.sh \
     bash /tmp/install_nvidia.sh
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/fmeta-entry
