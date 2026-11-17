@@ -66,6 +66,14 @@ and MUE 0.55 kcal/mol, R² 0.86, Kendall tau 0.81.
 `config` in `set.yaml` is empty: the defaults of fmeta, at 300 K. The standard state of every
 value is 1 mol/L.
 
+The back end of the runs is the default as well (`run.backend: auto`, FM-D18 in
+`docs/design/engine.md`): in the official image a new work directory runs with NVIDIA's
+cuPotential plugin of OpenMM, and a report names the back end of its replicas. The result below
+was made with OpenMM's own forces and integrator, before `run.backend` existed. A work
+directory of that time has another configuration than the set asks for today, and
+`fmeta benchmark` refuses to go on in it; with `config: {run: {backend: openmm}}` in `set.yaml`
+the set is the one it was prepared for.
+
 ## The protein file as fmeta reads it
 
 Measured on 2026-11-16 with commit eeb5302 (`fmeta benchmark prepare`, then

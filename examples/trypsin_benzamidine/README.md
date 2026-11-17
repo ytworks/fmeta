@@ -41,6 +41,12 @@ scripts/in_docker.sh fmeta analyze runs/tb --plot          # after the run, or d
 `docker stop fmeta-tb` stops the run; the same `fmeta run` command continues it from the last
 checkpoints. With one GPU use `--gpus 0` and `--mode sequential`.
 
+In the official image the production run is made with NVIDIA's cuPotential plugin of OpenMM:
+`run.backend` is `auto` by default (FM-D18, `docs/design/engine.md`). `fmeta status` names the
+back end of every replica; `run: {backend: openmm}` in `fmeta.yaml` gives OpenMM's own forces
+and integrator. Every number in this file was measured with OpenMM's own forces and integrator,
+before `run.backend` existed.
+
 ## What the preparation gives (measured on 2026-11-15 UTC, commit 8d1f10a)
 
 - Removed from the entry: BEN × 1, CA × 1, HOH × 62. 1591 hydrogens added at pH 7. The six
