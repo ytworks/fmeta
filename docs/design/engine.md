@@ -19,7 +19,8 @@ the ligand), FM-D15 (an amino acid without a backbone atom is rebuilt before the
 split, never dropped), FM-D9 and FM-D10 (a sample of a walker is weighted with the bias that
 walker had, rebuilt from a record of the hills it had read); from its second round (2026-11-17):
 FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chain ends at a gap
-before a missing backbone atom is rebuilt).
+before a missing backbone atom is rebuilt); from its third round (2026-11-17): FM-D15 (the caps
+of the input stand in the chain before a missing backbone atom is rebuilt).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -624,6 +625,22 @@ without its C, residues 15 to 17 missing, and the C was built 0.28 nm from the N
 where 0.447 nm lie between the two; `prepare` stopped with "no room for caps". With the chain
 ended there the C lay 0.107 nm from its place (no template) and the caps had no room next to
 the hydrogens; with the template 0.040 nm, and the model has 32 amino acids, NME and ACE.
+Amendment (2026-11-17, third review of PR #1): before that pass the acetyl and N-methyl groups of
+the input that are bonded to a chain end are put into the chain as ACE and NME, wherever the
+file has them and whatever it calls them (`caps_in_place`). PDBFixer builds a missing N or C with
+its bond to a cap it knows; a cap written as UNK after the chain it does not know. The reviewed
+code rebuilt the N of the first residue 0.198 nm from the acetyl carbon: above the bond rule
+(`CAP_BOND_NM`, 0.17 nm), so the cap was removed with the hetero components and the terminus
+became charged (net charge +2 instead of +1, note "removed from the protein file: UNK x1").
+With the cap in the chain the N lies 0.146 nm from the acetyl carbon and 0.021 nm from its place
+(C at the other end: 0.131 and 0.005 nm), both caps are kept and the charge is +1. A cap is
+found from the backbone atom of the end residue nearest to it along the chain: N or C within
+`CAP_BOND_NM`, or CA within 0.30 nm (`REACH_NM`, two bonds) when N or C is the missing atom.
+Two refusals instead of a silent removal: a cap-shaped group that only the far backbone atom
+can place (three bonds, both atoms between missing), and, in `build_model`, a cap-shaped group
+not bonded to a chain end but nearer to it than atoms without a bond come (`CAP_CLASH_NM`,
+0.3 nm). No criterion changed. The second case of the review (C of the last residue missing)
+kept its cap on this machine before the change, by 0.008 nm (0.162 nm); it is a test all the same.
 Why: a residue counted as an amino acid only with all three atoms. LEU1 without its CA was
 dropped as a hetero residue (34 residues, note "removed from the protein file: LEU x1"), and
 ALA16 without its C stopped `prepare` with a message about SER15 and PHE17, although PDBFixer,
