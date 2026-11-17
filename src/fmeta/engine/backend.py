@@ -28,10 +28,11 @@ BACKENDS = ("auto", "cupotential", "openmm")
 
 # What the plugin provides in a run, by the kind of system (measured choice, FM-D18). There is
 # no replacement for the membrane barostat; "barostat" stands for the isotropic one.
-CONFIGURATION = {"soluble": ("force", "integrator"), "membrane": ("force", "integrator")}
+CONFIGURATION = {"soluble": ("force", "integrator", "barostat"), "membrane": ("force", "integrator")}
 
 EWALD_TOLERANCE = 5e-4      # the only tolerance the plugin sizes its mesh for
 BOX_CUTOFFS = 3.0           # the plugin needs a box of at least this many cutoffs
+COM_INTERVAL = 100          # steps between removals of centre-of-mass motion by the plugin's integrator
 
 
 @dataclass(frozen=True)
@@ -186,12 +187,15 @@ def build(backend: Backend, system: mm.System, temperature: float, friction: flo
                 stock.getDefaultPressure(), stock.getDefaultTemperature(), stock.getFrequency(),
                 stock.getRandomNumberSeed()))
         if "integrator" in backend.parts:
-            # the plugin's integrator removes the motion of the centre of mass itself
-            for index in reversed(range(system.getNumForces())):
-                if isinstance(system.getForce(index), mm.CMMotionRemover):
-                    system.removeForce(index)
+            # The plugin's integrator removes the motion of the centre of mass itself, and does so
+            # unless it is told otherwise. It does it where the System asked for it and nowhere
+            # else: the one massive particle of the toy is its centre of mass.
+            removers = [index for index in range(system.getNumForces())
+                        if isinstance(system.getForce(index), mm.CMMotionRemover)]
+            for index in reversed(removers):
+                system.removeForce(index)
             integrator = nv.LangevinMiddleIntegrator(temperature * kelvin, friction / ps, timestep * ps,
-                                                     seed=seed)
+                                                     comFrequency=COM_INTERVAL if removers else 0, seed=seed)
         else:
             integrator = mm.LangevinMiddleIntegrator(temperature * kelvin, friction / ps, timestep * ps)
             if seed:

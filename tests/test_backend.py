@@ -27,7 +27,7 @@ DODECAHEDRON = (mm.Vec3(4, 0, 0), mm.Vec3(0, 4, 0), mm.Vec3(2, 2, 4 / 2**0.5))  
 @pytest.fixture
 def stand_in(monkeypatch):
     """The plugin's entry points, made of OpenMM objects that can be told from the stock ones."""
-    barostats = []
+    barostats, com_intervals = [], []
 
     def nonbonded(stock):
         force = mm.CustomExternalForce("0")
@@ -40,13 +40,15 @@ def stand_in(monkeypatch):
         force.setName("PluginBarostat")
         return force
 
-    def integrator(temperature, friction, step, seed=0):
+    def integrator(temperature, friction, step, comFrequency=100, seed=0):     # the plugin's defaults
+        com_intervals.append(comFrequency)
         made = mm.BrownianIntegrator(temperature, friction, step)
         made.setRandomNumberSeed(seed)
         return made
 
     namespace = types.SimpleNamespace(NonbondedForce=nonbonded, MonteCarloBarostat=barostat,
-                                      LangevinMiddleIntegrator=integrator, barostats=barostats)
+                                      LangevinMiddleIntegrator=integrator, barostats=barostats,
+                                      com_intervals=com_intervals)
     monkeypatch.setattr(backend, "plugin", lambda: namespace)
     return namespace
 
@@ -234,6 +236,16 @@ def test_the_plugin_takes_the_place_of_exactly_the_parts_it_provides(stand_in):
     system, bias = run_system(membrane=True)                   # there is no plugin barostat for a membrane
     build(Backend("cupotential", ("force", "integrator", "barostat")), system, 300.0, 1.0, 0.004, bias=bias)
     assert "MonteCarloMembraneBarostat" in names(system) and "PluginBarostat" not in names(system)
+
+
+def test_the_plugin_integrator_removes_centre_of_mass_motion_only_where_the_system_asked_for_it(stand_in):
+    """Its removal is on unless it is told otherwise. On the toy, whose one massive particle is
+    the centre of mass, the particle then had 247 K under a thermostat of 300 K (FM-D18)."""
+    build(Backend("cupotential", ("integrator",)), make_toy().system, 300.0, 1.0, 0.02)
+    system, _ = run_system()
+    build(Backend("cupotential", ("force", "integrator")), system, 300.0, 1.0, 0.004)
+    without_remover, with_remover = stand_in.com_intervals
+    assert without_remover == 0 and with_remover > 0
 
 
 def test_openmm_leaves_the_system_as_it_is(stand_in):

@@ -1069,10 +1069,10 @@ subset picked by noise.
 
 ### FM-D18 — The back end of a run: NVIDIA's cuPotential plugin in place of OpenMM's nonbonded force and integrator
 Status: **Accepted** (2026-11-17, owner request). In force as an option: `run.backend` is
-`openmm` unless a configuration says otherwise. Open until measured (plan
-`docs/plans/2026-11-17-cupotential-backend.md`, M2 to M4): which parts the plugin provides for
-each kind of system, the accuracy criteria of a gate item for the back end, and `auto` as the
-default.
+`openmm` unless a configuration says otherwise. The parts the plugin provides for each kind of
+system are chosen from measurements (M2 of the plan
+`docs/plans/2026-11-17-cupotential-backend.md`). Open (M3, M4): the accuracy criteria of a gate
+item for the back end, and `auto` as the default.
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
@@ -1092,8 +1092,25 @@ and to `device.json` (`backend_reason`). An error of the plugin that has no name
 run: it is never turned into a run with OpenMM.
 What the plugin provides is one set of parts for each kind of system (soluble, membrane), out
 of the force, the integrator and the isotropic barostat (`CONFIGURATION`); it has no
-replacement of the membrane barostat. Its integrator removes the motion of the centre of mass
-itself, so the `CMMotionRemover` leaves the System with it. The plugin sizes its mesh and its
+replacement of the membrane barostat. The rule of the choice: of the sets that pass every gate,
+the one with the largest simulated time per day on one GPU, summed over its replicas (1, 4, 6
+and 8 per GPU under MPS); a kind of system for which no set is faster than stock OpenMM in the
+same image gets OpenMM under `auto`. Measured on 2026-11-17 with the bias, in calls of
+`fmeta run` on the TYK2 example (88479 atoms) and the A2A example (221068 atoms, membrane); the
+numbers are in no tracked file (below). Chosen: force, integrator and barostat for a soluble
+system, force and integrator for a membrane system. For the soluble system the sets with and
+without the plugin's barostat are not separated at their best number of replicas per GPU (4
+repeats each): the set with the barostat is the largest by the rule, and it is ahead beyond the
+scatter with one replica per GPU, the default `run.per_gpu`. The choice stands only with the
+gates of the final code (M3, M4).
+Its integrator removes the motion of the centre of mass itself, every 100 steps unless it is
+told otherwise. Where the System holds a `CMMotionRemover`, that force leaves the System and
+the plugin's integrator does its work (`COM_INTERVAL`); where the System holds none, the
+plugin's integrator is told not to (`comFrequency` 0). Measured on the toy system, whose one
+massive particle is its centre of mass (200000 steps of 0.02 ps under a thermostat of 300 K,
+friction 1/ps, CUDA, mixed precision; kinetic temperature of the particle, error from 20
+blocks): stock integrator 298.4 ± 3.7 K; the plugin's integrator as it comes 246.9 ± 3.8 K;
+with its removal off 304.0 ± 4.6 K. The plugin sizes its mesh and its
 cell list when the Context is made, from the default box of the System: the box of the
 equilibrated state is made that box before the Context exists, also when a run continues, so
 every Context of a run has the same mesh. The probe of the CVs (FM-D4) is taken out of the
