@@ -20,7 +20,22 @@ split, never dropped), FM-D9 and FM-D10 (a sample of a walker is weighted with t
 walker had, rebuilt from a record of the hills it had read); from its second round (2026-11-17):
 FM-D5 and FM-D10 (the set of walkers of a replica may only grow), FM-D15 (a chain ends at a gap
 before a missing backbone atom is rebuilt); from its third round (2026-11-17): FM-D15 (the caps
-of the input stand in the chain before a missing backbone atom is rebuilt).
+of the input stand in the chain before a missing backbone atom is rebuilt); FM-D13 amended
+(2026-11-17, owner request: the image holds NVIDIA's cuPotential plugin, with OpenMM 8.4.0 on
+CUDA 13.4 and the CUDA compatibility libraries; and again the same day: the image holds the MPS
+programs of the driver of those libraries, so NVIDIA MPS works on a host driver below R615);
+FM-D18 added (2026-11-17, owner request: the cuPotential plugin as the back end of a run, an
+option until its configuration and its accuracy are measured); FM-D12 amended (2026-11-17: the
+tolerances of the default 20 ns toy test come from its measured scatter over 48 seeds, after a
+CI failure by 0.0015 kJ/mol on another CPU; the criteria of the gate and of the `slow` test are
+unchanged); FM-D13 amended a third time (2026-11-17: the MPS daemon runs with protocol 3, after
+the daemon of the default protocol stopped answering at about 50 client starts); FM-D18 in
+force as the default (2026-11-17: `run.backend` is `auto`; a benchmark set names the back end
+of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended to follow, and
+the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
+review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
+of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
+with these amendments passed with both back ends (80d7dc7, one record each).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -108,6 +123,21 @@ of the speed there. On Reference and CPU a table update of a `CustomCentroidBond
 `CustomCentroidBondForce` and a second, zero-energy force that only reads the CVs and is left
 out of the integration; Reference and CPU get one `CustomCVForce`. A context of the other kind
 is refused.
+Amendment (2026-11-17, FM-D18): the bias and its mechanism are the same under every back end.
+The cuPotential plugin replaces the `NonbondedForce` of the System and nothing of the funnel:
+the force of the bias, the force that reads the CVs, the CVs and the walls stay OpenMM's own,
+in their force groups (the plugin's force takes the group of the force it replaces). The force
+that reads the CVs is taken out of the integration when the integrator is made, before the
+Context exists (`build`, `engine/backend.py`); before FM-D18 only the runner did it, on the
+Simulation it was handed, and it still does. Whether an integrator of the plugin reads its
+force groups again after the Context is made was not tested, and a force left in would be
+computed in every step without an error. Checked: the
+items `backend` and `membrane_backend` compare the CVs and the wall and bias energies and
+forces of the two back ends at the same coordinates (FM-D18; identical in the measurements).
+The three measurements above are of OpenMM 8.6.1 and were not repeated with the 8.4.0 of the
+image (FM-D13, amendment of 2026-11-17). With 8.4.0 the form of the GPU platforms passes
+`forces` and runs at 95% of the speed of plain MD (1406 against 1481 ns/day on the test system
+of `fmeta check`, OpenMM's back end, gate record of 565b359).
 Why: OpenMM tables are zero outside their range (the bias would vanish when a CV overshoots);
 hill logging, exact restart and bias sharing need access the stock class does not give. A test
 keeps the table equal to the stock class for the same hills. Every hill costs a fit and a
@@ -143,6 +173,20 @@ directory is judged, not `run.yaml`, which a restart does not rewrite. This corr
 sentence above ("the walker settings may change"): with `run.walkers` cut from 3 to 2 the two
 walkers continued without the hills of `w2`, while the analysis adds every HILLS file of the
 replica; the bias of the analysis was off by up to 2.74 kJ/mol from the bias of the run.
+Amendment (2026-11-17, FM-D18): the back end is one of the conditions of a run. `run.yaml`
+names it (`backend`, and `backend_parts`: what the plugin provided); a `run.yaml` without the
+entry is a run with OpenMM. A run that continues under `run.backend: auto` follows its record
+and gets the same parts; another back end by name is refused before a device is chosen or a
+file is touched (`settle`, `engine/backend.py`), with walkers before any walker is rolled back,
+and `check_same_run` judges the entry like the others. The block `system` of `run.yaml` is
+read before forces are replaced, so it does not depend on the back end. `device.json` names
+what the last segment of a run began from (`restored_from`: `checkpoint`, the binary
+checkpoint; `state`, the State XML that is read when the binary one does not load; null for a
+new run), and the items `toy_restart` and `production` require `checkpoint`. The hills and
+samples of one run are then those of one set of forces, and a back end whose checkpoint cannot
+be read does not pass as a restart. Not measured: whether a continued run under the plugin
+repeats an uninterrupted one byte for byte; the test of this decision is on the Reference
+platform, with OpenMM's integrator.
 Why: a crash between files must not leave a mixed state; on the Reference platform a split run
 reproduces the continuous one byte for byte, which makes restart testable.
 
@@ -395,6 +439,29 @@ numerics (toy system, numpy references, Reference platform, the order of the sch
 decisions). Not decided by this amendment, and unchanged until the owner decides: the sentence
 of the test policy that the default `pytest` passes on a CPU-only machine, and the `cpu` job
 of CI.
+Amendment (2026-11-17): the tolerances of the default 20 ns toy test are taken from its
+measured scatter. The criteria of the gate (10 ns) and of the `slow` test (4 × 40 ns) are
+unchanged. `tests/test_analysis.py::test_toy_binding_free_energy_end_to_end` (20 ns, seed 12,
+Reference platform) failed in the `docker` job of CI on cc789b3 and on 565b359: −5.955 kJ/mol
+from the samples against the exact −4.954, an error of 1.0015 against the tolerance of 1.0. The
+same code in the image of the same lock gives −5.295 on the GPU machine. The trajectory of a
+fixed seed depends on the CPU, so the verdict of the test on another machine is a new draw. The
+run was repeated with seeds 1 to 48 on the GPU machine (Reference, the present estimators; a
+diagnostic in the image). Error against the exact value, kJ/mol:
+
+| 20 ns, 48 seeds | Mean ± standard deviation | Smallest and largest | Beyond 1.0 | Beyond 1.5 |
+|---|---|---|---|---|
+| from the samples (`dG_reweighted`) | −0.28 ± 0.52 | −1.32, +1.06 | 6 of 48 | none |
+| from the bias (`dG_plateau`) | +0.10 ± 0.72 | −1.49, +1.34 | 9 of 48 | none |
+
+Every run had 51 to 70 rebinding events, none was reported as no binding and none had a
+diagnostic. The former tolerances were 1.0 from the samples and 2.0 from the bias: 6 of the 48
+runs of a correct implementation miss the first. The test now has the pair of the gate's toy
+item, 2.0 kJ/mol from the samples and 3.0 from the bias: 3.3 and 4.0 standard deviations from
+the measured mean on the nearer side (a miss in about 1 draw of 2000, for errors that are
+normally distributed). The tight check of the estimate stays the mean over replicas of the
+`slow` test. Not measured: the scatter of the present estimate from the samples at the 10 ns
+of the gate (the table of the first amendment is of the former reweighting).
 Why: the development machine has no GPU; correctness has to be established where it can be
 (exact answers on CPU) and the rest gated on the machine that runs production.
 
@@ -416,6 +483,144 @@ Why: owner rule of 2026-11-15 (execution and tests run on Docker, except CI). `e
 pins nothing, so it resolves differently over time: evidence taken in a conda environment does
 not describe the environment a later user gets. With one locked image, the environment that is
 verified is the one that is distributed, and a record says which one it was.
+Amendment (2026-11-17, owner request: NVIDIA cuPotential as the default back end; plan
+`docs/plans/2026-11-17-cupotential-backend.md`, its M0): the image holds NVIDIA's cuPotential
+plugin for OpenMM (`nv-openmm-plugin` 0.3.5), and the environment follows what the plugin is
+built for: OpenMM 8.4.0 on CUDA 13.4 (before: 8.6.1 on CUDA 12.9), Python 3.12. No code under
+`src/fmeta/` changed with it; the use of the plugin by a run is a later decision.
+- What the lock describes. The plugin is a conda package of NVIDIA's release, not of a channel:
+  `docker/nvidia.pins` names the release file and its sha256, `scripts/update_lock.sh` solves
+  against it and writes the URL of the package into the lock. The CUDA forward-compatibility
+  libraries (`cuda-compat-13-4` 615.71.10, a `.deb` of NVIDIA's repository) are named with their
+  sha256 in a comment line of the lock, and the image build reads them from there
+  (`docker/install_nvidia.sh`). The hash of the lock, by which an image is judged official,
+  covers both.
+- The driver of the host. CUDA 13.4 needs a driver of R615 or newer; the GPU machine has
+  595.99.02. The compatibility libraries lie in `/usr/local/cuda/compat`, where the NVIDIA
+  Container Toolkit (1.19.1 here) finds them: it puts them on the loader path of a container
+  when they are newer than the driver of the host, so with R615 or newer they are not used. A
+  gate record names the host driver, the `libcuda` the process loaded, the CUDA runtime and the
+  plugin of the lock (block `environment`): it shows in which of the two ways it was taken.
+- Licences. The plugin and the compatibility libraries are NVIDIA's software under NVIDIA's
+  licences, whose texts are in the image under `/opt/fmeta/licenses`. A speed measured with the
+  plugin is not written to a tracked file, a commit message or GitHub until NVIDIA permits it
+  (owner, 2026-11-17: the licence of the plugin forbids the disclosure of performance data
+  without written permission). Speeds of stock OpenMM are recorded as before.
+- The ligand tools go down with OpenMM: `openmmforcefields` 0.16.0 needs OpenMM 8.5.1 or newer,
+  so the image has 0.15.1, and with it AmberTools 24.8 (before: 26.0). `openff-toolkit` 0.19.0,
+  `openff-interchange` 0.5.5 and `openff-forcefields` 2026.11.0 are the same. Measured on the
+  TYK2 ligand ejm_46 through `register_ligand`, old image against new: the charge, sigma and
+  epsilon of every atom are identical (largest difference 0) and the bonds, angles and torsions
+  are the same (counts and parameter sums), for `openff` (38 / 64 / 159) and for `gaff`
+  (38 / 64 / 105). The results on record keep their parameterisation.
+- Measured in the new image on this host (image f7d97cf1…, lock 0b6c344f…, the compatibility
+  `libcuda` 615.71.10 loaded): `python -m openmm.testInstallation` computes forces on all four
+  platforms; directories prepared and equilibrated with OpenMM 8.6.1 (a soluble system in the
+  rhombic dodecahedron, 24062 atoms, and a membrane system, 37401 atoms) load and run; a
+  Context with the plugin steps on both of them with the funnel forces and the bias in the
+  System (the plugin's force alone, with its integrator, with its barostat for the soluble
+  system, and with the stock `MonteCarloMembraneBarostat` for the membrane), every energy
+  finite, the potential energy at the starting state 1.3e-5 and 1.1e-5 (relative) from the
+  stock PME of the same System (a first reading, not a criterion).
+- Open: NVIDIA MPS with a host driver older than R615. With the daemon of `scripts/mps.sh` on
+  driver 595.99.02, a client that loads the compatibility `libcuda` does not return from
+  `cuInit`, whether the MPS server loaded the compatibility library (4 clients, stopped by
+  hand) or the library of the host (stopped by a timeout). A client forced onto the host's
+  `libcuda` 595.99.02 initialises under MPS, but cannot load the kernels of the CUDA 13.4
+  runtime (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). So on this host a process of the new image
+  has a GPU context of its own, and several replicas on one GPU at the same time (`run.per_gpu`
+  above 1, FM-D14) need a host driver of R615 or newer. Not tried: the MPS programs of driver
+  R615 run in a container on the R595 kernel module. (Tried the same day: the next amendment.)
+Why: the plugin has no build for another OpenMM or CUDA version, and one image stays the rule:
+the environment moves as a whole, and its tests and gates are taken again in it.
+Amendment (2026-11-17, owner: the driver of the host is not raised for now, and the MPS programs
+of driver R615 may be tried in a container): the image holds the two NVIDIA MPS programs of the
+driver its compatibility libraries come from (`nvidia-cuda-mps-control` and
+`nvidia-cuda-mps-server` of `libnvidia-compute` 615.71.10, in `/opt/fmeta/mps/bin`), and a
+container uses them exactly when it uses the compatibility libraries. This closes the open point
+above: `run.per_gpu` above 1 works with a host driver older than R615.
+- The rule: an MPS daemon, its server and the CUDA driver library of every client are of one
+  driver version. The entry of the image (`docker/entrypoint.sh`) puts the programs of the image
+  first on `PATH` when the loader resolves `libcuda.so.1` to the compatibility libraries, and
+  `scripts/mps.sh start` starts the daemon through the entry. With a host driver of R615 or
+  newer the compatibility libraries are not used, and the programs are the host's, as before.
+- An MPS client has no OpenCL platform there. Under the R615 daemon a process that loads
+  NVIDIA's OpenCL library of the host (595.99.02) does not return from the start of OpenCL,
+  and `import openmm` loads the OpenCL platform: a client waited for ever. The entry hides the
+  OpenCL vendors (`OCL_ICD_VENDORS` names an empty directory) when the compatibility libraries
+  are in use and the control socket of an MPS daemon is in the container. Such a client has the
+  Reference, CPU and CUDA platforms; a container that is no MPS client keeps OpenCL. A command
+  that bypasses the entry (`docker exec`, another `--entrypoint`) gets neither change.
+- What the lock describes: `docker/nvidia.pins` names the package and its sha256, the lock holds
+  it as a second comment line (`scripts/update_lock.sh --pins` rewrites these lines without a
+  new solve: the packages of the lock are those of the gate record of abd4548), and the image
+  build takes the two programs and the licence text from it and refuses a package whose version
+  is not that of the compatibility libraries. The licence of the package permits the
+  distribution of its unmodified binaries together with its text
+  (`/opt/fmeta/licenses/libnvidia-compute`).
+- Measured on this host (driver 595.99.02). First with the programs mounted from the unpacked
+  package into a container of the former image: the daemon and its server start on the R595
+  kernel module, the server loads the compatibility `libcuda` 615.71.10, and 4 replicas of the
+  soluble test system ran at the same time on one GPU as its clients (`fmeta run --per-gpu 4`
+  with the cuPotential back end, a run and its continuation to 3 ns, both with exit 0).
+  Then with the image built from the lock of this amendment (image 648480d3…, lock ee32ef34…).
+  A container with a GPU finds the two programs of the image on `PATH` and has the platforms
+  Reference, CPU, CUDA and OpenCL; a container without a GPU finds no MPS program. The daemon
+  was started by `scripts/mps.sh start 6,7`. In a client (`scripts/in_docker.sh --mps`)
+  `OCL_ICD_VENDORS` names the empty directory, `import openmm` returns and the platforms are
+  Reference, CPU and CUDA. 4 replicas of the soluble test system (24062 atoms) ran at the same
+  time on one GPU as clients of that daemon, once with the cuPotential back end and once with
+  stock OpenMM (`fmeta run --per-gpu 4`, 0.5 ns each: `nvidia-smi` listed the 4 processes of
+  each GPU as MPS clients, every HILLS has 503 lines, both runs with exit 0; stock OpenMM at 925
+  to 934 ns/day per replica). In that image `ruff check .` passes and `pytest` 193 passed.
+- No test covers this: CI has no GPU and no MPS. The check is the runs above.
+Why: several replicas on one GPU are where the throughput of a GPU is (FM-D14), and the driver of
+a host is not the project's to change. The other ways were measured and fail: the daemon of the
+host with a client on the compatibility library, and a client on the library of the host.
+Amendment (2026-11-17, third: the daemon runs with MPS protocol 3): `scripts/mps.sh start` starts
+the daemon as `nvidia-cuda-mps-control -f --protocol 3`. The image, the lock and the clients are
+unchanged, and a client needs no setting for it.
+- What failed: on one daemon of the second amendment (the default protocol of the control
+  program, 2) the measurements of FM-D18 stopped after about 50 client starts. New clients waited
+  at their start for ever with the GPUs idle, and the daemon answered no command.
+- The mechanism, read from the stopped processes: under protocol 2 the control program of
+  driver 615.71.10 stops reading the pipe of its log (`log` in the pipe directory) at the first
+  record of a client. Every client that starts adds records; when the pipe is full (64 KiB) the
+  daemon and every process that writes to the pipe block for good. It is a count of client
+  starts, not a load: 4 replicas at once worked (the second amendment) because they were the
+  first clients of their daemon.
+- With protocol 3 the pipe is read: the log of the daemon and of its servers is `docker logs` of
+  the daemon's container (`fmeta-mps`).
+- Measured on this host (driver 595.99.02, image 648480d3…, the daemon of `scripts/mps.sh start`
+  on all 8 GPUs): 20 calls of `fmeta run` with 4, 6 or 8 replicas on one GPU (soluble 88479
+  atoms and membrane 221068 atoms, both back ends, 0.5 or 1 ns each), 8 calls and up to 64
+  replicas at the same time: 120 replica processes, 480 client contexts in the log of the daemon,
+  every call with exit 0 and every replica at its end. During the 64 replicas and after the last
+  one the pipe held 0 of 65536 bytes and the control program had 2 threads. The log holds, for
+  every client context that ends, the two error-level lines "Server failed to receive command …
+  assuming client … has exited" and "Message receive failed, assuming the other end is dead"
+  (480 each), and once, 4 ms before the start of the first server, "Dropping connection with
+  failed handshake": no run failed with them.
+- Not verified: a host with a driver of R615 or newer, where `scripts/mps.sh` starts the MPS
+  programs of the host: a control program that does not know `--protocol` would not start.
+- No test covers this: CI has no GPU and no MPS. The check is the runs above.
+Why: a run with `run.per_gpu` above 1 starts one client per replica, a benchmark set starts
+hundreds on one daemon, and a daemon that stops answering after about 50 of them takes every
+run on the machine with it.
+Amendment (2026-11-17, fourth: FM-D18 in force as the default): the evidence of a commit is one
+gate record per back end. `scripts/gpu_gates.py` without `--backend` takes the gates with the
+back end of a new configuration (`run.backend: auto`, which is cuPotential in the image), and
+with `--backend openmm` with OpenMM's own forces and integrator. The records are
+`<date>-<commit>-cupotential-gpu-gates.json` and `<date>-<commit>-gpu-gates.json`; a record and
+its index entry name the back end (`backend`; none is `openmm`), and "the newest record" of a
+rule is the newest of each back end. The change gate asks for both
+(`.claude/rules/numerics-invariants.md`). The rule on speeds of the first amendment applies to
+the evidence: the record of cuPotential holds neither a speed nor a duration
+(`PLUGIN_WITHHELD`, `scripts/verify_bench_results.py`, checked in CI); they stay in the
+directory of the test runs, which Git does not track. The image and the lock are unchanged.
+Why: `run.backend: openmm` is the path that stays when the plugin is not there (it is
+early-access software under a licence that can end), and `auto` falls to it by name. Both paths
+are therefore verified on the code that is merged, and a record says which one it verified.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by
@@ -500,6 +705,24 @@ production, total ns/day before and after the limit: TYK2 set, 12 replicas on 2 
 three A2A runs 3 to 4% more. The load average fell to 46.
 Why: the work of a replica is on the GPU; its CPU part (fitting hills, writing files) does not
 gain from threads, and the spinning threads of the other replicas took the cores from it.
+Amendment (2026-11-17, FM-D18): the back end is passed per call, like mode, GPUs and length.
+The scheduler starts every replica and walker process with `--backend` (`run.backend`, or the
+`--backend` of `fmeta run`), and the process settles from the records on disk what it runs
+with: a run that continues keeps its back end, and a new replica under `auto` follows the
+replicas of its work directory. With walkers a back end by name is one of the conditions that
+are checked before any walker is rolled back. `device.json` holds the back end beside the
+device (`backend`, `backend_parts`, `backend_reason`), and `fmeta status` shows it there. The
+items `production`, `walkers`, `replicas_sequential`, `replicas_parallel` and `membrane_run`
+require in every `device.json` the back end that was asked for, and under `auto` cuPotential
+where the plugin can take part. `run.per_gpu` above 1 works with both back ends as clients of
+the daemon of `scripts/mps.sh` (FM-D13, second and third amendments: 4, 6 and 8 replicas on one
+GPU). The table above is of the image before FM-D13 changed it. Stock OpenMM in the image of
+today, with the bias, total ns/day on one RTX PRO 6000 Blackwell (calls of `fmeta run`,
+2026-11-17): TYK2 example (88479 atoms) 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8 replicas;
+A2A example (221068 atoms, membrane) 302 alone, 526 / 528 / 524. The numbers with the plugin
+are in no tracked file (FM-D13).
+Why: the replicas of one calculation are made with one set of forces, and what a replica was
+run with has to be readable from its record, like its device.
 
 ### FM-D15 — Real inputs. Membrane part: parts dropped first, kept components are receptor
 Accepted 2026-11-16.
@@ -910,3 +1133,226 @@ is marked "no binding" when its value (the mean of its replicas) is within 1 kT 
 funnel; it stays in the statistics. The notes on single replicas are listed as diagnostics.
 Why: choosing ligands by a check that almost no replica of 40 ns passes would describe a
 subset picked by noise.
+
+### FM-D18 — The back end of a run: NVIDIA's cuPotential plugin in place of OpenMM's nonbonded force and integrator
+Status: **Accepted** (2026-11-17, owner request). In force as the default: `run.backend` is
+`auto` unless a configuration says otherwise (M4 of the plan
+`docs/plans/2026-11-17-cupotential-backend.md`, 2026-11-17; until then an option, with `openmm`
+as the default). The parts the plugin provides for each kind of system are chosen from
+measurements (M2), and `fmeta check` has the items of the back end with their criteria (M3).
+The GPU gates of the final code 80d7dc7 (2026-11-17) passed with both back ends, all 20 each
+(the GPU tests and the 19 items): `bench/results/2026-11-17-80d7dc789-cupotential-gpu-gates.json`
+(the default, which gave cuPotential) and `bench/results/2026-11-17-80d7dc789-gpu-gates.json`
+(`--backend openmm`). That commit holds the amendments from the review of PR #3 (2026-11-17, at
+the end of this decision); the records of 1c09775, the code before them, passed in the same way
+(`bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`,
+`bench/results/2026-11-17-1c0977590-gpu-gates.json`).
+`run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
+`openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
+of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
+(cuPotential where its conditions hold, OpenMM otherwise). FM-D1 stands: the engine is OpenMM,
+and the plugin replaces objects inside an OpenMM System. `src/fmeta/engine/backend.py` does
+that in memory, just before the Context of a run is made: `prepared/system.xml` stays as OpenMM
+wrote it, the forces of the funnel (CVs, walls, bias; FM-D2 to FM-D4) are OpenMM's own under
+every back end, and the build, the equilibration and the analysis do not use the plugin. Every
+place that makes the Context of a run goes through this module: `fmeta run`, and the items of
+`fmeta check` that run dynamics on a solvated system.
+Conditions, checked by name before a run (`unmet`): the CUDA platform; single or mixed
+precision; the plugin is installed and its libraries load; exactly one `NonbondedForce`, with
+PME, an Ewald error tolerance of 5e-4 and no mesh set by hand; a box of at least 3 cutoffs
+along x, y and z; constraints that its integrator solves (the amendment of 2026-11-17 below).
+With `cupotential` an unmet condition is an error before a file is touched.
+With `auto` the run is made with OpenMM, and the condition is written to the log, to `run.yaml`
+and to `device.json` (`backend_reason`). An error of the plugin that has no name here stops the
+run: it is never turned into a run with OpenMM.
+What the plugin provides is one set of parts for each kind of system (soluble, membrane), out
+of the force, the integrator and the isotropic barostat (`CONFIGURATION`); it has no
+replacement of the membrane barostat. The rule of the choice: of the sets that pass every gate,
+the one with the largest simulated time per day on one GPU, summed over its replicas (1, 4, 6
+and 8 per GPU under MPS); a kind of system for which no set is faster than stock OpenMM in the
+same image gets OpenMM under `auto`. Measured on 2026-11-17 with the bias, in calls of
+`fmeta run` on the TYK2 example (88479 atoms) and the A2A example (221068 atoms, membrane); the
+numbers are in no tracked file (below). Chosen: force, integrator and barostat for a soluble
+system, force and integrator for a membrane system. For the soluble system the sets with and
+without the plugin's barostat are not separated at their best number of replicas per GPU (4
+repeats each): the set with the barostat is the largest by the rule, and it is ahead beyond the
+scatter with one replica per GPU, the default `run.per_gpu`. The choice was to stand only with
+the gates of the final code: they passed with these parts (the records of cuPotential on
+1c09775 and on 80d7dc7; their items `backend` and `membrane_backend` name the parts of each kind
+of system).
+Its integrator removes the motion of the centre of mass itself, every 100 steps unless it is
+told otherwise. Where the System holds a `CMMotionRemover`, that force leaves the System and
+the plugin's integrator does its work (`COM_INTERVAL`); where the System holds none, the
+plugin's integrator is told not to (`comFrequency` 0). Measured on the toy system, whose one
+massive particle is its centre of mass (200000 steps of 0.02 ps under a thermostat of 300 K,
+friction 1/ps, CUDA, mixed precision; kinetic temperature of the particle, error from 20
+blocks): stock integrator 298.4 ± 3.7 K; the plugin's integrator as it comes 246.9 ± 3.8 K;
+with its removal off 304.0 ± 4.6 K. The plugin sizes its mesh and its
+cell list when the Context is made, from the default box of the System: the box of the
+equilibrated state is made that box before the Context exists, also when a run continues, so
+every Context of a run has the same mesh. The probe of the CVs (FM-D4) is taken out of the
+integration before the Context exists.
+One run keeps the back end and the parts it began with: its hills and samples are then those
+of one set of forces. `run.yaml` and `device.json` name them (`backend`, `backend_parts`); a
+`run.yaml` without the entry is a run with OpenMM, and what `run.yaml` states about the system
+(particles, barostat) is read before forces are replaced. A run that continues under `auto`
+follows its record; another back end by name is refused before a device is chosen or a file is
+touched (`settle`), and with walkers before any walker is rolled back. A new replica under
+`auto` follows the replicas that are in the work directory. `fmeta status` shows the back end
+beside the device; `fmeta run --backend` and `fmeta check --backend` set it for one call.
+The default is `auto` (M4): in the code, in the two presets, and for `fmeta check` and the GPU
+gates without `--backend`. A calculation that began with OpenMM is not changed by it: a run
+that continues follows its record, and a new replica follows the replicas of its work
+directory. On every platform but CUDA, and in an installation without the plugin (pip; the
+`cpu` job of CI), `auto` gives OpenMM with the reason on record, so the default tests need no
+plugin and no GPU.
+Benchmark sets (FM-D17): the back end is part of the hash of the configuration; with `openmm`
+the hash is the one from before the key existed. With `auto` as the default, a set that names
+no back end is another configuration than the one of the sets reported so far, which were made
+with OpenMM. A work directory prepared for OpenMM is therefore refused by such a set, with the
+way to go on (`run: {backend: openmm}` in the `config` of `set.yaml`), and a `config.yaml`
+written before the key existed is read as `openmm`, not with the default of today: by the set,
+and by the build process of a ligand (`fmeta benchmark build`), which writes the file again
+(`saved_config`; review of PR #3: the build read it with the default, and the set then refused
+its own work directory as changed). A report
+names the back end of every replica (`backend`, from its `run.yaml`) and has one line for them
+in its header. Under `auto` the ligands of a set may get different back ends (the conditions of
+the plugin are those of each system): replicas of more than one back end are named in that
+line as a diagnostic, and all of them count.
+Evidence: a gate record is labelled with the back end its test runs used, and the two back ends
+of one commit are two records (`<date>-<commit>-gpu-gates.json` and
+`<date>-<commit>-cupotential-gpu-gates.json`). The record of cuPotential holds the verdicts and
+the accuracy, and neither a speed nor a duration: NVIDIA's licence of the plugin forbids the
+disclosure of benchmark results without permission (clause 2.12; owner, 2026-11-17: no speed
+measured with the plugin in a tracked file, a commit message or a text on GitHub).
+`scripts/verify_bench_results.py` rejects such a record with a speed, in CI; with NVIDIA's
+permission the switch is `PLUGIN_WITHHELD` there.
+Checks (`fmeta check`, 19 items with the two of the back end; M3, 2026-11-17). `platform`:
+where `run.backend` gives cuPotential, the plugin makes 100 steps of a small PME system (512
+ions), so a plugin that loads and cannot make a Context is found before the long items.
+`backend` (the soluble test system, a rhombic dodecahedron) and `membrane_backend` (the
+membrane test system, a rectangular box with the membrane barostat) work on the equilibrated
+state, with every Context built as a run builds it:
+(1) `run.backend: auto` gives cuPotential where the plugin can take part (CUDA, single or mixed
+precision, the plugin loads); OpenMM there is a failure.
+(2) The nonbonded energy and forces, alone in a force group, with OpenMM's PME and with the
+back end of the runs, against the same System with an Ewald tolerance of 1e-6 in double
+precision, at the equilibrated coordinates and with the molecules moved by lattice vectors (the
+complex by one cell along each axis, every other molecule by cells drawn at random): energy
+≤ 1e-4, force ≤ 2e-3, relative as in `forces` (the energy by max(1, |E|) of the reference, the
+largest difference of a force component by the largest component of the reference).
+(3) The CVs and the wall and bias energies and forces (three hills at the ligand) with
+cuPotential against OpenMM's at the same coordinates: CV ≤ 2e-5 nm, energy ≤ 1e-4, force ≤ 2e-3.
+(4) The plugin's barostat holds the pressure and the temperature of the configuration.
+The numbers are those of `forces`, the upper bound that the plan set. Measured before they
+were fixed (3 frames of each test system, 24062 and 37422 atoms; the reference moves by 1.1e-8
+in energy and 1.7e-6 in force between tolerances of 1e-7 and 1e-6): OpenMM's PME at 5e-4 in
+mixed precision is within 1.8e-5 in energy and 7.6e-4 in force of the reference, the plugin
+within 3.9e-6 and 4.6e-4, and the two are up to 8.8e-4 in force from each other; the funnel
+groups were identical in the two Contexts; moving the molecules by lattice vectors changed the
+forces of one Context by at most 5.4e-5 (OpenMM) and 4.5e-5 (plugin). The largest force
+component differs from frame to frame (OpenMM: 5.9e-4 to 7.6e-4), so a criterion close to these
+values would decide by the frame and not by the code; the items are there for the forces of
+another model (a lost exception, another cutoff, the mesh of another box), not for the last
+digit of the mesh. In the runs of the items with the three settings of `--backend`: OpenMM
+within 3.1e-5 and 8.0e-4, cuPotential within 2.8e-6 and 4.5e-4, the funnel groups identical.
+In the gate records of 1c09775 (energy, force): the record of cuPotential has
+OpenMM at 1.9e-5, 7.2e-4 and cuPotential at 2.6e-6, 4.1e-4 on the soluble system, 1.1e-6,
+7.3e-4 and 5.8e-7, 3.1e-4 on the membrane system, the funnel groups identical in both; the
+record of OpenMM has 3.7e-5, 6.6e-4 and 2.9e-6, 7.1e-4.
+In the gate records of the final code (80d7dc7, with the amendments from the review of PR #3):
+the record of cuPotential has OpenMM at 1.9e-5, 6.8e-4 and cuPotential at 1.7e-6, 4.0e-4 on the
+soluble system, 6.4e-6, 7.2e-4 and 1.2e-6, 3.0e-4 on the membrane system, the funnel groups
+identical in both; the record of OpenMM has 1.1e-5, 7.5e-4 and 1.1e-5, 6.5e-4.
+The toy items run with the integrator that a run of a real system gets (`integrator_only`): the
+toy system has no PME force, so the plugin's force cannot take part, and under `cupotential`
+and `auto` on CUDA the plugin's integrator moves the particle. Their criteria are unchanged
+(2.0 and 3.0 kJ/mol). With the plugin's integrator, at the seed of the item: reweighted −4.36
+and plateau −3.78 kJ/mol against the exact −4.95; with OpenMM's in the same image −4.76 and
+−4.34.
+`device.json` names what the last segment of a run began from (`restored_from`: `checkpoint`,
+the binary checkpoint of the platform; `state`, the State XML that is read when the binary one
+does not load; null for a new run). `toy_restart` and `production` require `checkpoint`. That
+is stricter than before: a run that fell to the State XML passed them, and a back end whose
+checkpoint cannot be read would have gone unnoticed. With each back end the continued test runs
+were restored from their binary checkpoints. Not measured: whether a continued run under the
+plugin repeats an uninterrupted one bit for bit (the contract "N + N hills against 2N" is
+checked on the Reference platform, with OpenMM's integrator).
+Every test run of `production`, `walkers`, `replicas_*` and `membrane_run` is verified from its
+`device.json`: the back end is the one asked for, and under `auto` it is cuPotential where the
+plugin can take part. Without this, a default that fell to OpenMM would pass every item and
+read as a verified plugin.
+The integrator and the barostat on the real test systems (measured once, 2026-11-17; not a gate
+item): NPT, 8 seeds of 1 ns at 4 fs, CUDA, mixed precision; means over 100 to 1000 ps as the
+difference from stock OpenMM, with the standard error of that difference, for the potential
+energy (kJ/mol), the density (g/cm3) and the kinetic temperature (K). Soluble system (stock:
+−333977, 0.99958, 300.97): the plugin's force alone −34 ± 18, −3.6e-5 ± 6.1e-5, −0.01 ± 0.04;
+force and integrator +12 ± 12, −1.9e-5 ± 7.4e-5, +0.13 ± 0.05; force, integrator and barostat
+−13 ± 15, −0.3e-5 ± 9.7e-5, +0.14 ± 0.03. Membrane system (stock: −416692, 1.02173, 300.93):
+force alone −1 ± 43, +3.7e-5 ± 1.8e-4, −0.02 ± 0.03; force and integrator −64 ± 32, −7.5e-5 ±
+2.1e-4, −0.01 ± 0.02. The density is within 0.6 standard errors of stock in every set, the
+potential energy within 2.0 (1.9 and 2.0 in two of the five sets). The kinetic temperature of
+the soluble system is 0.13 K (0.04%) higher with the plugin's integrator, in both sets that use
+it (2.8 and 4.4 standard errors), not with the plugin's force alone and not in the membrane
+system. Its origin is not known, and nothing was adjusted for it. (Stock itself reads 300.97 K
+under a thermostat of 300 K at this time step; that was not investigated either.)
+What no gate item measures under the plugin: the density, and the binding free energy of a real
+system (the replicas of one setting scatter by tens of kJ/mol, FM-D9). The evidence for the
+back end is the accuracy of its forces (`backend`, `membrane_backend`), the toy free energy
+with its integrator, the NPT means above, and the unchanged items that move a real system with
+it (`periodic_images`, `production`, `walkers`, `replicas_*`, `membrane_run`).
+Not done: the plugin in the equilibration or inside `addMembrane` (1 to 2.5% of the GPU time
+of a calculation, and the restraints and stages there would need their own verification);
+changing the back end of a run that has begun (its bias would be a sum of hills from two sets
+of forces); a silent run with OpenMM where cuPotential was asked for (a calculation slower than
+planned without a word, and a default that could pass every gate without using the plugin).
+Amendment (2026-11-17, review of PR #3): the constraints of the System are a condition where
+the plugin provides the integrator. Its `LangevinMiddleIntegrator` solves two kinds of groups
+of constraints, where no atom of a group has a constraint to an atom outside: three atoms
+constrained in pairs with at most two different lengths (rigid three-site water), and one atom
+with one to three partners of one length and one mass (the bonds to hydrogen, but for an atom
+with four hydrogens); a constraint between two massless particles is left alone. Every other
+constraint it refuses when the Context is made, with their number ("does not support N
+constraint(s) that require CCMA"). `unmet` counts them (`unsolved_constraints`) and names the
+count as the condition: under `auto` such a system runs with OpenMM, with the reason on record;
+`cupotential` by name is an error before a file is touched; a run that began with the plugin's
+force alone goes on, since OpenMM's integrator solves them.
+- Before: a System with constraints on all bonds got the plugin under `auto`, and the run ended
+  with the plugin's error when its Context was made. No number came of it (an error of the
+  plugin stops the run), but the default did not run a system that OpenMM runs.
+- What fmeta builds (`system/builder.py`: constraints on the bonds to hydrogen, rigid water) is
+  inside the rule, but for a heavy atom with four hydrogens (methane, an ammonium ion): such a
+  system now runs with OpenMM under `auto`. A System made elsewhere enters through
+  `prepare_from_system` with the constraints it was made with.
+- The rule is read from the source of the plugin (0.3.5, `ConstraintClusters.hpp`) and held to
+  its integrator by a test on the GPU (`tests/test_backend.py`, `gpu`): for 13 small systems the
+  integrator takes the System where the count is zero and names the count where it refuses.
+  On the A2A example (221152 atoms, 193402 constraints) the count is zero and takes 1.2 s, once
+  per run process.
+Amendment (2026-11-17, review of PR #3, second): the walkers of a replica are made with one
+back end. A new walker is settled against the walkers of its replica that hold hills (a
+`run.yaml` and a HILLS file), before the other runs of the work directory: under `auto` it
+follows them, and another back end by name is refused before a device is chosen or a file is
+touched, as for a run that continues (`settle`). A replica whose walkers already differ takes
+no new walker.
+- Before: a back end by name was taken as asked for every new run. `fmeta run WORK --replica 0
+  --walker 2 --backend cupotential`, after `run.walkers` went from 2 to 3 in a replica made
+  with OpenMM, was not refused: the check of the walker conditions (FM-D14) is made by the
+  scheduler, which a call for one walker does not pass. The new walker adds the hills of the
+  others to its bias, and they add its hills to theirs: the bias of the replica would have been
+  a sum of hills from two sets of forces, which this decision rules out for one run. Under
+  `auto` the new walker followed the work directory, and beside replicas of two back ends it got
+  the default instead of the back end of its own replica.
+- Replicas stay as they were: they share nothing, a back end by name is taken as asked, and
+  replicas of more than one back end are a diagnostic of a report (above).
+- The check reads what is on disk when the walker starts. Walkers of a new replica that are
+  started by hand at the same moment under different names are not seen by it; the scheduler
+  gives every walker of a replica the same back end.
+- Not run: a walker added to a replica on the GPU. The test is on the records (`settle`, and
+  `run_stage` up to its refusal), on the code before the fix and after it. The GPU gates of the
+  code with both amendments passed with both back ends (80d7dc7, the Status lines above); their
+  item `walkers` runs the two walkers of a new replica from the scheduler and adds none.
+Why: owner request of 2026-11-17, to make fmeta faster with cuPotential and to make it the
+default. The plugin is early-access software under NVIDIA's licence, which may end: `openmm`
+stays a complete path with its own gate record, and `auto` gives OpenMM, with the reason, when
+the plugin is not there.

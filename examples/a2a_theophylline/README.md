@@ -121,6 +121,12 @@ The SMILES is neutral theophylline with the hydrogen on N7: a choice of this exa
 `docker stop a2a` stops the run; the same `fmeta run` command continues it from the last
 checkpoints.
 
+In the official image the production run is made with NVIDIA's cuPotential plugin of OpenMM:
+`run.backend` is `auto` by default (FM-D18, `docs/design/engine.md`). With a membrane the
+plugin provides the nonbonded force and the integrator, and the membrane barostat is OpenMM's.
+`fmeta status` names the back end of every replica; `run: {backend: openmm}` in `fmeta.yaml`
+gives OpenMM's own forces and integrator.
+
 ## Result
 
 Measured on 2026-11-16 (UTC): the steps above with the official defaults (5 replicas of 40 ns)
@@ -134,6 +140,10 @@ command continued the five replicas from their checkpoints (`schedule.jsonl`); e
 the analysis of the third amendment of FM-D9 (`docs/design/engine.md`, code of c59ec99): the
 value of a replica is the mean over the second half of the run of dG(t) from the accumulated
 bias, with a block error.
+
+The run was made with OpenMM's own forces and integrator: commit 47e84f7 is from before
+`run.backend` existed, and today that is `run.backend: openmm`. A run of the full length with
+the cuPotential back end has not been made.
 
 | Quantity | fmeta | Experiment |
 |---|---|---|

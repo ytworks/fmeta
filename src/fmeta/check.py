@@ -38,8 +38,11 @@ import openmm.unit as unit
 from .analysis import analyze_run
 from .config import Config, RunConfig
 from .engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
+from .engine.backend import Backend, build, integrator_only, resolve, unavailable
 from .engine.hills import read_colvar, read_hills
 from .engine.platform import GPU_PLATFORMS, available_platforms, select_platform
+from .engine.runner import system_conditions
+from .funnel.forces import free_force_group
 from .funnel.geometry import compute_cvs, funnel_frame
 from .scheduler import read_schedule, verify_schedule
 from .system.builder import SystemSettings, add_barostat, ligand_net_charge, prepare
@@ -60,10 +63,12 @@ PROFILES = {
 
 # What each item has to show. scripts/gpu_gates.py stores these with the recorded evidence.
 CRITERIA = {
-    "platform": "a GPU platform (CUDA, HIP or OpenCL) is selected and usable",
+    "platform": "a GPU platform (CUDA, HIP or OpenCL) is selected and usable; where run.backend gives "
+                "cuPotential, the plugin makes 100 steps of a small PME system on it",
     "forces": "funnel-wall and bias energies, forces and CVs match the Reference platform at 6 "
               "positions: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3 (relative)",
-    "toy_restart": "80 time-ordered hills after a restart at 40; CVs finite and inside the walls",
+    "toy_restart": "80 time-ordered hills after a restart at 40 from the binary checkpoint; CVs finite "
+                   "and inside the walls",
     "toy_free_energy": "solvable toy system, 10 ns: reweighted dG0 within 2.0 kJ/mol and plateau "
                        "mean within 3.0 kJ/mol of the exact value",
     "pdb_sdf_openff": "system built from the protein PDB and the ligand SDF alone with OpenFF ligand "
@@ -71,6 +76,13 @@ CRITERIA = {
     "pdb_sdf_gaff": "the same with GAFF ligand parameters",
     "prepare": "solvated system built, funnel placed automatically, no funnel check fails",
     "equilibrate": "staged equilibration completes; funnel checks pass on the equilibrated structure",
+    "backend": "run.backend auto gives cuPotential where the plugin can take part; nonbonded energy and "
+               "forces of the equilibrated system, with OpenMM's PME and with the back end of the runs, "
+               "against PME at an Ewald tolerance of 1e-6 in double precision, at the equilibrated "
+               "coordinates and with whole molecules moved by lattice vectors: energy <= 1e-4, force "
+               "<= 2e-3 (relative); CVs, wall and bias energies and forces with that back end against "
+               "OpenMM's at the same coordinates: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3; the "
+               "barostat holds the pressure and the temperature of the configuration",
     "periodic_images": "the ligand and the funnel anchors are in one molecule of the context; during "
                        "1000 steps each with the whole system shifted across the box and with a corner "
                        "of the periodic cell inside the complex, and with the ligand at the upper wall "
@@ -78,9 +90,11 @@ CRITERIA = {
                        "the run platform are within 2e-3 nm of the numpy CVs of the reported "
                        "coordinates (as reported and wrapped into the cell) and the wall energy within "
                        "0.1 kJ/mol of the walls at those CVs",
-    "production": "2 replicas reach the requested number of hills and continue from their "
+    "production": "2 replicas reach the requested number of hills and continue from their binary "
                   "checkpoints without changing earlier hills; CVs finite, inside the funnel, "
-                  "no jump above 1 nm between samples",
+                  "no jump above 1 nm between samples. For every test run (this item, walkers, "
+                  "replicas_*, membrane_run): the back end in its device.json is the one asked for, and "
+                  "under auto it is cuPotential where the plugin can take part",
     "walkers": "2 walkers deposit the requested hills each and the analysis merges them",
     "replicas_sequential": "mode sequential: 2 replicas run one after another on the last device given; "
                            "schedule.jsonl has no violation of the scheduler's rules; each replica "
@@ -95,6 +109,8 @@ CRITERIA = {
     "membrane_build": "POPC bilayer built with Modeller.addMembrane; funnel and membrane checks pass",
     "membrane_run": "membrane system equilibrates with the semi-isotropic barostat and reaches the "
                     "requested number of hills",
+    "membrane_backend": "the criteria of backend on the equilibrated membrane system (rectangular box, "
+                        "membrane barostat)",
 }
 
 
@@ -104,6 +120,7 @@ class Item:
     status: str
     detail: str
     seconds: float
+    performance: Optional[str] = None      # speeds, apart from the result: a record can leave them out
 
 
 class Skip(Exception):
@@ -112,11 +129,13 @@ class Skip(Exception):
 
 class Checker:
     def __init__(self, workdir, platform: str = "auto", precision: str = "mixed",
-                 device: Optional[int] = None, gpus: Optional[list] = None, quick: bool = False):
+                 device: Optional[int] = None, gpus: Optional[list] = None, quick: bool = False,
+                 backend: Optional[str] = None):
         self.workdir = Path(workdir).resolve()
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.requested = platform
         self.precision = precision
+        self.backend = backend or RunConfig().backend      # what the test runs ask for (run.backend)
         self.device = device if device is not None else (gpus[0] if gpus else None)
         # the devices of the replicas: those given, or the one device given, or the default one
         self.gpus = gpus if gpus else ([device] if device is not None else None)
@@ -126,24 +145,33 @@ class Checker:
         self.platform: Optional[mm.Platform] = None
         self.properties: dict = {}
         self.device_name: Optional[str] = None
+        self.backends: set[str] = set()         # what the test runs were made with (their device.json)
+
+    @property
+    def backend_used(self) -> str:
+        """The back end these checks are a record of: cuPotential when a test run was made with it."""
+        return "cupotential" if "cupotential" in self.backends else "openmm"
 
     # ---- plumbing ---------------------------------------------------------
-    def run(self, name: str, function: Callable[[], str], needs: tuple = ()) -> None:
-        start = time.time()
+    def run(self, name: str, function: Callable[[], object], needs: tuple = ()) -> None:
+        """Run one check. It returns its result as text, or the result and its speeds as two texts."""
+        start, performance = time.time(), None
         missing = [n for n in needs if n not in self.done]
         try:
             if missing:
                 raise Skip(f"needs {', '.join(missing)}")
-            detail, status = function(), PASS
+            result, status = function(), PASS
+            detail, performance = result if isinstance(result, tuple) else (result, None)
             self.done.add(name)
         except Skip as skip:
             detail, status = str(skip), SKIP
         except Exception as error:   # a failed check must not stop the others
             detail, status = f"{type(error).__name__}: {error}", FAIL
             (self.workdir / f"{name}.traceback.txt").write_text(traceback.format_exc())
-        item = Item(name, status, detail, time.time() - start)
+        item = Item(name, status, detail, time.time() - start, performance)
         self.items.append(item)
-        print(f"[{status}] {name:<20s} {detail}  ({item.seconds:.0f} s)", flush=True)
+        text = "; ".join(filter(None, [detail, performance]))
+        print(f"[{status}] {name:<20s} {text}  ({item.seconds:.0f} s)", flush=True)
 
     def config(self, **overrides) -> Config:
         p = self.profile
@@ -152,7 +180,8 @@ class Checker:
             "equilibration": dict(p["equil"], seed=3),
             "run": {"length_ns": p["run_ps"] / 1000.0, "replicas": 2, "pace_ps": p["pace_ps"],
                     "checkpoint_ps": p["run_ps"] / 2.0, "trajectory_ps": p["run_ps"] / 2.0,
-                    "seed": 11, "platform": self.platform.getName(), "precision": self.precision},
+                    "seed": 11, "platform": self.platform.getName(), "precision": self.precision,
+                    "backend": self.backend},
         }
         for section, values in overrides.items():
             if section == "input" or section == "membrane":
@@ -186,7 +215,39 @@ class Checker:
             if self.requested == "auto":
                 raise RuntimeError("no usable GPU platform (CUDA, HIP or OpenCL) was found. " + text)
             text += ". DRY RUN on a CPU platform: this does not verify a GPU"
+        if self.backend != "openmm":
+            text += "; " + self._plugin_steps(name)
         return text
+
+    def _plugin_steps(self, name: str) -> str:
+        """Steps of a small PME system with what ``run.backend`` gives on this platform: a plugin
+        that loads and cannot make a Context or move atoms is found here, before the long items."""
+        n, spacing = 8, 0.4                         # ions on a cubic lattice, in a box of 3.2 cutoffs
+        cells = np.indices((n, n, n)).reshape(3, -1).T
+        system = mm.System()
+        nonbonded = mm.NonbondedForce()             # its defaults: a cutoff of 1 nm, a tolerance of 5e-4
+        nonbonded.setNonbondedMethod(mm.NonbondedForce.PME)
+        for cell in cells:
+            system.addParticle(30.0)
+            nonbonded.addParticle(1.0 if cell.sum() % 2 else -1.0, 0.3, 0.5)
+        system.addForce(nonbonded)
+        system.setDefaultPeriodicBoxVectors(*(mm.Vec3(*row) for row in n * spacing * np.eye(3)))
+        backend = resolve(self.backend, name, self.precision, system)
+        if backend.name != "cupotential":
+            return f"run.backend {self.backend} gives OpenMM here ({backend.reason})"
+        integrator = build(backend, system, 300.0, 1.0, 0.002, seed=1)
+        context = mm.Context(system, integrator, self.platform, self.properties)
+        context.setPositions(spacing * cells)
+        context.setVelocitiesToTemperature(300.0 * unit.kelvin, 1)
+        integrator.step(100)
+        state = context.getState(getEnergy=True, getPositions=True)
+        energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+        moved = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer) - spacing * cells
+        if not (np.isfinite(energy) and np.isfinite(moved).all() and np.abs(moved).max() > 0.0):
+            raise AssertionError(f"100 steps of {len(cells)} ions with the cuPotential plugin: energy {energy:g} "
+                                 f"kJ/mol, largest displacement {np.abs(moved).max():g} nm")
+        used = ", ".join(part for part in backend.parts if part != "barostat")     # the system has none
+        return f"the cuPotential plugin ({used}) made 100 steps of a PME system of {len(cells)} ions"
 
     def check_forces(self) -> str:
         reference = mm.Platform.getPlatformByName("Reference")
@@ -229,23 +290,35 @@ class Checker:
                 f"energy {worst_energy:.1e}, force {worst_force:.1e} (relative)")
 
     def _toy_run(self, directory, n_hills: int, seed: int):
+        """A run of the toy to ``n_hills`` with the integrator of the test runs' back end (the toy
+        has no PME force for the plugin). Returns the toy, what the run was restored from
+        (``MetadynamicsRun.restored``) and the name of the integrator's back end."""
         toy = make_toy()
         settings = BiasSettings(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05,
                                 sigma_rho=0.05, pace=100, points_per_sigma=2.0)
-        bias = FunnelBias(toy.system, toy.funnel, settings, platform=self.platform.getName())
-        simulation = make_simulation(toy, seed=seed, platform=self.platform.getName(),
-                                     properties=self.properties)
+        name = self.platform.getName()
+        bias = FunnelBias(toy.system, toy.funnel, settings, platform=name)
+        backend = integrator_only(self.backend, name, self.precision)
+        self.backends.add(backend.name)
+        integrator = build(backend, toy.system, 300.0, 1.0, 0.02, seed=seed, bias=bias)
+        simulation = make_simulation(toy, seed=seed, platform=name, properties=self.properties,
+                                     integrator=integrator)
         run = MetadynamicsRun(simulation, bias, directory, toy.restraint_group,
-                              RunSettings(checkpoint_hills=max(20, n_hills // 4)))
+                              RunSettings(checkpoint_hills=max(20, n_hills // 4)),
+                              conditions=backend.record())
+        restored = run.restored
         run.run(n_hills)
         run.close()
-        return toy
+        return toy, restored, backend.name
 
     def check_toy_restart(self) -> str:
         directory = self.workdir / "toy_restart"
         shutil.rmtree(directory, ignore_errors=True)
         for target in (40, 80):
-            toy = self._toy_run(directory, target, seed=2)
+            toy, restored, backend = self._toy_run(directory, target, seed=2)
+        if restored != "checkpoint":
+            raise AssertionError("the run continued from the State XML, not from its binary checkpoint: "
+                                 "that is not the exact state it had")
         hills = read_hills(directory / "HILLS")
         colvar = read_colvar(directory / "COLVAR")
         if len(hills) != 80 or not np.all(np.diff(hills.time) > 0):
@@ -253,17 +326,18 @@ class Checker:
         if not (np.isfinite(colvar["s"]).all() and hills.s.min() > toy.funnel.lower - 0.3
                 and hills.s.max() < toy.funnel.upper + 0.3):
             raise AssertionError("the ligand left the funnel or produced non-finite CVs")
-        return "toy run of 80 hills, restarted from its checkpoint at 40; CVs stay inside the walls"
+        return (f"toy run of 80 hills with the integrator of the {backend} back end, restarted from its "
+                "binary checkpoint at 40; CVs stay inside the walls")
 
     def check_toy_free_energy(self) -> str:
         directory = self.workdir / "toy_free_energy"
         shutil.rmtree(directory, ignore_errors=True)
         n_hills = self.profile["toy_hills"]
-        toy = self._toy_run(directory, n_hills, seed=12)
+        toy, _, backend = self._toy_run(directory, n_hills, seed=12)
         result = analyze_run(directory)
         exact = toy.exact_binding_free_energy(300.0, result["site_max"])
         reweighted = result["dG_reweighted"]
-        text = (f"{result['simulated_ns']:.0f} ns: dG0 reweighted "
+        text = (f"integrator of the {backend} back end, {result['simulated_ns']:.0f} ns: dG0 reweighted "
                 f"{'none' if reweighted is None else format(reweighted, '.2f')}, "
                 f"plateau {result['dG_plateau']:.2f}, exact {exact:.2f} kJ/mol; "
                 f"{result['rebinding_events']} rebinding events")
@@ -327,6 +401,138 @@ class Checker:
                 f"({'ok' if summary['wall_ok'] else 'above 0.1 kT'}); box "
                 + " x ".join(f"{v:.2f}" for v in summary["box_lengths"]) + " nm")
 
+    def _integrator(self, system, config: Config, state, bias=None, seed: int = 0):
+        """The integrator of a test that makes its own Context of ``system`` (with its barostat and
+        funnel forces in it), with the back end of the test runs, and what a run records about it."""
+        box = state.getPeriodicBoxVectors()
+        backend = resolve(config.run.backend, self.platform.getName(), self.precision, system, box)
+        self.backends.add(backend.name)
+        conditions = dict(backend.record(), system=system_conditions(system))
+        integrator = build(backend, system, config.system.temperature, 1.0, config.run.timestep_fs / 1000.0,
+                           seed, box=box, bias=bias)
+        return integrator, conditions
+
+    def check_backend(self, work: str = "soluble") -> str:
+        """The back end a run of the equilibrated test system ``work`` gets, and its forces
+        (``CRITERIA["backend"]``). Every Context is built as a run builds it, with the
+        NonbondedForce in a force group of its own so that it is read alone."""
+        directory = self.workdir / work
+        config = Config.load(directory / "config.yaml")
+        with open(directory / "equil" / "state.xml") as handle:
+            state = mm.XmlSerializer.deserialize(handle.read())
+        box = state.getPeriodicBoxVectors()
+        start = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)
+        name = self.platform.getName()
+
+        def load():
+            prepared = load_prepared(directory, config)
+            add_barostat(prepared.system, config.system.temperature, config.system.pressure, prepared.membrane)
+            return prepared
+
+        probe = load()
+        backend = resolve(self.backend, name, self.precision, probe.system, box)
+        self.backends.add(backend.name)
+        if self.backend == "auto" and backend.name == "openmm" and unavailable(name, self.precision) is None:
+            raise AssertionError("run.backend auto gives OpenMM where the plugin can take part: "
+                                 f"{backend.reason}")
+        s, rho = compute_cvs(probe.funnel, start)       # hills at the ligand: the bias acts on it
+        hills = [(s + ds, rho + drho, height)
+                 for ds, drho, height in ((0.0, 0.0, 4.0), (0.3, 0.05, 3.0), (-0.2, 0.15, 2.0))]
+
+        def make(backend, platform, properties, tolerance=None):
+            prepared = load()
+            system = prepared.system
+            nonbonded = next(force for force in system.getForces() if isinstance(force, mm.NonbondedForce))
+            nonbonded.setForceGroup(free_force_group(system))
+            if tolerance is not None:
+                nonbonded.setEwaldErrorTolerance(tolerance)
+            bias = FunnelBias(system, prepared.funnel, config.metad, platform=name)
+            for hill in hills:
+                bias.grid.add_hill(*hill)
+            groups = dict(nonbonded=nonbonded.getForceGroup(), wall=prepared.restraint_group,
+                          bias=bias.force_group)
+            integrator = build(backend, system, config.system.temperature, config.run.friction,
+                               config.run.timestep_fs / 1000.0, seed=1, box=box, bias=bias)
+            context = mm.Context(system, integrator, platform, properties)
+            context.setState(state)
+            bias.push(context)
+            return context, bias, groups
+
+        def evaluate(entry, positions):
+            context, bias, groups = entry
+            context.setPositions(positions)
+            values = {}
+            for label, group in groups.items():
+                result = context.getState(getEnergy=True, getForces=True, groups={group})
+                values[label] = (result.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole),
+                                 result.getForces(asNumpy=True).value_in_unit(
+                                     unit.kilojoule_per_mole / unit.nanometer))
+            return values, np.array(bias.collective_variables(context))
+
+        def difference(mine, reference):                # relative, as in the item forces
+            (energy, forces), (energy_ref, forces_ref) = mine, reference
+            return (abs(energy - energy_ref) / max(1.0, abs(energy_ref)),
+                    float(np.abs(forces - forces_ref).max()) / max(1.0, float(np.abs(forces_ref).max())))
+
+        # The reference: the same System with the tolerance of the Ewald sum tightened, in double
+        # precision where the platform has precisions.
+        gpu = name in GPU_PLATFORMS
+        reference = select_platform(name, "double", self.device) if gpu else (self.platform, self.properties)
+        contexts = {"reference": make(Backend("openmm"), *reference, tolerance=1e-6),
+                    "OpenMM": make(Backend("openmm"), self.platform, self.properties)}
+        if backend.name == "cupotential":
+            contexts["cuPotential"] = make(backend, self.platform, self.properties)
+
+        # Whole molecules moved by lattice vectors, the complex among them: the same forces.
+        lattice = state.getPeriodicBoxVectors(asNumpy=True).value_in_unit(unit.nanometer)
+        rng = np.random.default_rng(7)
+        moved, n_moved = start.copy(), 0
+        for molecule in contexts["OpenMM"][0].getMolecules():
+            cells = np.array([1, -1, 1]) if len(molecule) > 100 else rng.integers(-1, 2, size=3)
+            moved[list(molecule)] += cells @ lattice
+            n_moved += bool(cells.any())
+
+        nonbonded = {label: [] for label in contexts if label != "reference"}
+        funnel = []
+        for positions in (start, moved):
+            values = {label: evaluate(entry, positions) for label, entry in contexts.items()}
+            for label, rows in nonbonded.items():
+                rows.append(difference(values[label][0]["nonbonded"], values["reference"][0]["nonbonded"]))
+            if "cuPotential" in values:
+                (mine, my_cvs), (stock, stock_cvs) = values["cuPotential"], values["OpenMM"]
+                funnel.append((float(np.abs(my_cvs - stock_cvs).max()),
+                               *np.max([difference(mine[group], stock[group]) for group in ("wall", "bias")],
+                                       axis=0)))
+
+        # numpy's maximum keeps a value that is not a number, and "not <=" fails on it
+        worst = {label: np.max(rows, axis=0) for label, rows in nonbonded.items()}
+        text = (f"run.backend {self.backend} gives {backend.name}"
+                + (f" ({', '.join(backend.parts)})" if backend.parts else "")
+                + (f" ({backend.reason})" if backend.reason else "")
+                + "; nonbonded energy and forces against PME at a tolerance of 1e-6"
+                + (" in double precision" if gpu else "") + ", at the equilibrated coordinates and with "
+                + f"{n_moved} molecules moved by lattice vectors: "
+                + "; ".join(f"{label} energy {energy:.1e}, force {force:.1e}"
+                            for label, (energy, force) in worst.items()) + " (relative)")
+        if not all(energy <= 1e-4 and force <= 2e-3 for energy, force in worst.values()):
+            raise AssertionError(text + "; above energy 1e-4 or force 2e-3")
+        if funnel:
+            cv, energy, force = np.max(funnel, axis=0)
+            text += (f"; CVs, walls and bias with cuPotential against OpenMM: CV {cv:.1e} nm, energy "
+                     f"{energy:.1e}, force {force:.1e} (relative)")
+            if not (cv <= 2e-5 and energy <= 1e-4 and force <= 2e-3):
+                raise AssertionError(text + "; above CV 2e-5 nm, energy 1e-4 or force 2e-3")
+        if "barostat" in backend.parts:
+            context = contexts["cuPotential"][0]
+            held = [context.getParameter(mm.MonteCarloBarostat.Pressure()),
+                    context.getParameter(mm.MonteCarloBarostat.Temperature())]
+            if not np.allclose(held, [config.system.pressure, config.system.temperature], rtol=1e-9, atol=0.0):
+                raise AssertionError(text + f"; the plugin's barostat holds {held[0]:g} bar and {held[1]:g} K, "
+                                     f"not the {config.system.pressure:g} bar and "
+                                     f"{config.system.temperature:g} K of the configuration")
+            text += f"; the plugin's barostat holds {held[0]:g} bar and {held[1]:g} K"
+        return text
+
     def check_pbc(self) -> str:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
@@ -337,12 +543,8 @@ class Checker:
         system = prepared.system
         add_barostat(system, config.system.temperature, config.system.pressure, False)
         bias = FunnelBias(system, funnel, config.metad, platform=self.platform.getName())
-        integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
-                                                 1.0 / unit.picosecond,
-                                                 config.run.timestep_fs * unit.femtosecond)
-        integrator.setRandomNumberSeed(1)
+        integrator = self._integrator(system, config, state, bias, seed=1)[0]
         context = mm.Context(system, integrator, self.platform, self.properties)
-        bias.exclude_probe(integrator)
 
         # A platform moves whole molecules between periodic images. The forces of the CVs join
         # the ligand and the anchors into one, and the CVs rely on that.
@@ -410,7 +612,23 @@ class Checker:
                 f"the box: CVs within {worst['cv']:.1e} nm, wall energy within {worst['wall']:.1e} kJ/mol "
                 "of the values from the coordinates")
 
-    def _verify_run(self, directory: Path, expected: int, funnel) -> str:
+    def _verify_run(self, directory: Path, expected: int, funnel, continued: bool = False) -> str:
+        """Verify a test run from its files; ``continued``: its last segment went on from a
+        checkpoint. Returns its speed as text."""
+        with open(directory / "device.json") as handle:
+            record = json.load(handle)
+        backend = record.get("backend", "openmm")
+        self.backends.add(backend)
+        if self.backend != "auto" and backend != self.backend:
+            raise AssertionError(f"{directory.name} was asked for the {self.backend} back end and ran "
+                                 f"with {backend}")
+        if (self.backend == "auto" and backend == "openmm"
+                and unavailable(self.platform.getName(), self.precision) is None):
+            raise AssertionError(f"{directory.name}: run.backend auto gave OpenMM where the plugin can "
+                                 f"take part ({record.get('backend_reason')})")
+        if continued and record.get("restored_from") != "checkpoint":
+            raise AssertionError(f"{directory.name} continued from {record.get('restored_from')}, not from "
+                                 "its binary checkpoint: that is not the exact state it had")
         hills = read_hills(directory / "HILLS")
         colvar = read_colvar(directory / "COLVAR")
         if len(hills) != expected:
@@ -424,7 +642,7 @@ class Checker:
         speed = (directory / "run.log").read_text().strip().splitlines()[-1].split("speed")[-1].strip()
         return speed
 
-    def check_production(self) -> str:
+    def check_production(self) -> tuple:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
         funnel = load_prepared(work).funnel
@@ -434,11 +652,13 @@ class Checker:
         run_replicas(config, work, self.gpus, length_ns=1.5 * config.run.length_ns)
         longer = round(1.5 * self.n_hills)
         for i in range(2):
-            self._verify_run(work / f"rep{i}", longer, funnel)
+            self._verify_run(work / f"rep{i}", longer, funnel, continued=True)
         if not (work / "rep0" / "HILLS").read_text().startswith(first):
             raise AssertionError("continuing the run changed hills that were already written")
-        return (f"2 replicas x {self.n_hills} hills, then continued to {longer} from their "
-                f"checkpoints; {speeds[0]}")
+        with open(work / "rep0" / "device.json") as handle:
+            backend = json.load(handle).get("backend", "openmm")
+        return (f"2 replicas x {self.n_hills} hills with the {backend} back end, then continued to {longer} "
+                "from their binary checkpoints", speeds[0])
 
     def _fresh_copy(self, name: str, **run) -> tuple[Config, Path]:
         """A new work directory ``name`` with the prepared and equilibrated system of ``soluble``."""
@@ -550,7 +770,7 @@ class Checker:
         return (f"analysis of {summary['n_replicas']} replicas ran (far too short for a value that "
                 f"means something: diagnostics on {noted} of them){figures}")
 
-    def check_benchmark(self) -> str:
+    def check_benchmark(self) -> tuple:
         work = self.workdir / "soluble"
         config = Config.load(work / "config.yaml")
         with open(work / "equil" / "state.xml") as handle:
@@ -567,8 +787,7 @@ class Checker:
             metad = BiasSettings(temperature=config.system.temperature, pace=pace)
             bias = (FunnelBias(system, prepared.funnel, metad, platform=self.platform.getName())
                     if label == "biased" else None)
-            integrator = mm.LangevinMiddleIntegrator(config.system.temperature * unit.kelvin,
-                                                     1.0 / unit.picosecond, dt * unit.picosecond)
+            integrator, conditions = self._integrator(system, config, state, bias)
             simulation = app.Simulation(prepared.topology, system, integrator, self.platform,
                                         self.properties)
             simulation.context.setState(state)
@@ -585,7 +804,7 @@ class Checker:
                 directory = self.workdir / "benchmark"
                 shutil.rmtree(directory, ignore_errors=True)
                 run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group,
-                                      RunSettings(checkpoint_hills=10**9))
+                                      RunSettings(checkpoint_hills=10**9), conditions=conditions)
                 run.run(1)
                 start = time.time()
                 run.run(1 + hills)                    # ends with a checkpoint ...
@@ -600,11 +819,12 @@ class Checker:
         length = RunConfig().length_ns                 # the default, not the short run of the check
         hours = 24.0 * length / speeds["biased"]
         grid = bias.grid.values.size
-        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, "
-                f"{hills} ps each: {speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day "
-                f"with funnel metadynamics (overhead {overhead:.1f}%, {grid} grid points, 1 hill/ps, "
-                f"checkpoints excluded: {1e3 * checkpoint:.0f} ms each); "
-                f"a replica of the default {length:.0f} ns takes about {hours:.1f} hours")
+        return (f"{prepared.topology.getNumAtoms()} atoms at {config.run.timestep_fs:.0f} fs, {hills} ps each "
+                f"with and without funnel metadynamics ({grid} grid points, 1 hill/ps), back end "
+                f"{conditions['backend']}",
+                f"{speeds['plain']:.0f} ns/day plain, {speeds['biased']:.0f} ns/day with funnel "
+                f"metadynamics (overhead {overhead:.1f}%, checkpoints excluded: {1e3 * checkpoint:.0f} ms "
+                f"each); a replica of the default {length:.0f} ns takes about {hours:.1f} hours")
 
     def check_membrane_build(self) -> str:
         directory = self.workdir / "inputs"
@@ -625,7 +845,7 @@ class Checker:
                 f"{prepared.topology.getNumAtoms()} atoms, box " + " x ".join(f"{v:.2f}" for v in box)
                 + " nm; funnel points into water and clears the membrane")
 
-    def check_membrane_run(self) -> str:
+    def check_membrane_run(self) -> tuple:
         work = self.workdir / "membrane"
         config = Config.load(work / "config.yaml")
         summary = equilibrate_stage(config, work, self.device)
@@ -635,7 +855,7 @@ class Checker:
         speed = self._verify_run(work / "rep0", self.n_hills, load_prepared(work).funnel)
         return (f"equilibrated with the semi-isotropic barostat (area per lipid "
                 f"{summary['area_per_lipid']:.2f} nm2 incl. the protein footprint), "
-                f"{self.n_hills} hills of production; {speed}")
+                f"{self.n_hills} hills of production", speed)
 
     # ---- driver -----------------------------------------------------------
     def run_all(self) -> bool:
@@ -647,6 +867,7 @@ class Checker:
         self.run("pdb_sdf_gaff", lambda: self._check_ligand("gaff"), needs=("platform",))
         self.run("prepare", self.check_prepare, needs=("platform",))
         self.run("equilibrate", self.check_equilibrate, needs=("prepare",))
+        self.run("backend", self.check_backend, needs=("equilibrate",))
         self.run("periodic_images", self.check_pbc, needs=("equilibrate",))
         self.run("production", self.check_production, needs=("equilibrate",))
         self.run("walkers", self.check_walkers, needs=("equilibrate",))
@@ -656,12 +877,14 @@ class Checker:
         self.run("benchmark", self.check_benchmark, needs=("equilibrate",))
         self.run("membrane_build", self.check_membrane_build, needs=("platform",))
         self.run("membrane_run", self.check_membrane_run, needs=("membrane_build",))
+        self.run("membrane_backend", lambda: self.check_backend("membrane"), needs=("membrane_run",))
 
         counts = {status: sum(item.status == status for item in self.items)
                   for status in (PASS, FAIL, SKIP)}
         gpu = self.platform is not None and self.platform.getName() in GPU_PLATFORMS
         report = dict(platform=None if self.platform is None else self.platform.getName(),
-                      gpu=gpu, counts=counts, items=[asdict(item) for item in self.items])
+                      gpu=gpu, backend=self.backend_used, counts=counts,
+                      items=[asdict(item) for item in self.items])
         with open(self.workdir / "check_report.json", "w") as handle:
             json.dump(report, handle, indent=2)
         print(f"\n{counts[PASS]} passed, {counts[FAIL]} failed, {counts[SKIP]} skipped"

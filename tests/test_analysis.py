@@ -150,14 +150,16 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     exact = toy.exact_binding_free_energy(T, result["site_max"])
     assert result["simulated_ns"] == pytest.approx(20.0)
     assert result["rebinding_events"] >= 20
-    # One 20 ns replica scatters by roughly 0.5-1 kJ/mol around the exact value
-    # (the well is 14 kJ/mol deep); the replica test below checks the mean tightly.
-    assert result["dG_plateau"] == pytest.approx(exact, abs=2.0)
+    # The trajectory of a fixed seed differs between CPUs, so the value is a draw from the scatter
+    # of one 20 ns run. Error over seeds 1-48 (FM-D12, amendment of 2026-11-17): +0.10 +- 0.72
+    # kJ/mol from the bias, -0.28 +- 0.52 from the samples. The tolerances are those of the gate's
+    # toy item, 3.3 standard deviations or more; the replica test below checks the mean tightly.
+    assert result["dG_plateau"] == pytest.approx(exact, abs=3.0)
     assert not result["no_binding"]
     assert not [note for note in result["diagnostics"] if "rebinding" in note or "flat" in note]
     # the headline is that mean of dG(t) from the bias; the estimate from the samples after the
     # first 2 ns is its cross-check
-    assert result["dG_reweighted"] == pytest.approx(exact, abs=1.0)
+    assert result["dG_reweighted"] == pytest.approx(exact, abs=2.0)
     assert (result["dG"], result["discard_ns"]) == (result["dG_plateau"], 2.0)
     assert (tmp_path / "result.json").exists() and (tmp_path / "fes.npz").exists()
 

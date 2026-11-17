@@ -1,5 +1,7 @@
 """Bias engine: agreement with openmm.app.Metadynamics, HILLS replay, exact restart."""
 
+import zipfile
+
 import numpy as np
 import openmm as mm
 import openmm.app as app
@@ -155,6 +157,31 @@ def test_restart_is_exact(tmp_path):
     assert count_dcd_frames(whole / "traj.dcd") == count_dcd_frames(split / "traj.dcd") == 10
     assert (whole / "traj.dcd").read_bytes()[276:] == (split / "traj.dcd").read_bytes()[276:]
     assert read_colvar(whole / "COLVAR")["time"].size == 200
+
+
+def test_a_continued_run_names_what_it_was_restored_from(tmp_path):
+    """The binary checkpoint holds the exact state. Where it cannot be loaded the run goes on from
+    the State XML, and says so: ``fmeta check`` reads it from ``device.json``."""
+    def segment(target):
+        toy = make_toy()
+        bias = FunnelBias(toy.system, toy.funnel, BiasSettings(**SETTINGS))
+        run = MetadynamicsRun(make_simulation(toy, seed=5), bias, tmp_path, toy.restraint_group,
+                              RunSettings(checkpoint_hills=25))
+        restored = run.restored
+        run.run(target)
+        run.close()
+        return restored
+
+    assert segment(25) is None
+    assert segment(50) == "checkpoint"
+    with zipfile.ZipFile(tmp_path / "checkpoint.zip") as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    members["checkpoint.chk"] = b"the checkpoint of another platform"
+    with zipfile.ZipFile(tmp_path / "checkpoint.zip", "w", zipfile.ZIP_STORED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    assert segment(75) == "state"
+    assert len(read_hills(tmp_path / "HILLS")) == 75
 
 
 def test_restart_discards_work_after_the_last_checkpoint(tmp_path):

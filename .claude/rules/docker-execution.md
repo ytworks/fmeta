@@ -23,17 +23,31 @@ Owner rule (2026-11-15): everything except CI is executed and tested in Docker. 
 - One image (`Dockerfile`): the environment of `conda-linux-64.lock` on a base image pinned by
   digest, plus fmeta. It holds the test and lint tools, so the image that is verified is the
   image that is distributed.
-- Packages change in `environment.yml`; `scripts/update_lock.sh` regenerates the lock (in a
-  container). After a change of the lock or the `Dockerfile`: rebuild, rerun the tests and the
-  GPU gates, and commit the lock with the new evidence.
+- Packages change in `environment.yml`, NVIDIA's files (the cuPotential plugin, the CUDA
+  compatibility libraries, the MPS programs of their driver) in `docker/nvidia.pins`;
+  `scripts/update_lock.sh` regenerates the lock (in a container), which names them all. After a
+  change of the lock or the `Dockerfile`: rebuild, rerun the tests and the GPU gates, and commit
+  the lock with the new evidence.
 - GPU evidence (`bench/results/`) is written only inside the image, when the lock in the image
-  is the lock of the repository; the record names the image, the lock and the GPUs.
+  is the lock of the repository; the record names the image, the lock, the GPUs, the host
+  driver and the `libcuda` that was loaded.
+- The image holds NVIDIA's software under NVIDIA's licences (`/opt/fmeta/licenses`). A speed
+  measured with the cuPotential plugin goes to no tracked file, commit message or GitHub text
+  until NVIDIA permits it (owner, 2026-11-17).
+- Runs use the plugin by default (`run.backend: auto`, FM-D18); `--backend openmm` asks for
+  OpenMM's own forces and integrator. The GPU gates are taken once per back end, and the record
+  of cuPotential holds no speed and no duration.
+- The CUDA runtime of the image (13.4) needs a host driver of R615 or newer; on an older one
+  the compatibility libraries of the image are used, and with them the MPS programs of the
+  image: an MPS daemon and the CUDA driver library of its clients must be of one driver version.
+  A client of that daemon has no OpenCL platform (FM-D13, amendments of 2026-11-17).
 
 ## Usage
 
 ```bash
 scripts/in_docker.sh pytest                                  # builds the image on first use
 scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1
+scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1 --backend openmm
 scripts/in_docker.sh --gpus 0,1,2,3 --detach --name run1 fmeta run runs/run1 --gpus 0,1,2,3
 ```
 

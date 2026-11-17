@@ -10,7 +10,7 @@ from fmeta.config import Config, RunConfig
 from fmeta.engine import BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.engine.hills import HillsFollower, merge_hills, read_colvar, read_hills, sum_hills
 from fmeta.testing.toy import make_simulation, make_toy
-from fmeta.workflow import _rollback_walkers, run_stage
+from fmeta.workflow import _rollback_walkers, replica_jobs, run_stage
 
 SETTINGS = dict(temperature=300.0, bias_factor=10.0, height=1.2, sigma_s=0.05, sigma_rho=0.05,
                 pace=100, points_per_sigma=2.0)
@@ -243,6 +243,29 @@ def test_a_run_that_leaves_out_a_walker_with_hills_is_refused(tmp_path):
     for walker in walkers:
         assert np.allclose(walker.bias.grid.values, expected, rtol=1e-7, atol=1e-7)
         walker.close()
+
+
+def test_the_walkers_of_a_replica_are_not_started_with_another_back_end(tmp_path):
+    """A replica keeps the back end its walkers began with (FM-D18). The scheduler refuses before a
+    walker is rolled back or started, as it does for another bias."""
+    base = tmp_path / "rep0"
+    for k in range(2):
+        walker = make_walker(base, k, 2, seed=k + 1)[1]         # as before the back end was recorded
+        walker.run(20)
+        walker.close()
+    files = [base / f"w{k}" / name for k in range(2) for name in ("HILLS", "COLVAR", "SYNC", "run.yaml")]
+    before = [path.read_bytes() for path in files]
+
+    def start(backend):
+        config = Config(metad=BiasSettings(**SETTINGS),
+                        run=RunConfig(walkers=2, replicas=1, timestep_fs=20.0, pace_ps=2.0, backend=backend))
+        replica_jobs(config, tmp_path)[0].before_start()
+
+    with pytest.raises(RuntimeError, match="backend: openmm there, cupotential now"):
+        start("cupotential")
+    assert before == [path.read_bytes() for path in files]
+    start("openmm")
+    start("auto")                       # follows what each walker was run with
 
 
 @pytest.mark.slow

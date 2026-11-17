@@ -87,6 +87,26 @@ Verified on CPU only (see `PROGRESS.md`).
   Reported, not gated. Not reached: narrow intervals and the order of the ligands (as R2); in
   the A2A set the ligand did not come back to the site within 40 ns in 25 of the 40 replicas.
   Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`.
+- **R11 — The cuPotential back end** (2026-11-17, FM-D18, PR #3). On the owner's request the
+  runs use NVIDIA's cuPotential plugin for OpenMM (`nv-openmm-plugin` 0.3.5, early access) by
+  default: `run.backend: auto` gives the plugin where its conditions hold (CUDA in single or
+  mixed precision, PME as the plugin takes it) and OpenMM's own forces and integrator with a
+  recorded reason otherwise; `--backend openmm` stays a complete, gated path. The plugin takes
+  the nonbonded force, the integrator and the barostat of a soluble system, and the force and
+  the integrator of a membrane system; the CV forces stay OpenMM's. A run directory keeps the
+  back end it began with. The image went to OpenMM 8.4.0 and CUDA 13.4 for it and holds the
+  plugin, NVIDIA's compatibility libraries and the MPS programs under NVIDIA's licences.
+  `fmeta check` has 19 items; `backend` and `membrane_backend` measure the accuracy of both
+  back ends on the two test systems. The gates of the final code (80d7dc7, with the three
+  fixes from the review of PR #3) passed with each back end:
+  `bench/results/2026-11-17-80d7dc789-cupotential-gpu-gates.json` and
+  `bench/results/2026-11-17-80d7dc789-gpu-gates.json`. The TYK2 example and the A2A example
+  ran by the steps of their READMEs with the default on 1c09775, the code before those fixes
+  (5 replicas of 1 ns each; every `device.json` names cuPotential, and every replica ended with
+  return code 0); they were not run again on the final code. Not done: a run of full length
+  with the plugin. Speeds measured with the plugin are in no tracked file
+  until NVIDIA permits it (owner, 2026-11-17); the parts were chosen from them by the rule of
+  FM-D18. Plan: `docs/plans/2026-11-17-cupotential-backend.md`.
 
 ## Next
 

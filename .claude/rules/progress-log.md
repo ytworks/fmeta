@@ -46,7 +46,8 @@ warning when the budget is exceeded, and CI fails on it: then follow
   to the archive (per `docs/progress/archiving.md`) is the ONLY allowed move; corrections are
   new entries referencing the old one.
 - Keep `Current Status` consistent with the `Status:` lines in `docs/design/*.md` and with the
-  newest entry of `bench/results/index.json`; if they diverge, fix them in the same commit.
+  newest entry of each back end in `bench/results/index.json` (`backend`; none is `openmm`); if
+  they diverge, fix them in the same commit.
 - State what was verified and how. "Not run" and "not verified here" are status values:
   write them rather than leaving a gap.
 - Write entries in English.

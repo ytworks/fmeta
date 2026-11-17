@@ -11,6 +11,8 @@ procedure in `docs/gpu-runbook.md`) check them.
 | CVs `s`, `rho` vs the numpy reference (`compute_cvs`) | ≤ 1e-9 nm on Reference | `tests/test_forces.py` |
 | Wall and bias energy, forces, CVs on the run platform vs Reference | CV ≤ 2e-5 nm; energy ≤ 1e-4, force ≤ 2e-3 (relative) | gate `forces`, `tests/test_platform.py` (`gpu`) |
 | CVs and wall energy of a solvated complex while the run platform moves it between periodic cells (dynamics from two placements, and the ligand at the upper wall along the narrowest direction of the box) | ligand and anchors in one molecule of the context; CVs ≤ 2e-3 nm from the numpy CVs of the reported coordinates; wall energy ≤ 0.1 kJ/mol from the walls at those CVs | gate `periodic_images` |
+| Nonbonded energy and forces of the equilibrated test systems (rhombic dodecahedron; membrane box), with OpenMM's PME and with the back end of the runs, vs PME at an Ewald tolerance of 1e-6 in double precision; at the equilibrated coordinates and with whole molecules moved by lattice vectors | energy ≤ 1e-4, force ≤ 2e-3 (relative) | gates `backend`, `membrane_backend` |
+| CVs, wall and bias energy and forces with the cuPotential back end vs OpenMM's at the same coordinates; `run.backend: auto` where the plugin can take part | CV ≤ 2e-5 nm; energy ≤ 1e-4, force ≤ 2e-3 (relative); `auto` gives cuPotential | gates `backend`, `membrane_backend` |
 | Bias table vs `openmm.app.Metadynamics` for the same hills | ≤ 1e-6 relative | `tests/test_engine.py` |
 | Bias force (both forms) vs a `Continuous2DFunction` table of the same grid values | energy ≤ 1e-10 relative, forces ≤ 1e-8 (Reference) | `tests/test_engine.py` |
 | Restart: N + N hills vs 2N in one run | HILLS, COLVAR, DCD frames identical (Reference) | `tests/test_engine.py` |
@@ -87,9 +89,11 @@ recorded in `docs/design/` and `PROGRESS.md`, with its reason.
 ## Change gate
 
 - A change under `src/fmeta/` to forces, bias, runner, system building or platform handling is
-  verified on a GPU machine before merge: `python scripts/gpu_gates.py` on a clean commit.
-  Commit the result file and the index entry (`bench/results/`) and note a status change in
-  `PROGRESS.md`. CI cannot run these; say so in the PR if it has not been done yet.
+  verified on a GPU machine before merge: `python scripts/gpu_gates.py` on a clean commit, once
+  per back end (as it is, which is cuPotential in the image, and with `--backend openmm`;
+  FM-D18). Commit the two result files and their index entries (`bench/results/`) and note a
+  status change in `PROGRESS.md`. CI cannot run these; say so in the PR if it has not been done
+  yet.
 - A new CV, restraint or estimator gets a case on the toy system, where the exact answer is
   known, before it is used on a real system.
 

@@ -1,0 +1,208 @@
+{
+ "date": "2026-11-17",
+ "commit": "565b3592df4de7225806bd251410964b192f2ff3",
+ "dirty": false,
+ "gpus": 2,
+ "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+ "platform": "CUDA",
+ "openmm": "8.4",
+ "backend": "openmm",
+ "environment": {
+  "image": "sha256:648480d39c9ef2c0a8121f9802b8df1783c43dea2368bda9a98d83d8b81b115d",
+  "lock_sha256": "ee32ef34e556fc0a325be514c9fba398fd3ee9c7866b3ca5b4aae7bc715b7f68",
+  "gpu_uuids": [
+   "GPU-f212d821-c550-947e-904c-1ee6be110c96",
+   "GPU-9813a152-84b7-57ef-3109-76b4a1d47673"
+  ],
+  "driver": "595.99.02",
+  "libcuda": "libcuda.so.615.71.10",
+  "cuda_runtime": "13.4",
+  "plugin": "0.3.5"
+ },
+ "all_passed": true,
+ "gates": [
+  {
+   "name": "gpu-tests",
+   "passed": true,
+   "metrics": {
+    "summary": "2 passed, 200 deselected",
+    "n_passed": 2,
+    "seconds": 19.9
+   },
+   "criteria": "pytest -m gpu: every GPU test passes and at least one runs"
+  },
+  {
+   "name": "platform",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "OpenMM 8.4, platform CUDA DeviceName=NVIDIA RTX PRO 6000 Blackwell Server Edition DeviceIndex=0 Precision=mixed; available: Reference, CPU, CUDA, OpenCL",
+    "seconds": 1.3
+   },
+   "criteria": "a GPU platform (CUDA, HIP or OpenCL) is selected and usable"
+  },
+  {
+   "name": "forces",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "bias and wall forces match Reference at 6 positions: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06 (relative)",
+    "seconds": 9.0
+   },
+   "criteria": "funnel-wall and bias energies, forces and CVs match the Reference platform at 6 positions: CV <= 2e-5 nm, energy <= 1e-4, force <= 2e-3 (relative)"
+  },
+  {
+   "name": "toy_restart",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "toy run of 80 hills, restarted from its checkpoint at 40; CVs stay inside the walls",
+    "seconds": 3.9
+   },
+   "criteria": "80 time-ordered hills after a restart at 40; CVs finite and inside the walls"
+  },
+  {
+   "name": "toy_free_energy",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "10 ns: dG0 reweighted -4.76, plateau -4.34, exact -4.95 kJ/mol; 30 rebinding events",
+    "seconds": 26.1
+   },
+   "criteria": "solvable toy system, 10 ns: reweighted dG0 within 2.0 kJ/mol and plateau mean within 3.0 kJ/mol of the exact value"
+  },
+  {
+   "name": "pdb_sdf_openff",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "protein PDB + ligand SDF only, ligand parameters from openff: 24062 atoms built, ligand net charge +0.000 e, energy -211199 kJ/mol",
+    "seconds": 15.6
+   },
+   "criteria": "system built from the protein PDB and the ligand SDF alone with OpenFF ligand parameters: finite energy, neutral benzene, funnel checks pass"
+  },
+  {
+   "name": "pdb_sdf_gaff",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "protein PDB + ligand SDF only, ligand parameters from gaff: 24062 atoms built, ligand net charge +0.000 e, energy -213185 kJ/mol",
+    "seconds": 6.1
+   },
+   "criteria": "the same with GAFF ligand parameters"
+  },
+  {
+   "name": "prepare",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "24062 atoms; funnel from s = 0.62 to 2.77 nm, placed and validated automatically",
+    "seconds": 5.6
+   },
+   "criteria": "solvated system built, funnel placed automatically, no funnel check fails"
+  },
+  {
+   "name": "equilibrate",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "funnel wall energy on the bound ligand 0.002 kJ/mol (ok); box 6.99 x 6.99 x 4.94 nm",
+    "seconds": 21.4
+   },
+   "criteria": "staged equilibration completes; funnel checks pass on the equilibrated structure"
+  },
+  {
+   "name": "periodic_images",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "ligand and anchors in one molecule of 594 atoms; shifted across the box and with a cell corner inside the complex (1000 steps each, the complex in 5 periodic cells), and at the upper wall along the narrowest direction of the box: CVs within 1.2e-06 nm, wall energy within 1.4e-10 kJ/mol of the values from the coordinates",
+    "seconds": 5.4
+   },
+   "criteria": "the ligand and the funnel anchors are in one molecule of the context; during 1000 steps each with the whole system shifted across the box and with a corner of the periodic cell inside the complex, and with the ligand at the upper wall while the funnel axis lies along the narrowest direction of the box, the CVs on the run platform are within 2e-3 nm of the numpy CVs of the reported coordinates (as reported and wrapped into the cell) and the wall energy within 0.1 kJ/mol of the walls at those CVs"
+  },
+  {
+   "name": "production",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "2 replicas x 100 hills, then continued to 150 from their checkpoints",
+    "seconds": 19.8,
+    "performance": "1288.1 ns/day"
+   },
+   "criteria": "2 replicas reach the requested number of hills and continue from their checkpoints without changing earlier hills; CVs finite, inside the funnel, no jump above 1 nm between samples"
+  },
+  {
+   "name": "walkers",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "2 walkers sharing one bias (200 hills in total; walker 0 deposited 100 and feels a bias of 12.3 kJ/mol)",
+    "seconds": 11.3
+   },
+   "criteria": "2 walkers deposit the requested hills each and the analysis merges them"
+  },
+  {
+   "name": "replicas_sequential",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "2 replicas x 100 hills one after another on device 1; device.json agrees with the assignment; the memory in use on the assigned GPU grew by 600, 600 MiB",
+    "seconds": 22.2
+   },
+   "criteria": "mode sequential: 2 replicas run one after another on the last device given; schedule.jsonl has no violation of the scheduler's rules; each replica reaches the requested number of hills; its device.json names the assigned device, and the memory in use on that GPU (nvidia-smi) grew with the run"
+  },
+  {
+   "name": "replicas_parallel",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "3 replicas x 100 hills on devices 0 and 1: rep0 and rep1 side by side, rep2 on device 1 after rep1 ended there; device.json agrees with the assignment; the memory in use on the assigned GPU grew by 599, 600, 600 MiB",
+    "seconds": 21.1
+   },
+   "criteria": "mode parallel: 3 replicas on 2 GPUs; the first two start side by side on different GPUs and the third on the GPU that the first ended replica released; schedule.jsonl, hills, device.json and GPU memory as for replicas_sequential"
+  },
+  {
+   "name": "analysis",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "analysis of 2 replicas ran (far too short for a value that means something: diagnostics on 2 of them); figures written",
+    "seconds": 1.0
+   },
+   "criteria": "analysis of the replicas produces a finite result and summary.json"
+  },
+  {
+   "name": "benchmark",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "24062 atoms at 4 fs, 200 ps each with and without funnel metadynamics (4980 grid points, 1 hill/ps), back end openmm",
+    "seconds": 28.3,
+    "performance": "1481 ns/day plain, 1406 ns/day with funnel metadynamics (overhead 5.3%, checkpoints excluded: 188 ms each); a replica of the default 40 ns takes about 0.7 hours"
+   },
+   "criteria": "throughput with and without the bias is measured (diagnostic: decides nothing)"
+  },
+  {
+   "name": "membrane_build",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "POPC bilayer built with Modeller.addMembrane: 108 lipids, 37422 atoms, box 6.37 x 6.69 x 9.48 nm; funnel points into water and clears the membrane",
+    "seconds": 18.2
+   },
+   "criteria": "POPC bilayer built with Modeller.addMembrane; funnel and membrane checks pass"
+  },
+  {
+   "name": "membrane_run",
+   "passed": true,
+   "metrics": {
+    "status": "PASS",
+    "detail": "equilibrated with the semi-isotropic barostat (area per lipid 0.72 nm2 incl. the protein footprint), 100 hills of production",
+    "seconds": 55.8,
+    "performance": "931.7 ns/day"
+   },
+   "criteria": "membrane system equilibrates with the semi-isotropic barostat and reaches the requested number of hills"
+  }
+ ]
+}

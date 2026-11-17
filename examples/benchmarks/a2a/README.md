@@ -87,6 +87,15 @@ equilibration) with two differences: `orient: input` (the frame is that of the
 superposition) and the sodium ion kept (`keep_hetero: [NA]`). Everything else is the official
 default, at 300 K. The standard state of every value is 1 mol/L.
 
+The back end of the runs is the default as well (`run.backend: auto`, FM-D18 in
+`docs/design/engine.md`): in the official image a new work directory runs with NVIDIA's
+cuPotential plugin of OpenMM (the nonbonded force and the integrator; the membrane barostat is
+OpenMM's), and a report names the back end of its replicas. The result below was made with
+OpenMM's own forces and integrator, before `run.backend` existed. A work directory of that time
+has another configuration than the set asks for today, and `fmeta benchmark` refuses to go on
+in it; with `run: {backend: openmm}` added to `config` in `set.yaml` the set is the one it was
+prepared for.
+
 `Modeller.addMembrane` builds the bilayer from whole lipid patches of 6.37 x 6.69 nm, so the
 size of the system moves in steps. For `4q` in this frame:
 

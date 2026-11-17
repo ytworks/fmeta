@@ -8,11 +8,17 @@ PROGRESS.md budget, evidence index, CPU tests, the image build). Criteria:
 ## Prerequisites
 
 - An NVIDIA GPU with a working driver, and Docker with the NVIDIA Container Toolkit
-  (`docker info` lists the `nvidia` runtime).
+  (`docker info` lists the `nvidia` runtime). The CUDA runtime of the image is 13.4: with a
+  driver of R615 or newer nothing else is needed; with an older one (R595 on the GPU machine)
+  the toolkit puts the CUDA compatibility libraries of the image on the loader path (toolkit
+  1.19.1, `cuda-compat-mode = "ldconfig"`), and NVIDIA MPS runs with the MPS programs of the
+  image (FM-D13; "Several replicas on one GPU" below). A gate record names the driver and the
+  `libcuda` that was loaded.
 - The image. `scripts/in_docker.sh` builds it from `conda-linux-64.lock` on first use (about
-  6 GB: the CUDA build of OpenMM, the ligand-parameter generators `openmmforcefields`,
-  `openff-toolkit` and `ambertools`, and the test tools). It refuses an image that was built
-  from another lock; `scripts/in_docker.sh --build ...` rebuilds.
+  7.4 GB: the CUDA build of OpenMM, NVIDIA's cuPotential plugin, CUDA compatibility libraries
+  and MPS programs, the ligand-parameter generators `openmmforcefields`, `openff-toolkit` and
+  `ambertools`, and the test tools). It refuses an image that was built from another lock;
+  `scripts/in_docker.sh --build ...` rebuilds.
 - Two GPUs, and both free: `nvidia-smi --query-compute-apps=pid,process_name --format=csv` shows
   no other jobs on the GPUs you pass. The items `replicas_sequential` and `replicas_parallel`
   compare the memory in use on a GPU before and after a replica starts there: another process
@@ -33,21 +39,37 @@ record stores the UUIDs, which identify the physical GPUs.
    `conda-linux-64.lock`, `Dockerfile` or `.dockerignore` differ from it. Run the gates in the
    main checkout, not in a `git worktree`: the script reads the commit with git in the
    container, where the git directory of a worktree is not mounted, and stops at once.
-2. `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`:
+2. Run the gates once per back end (FM-D18), one after the other: both runs write `gates_work/`
+   and the index.
+
+   ```bash
+   scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1
+   scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1 --backend openmm
+   ```
+
+   Without `--backend` the test runs use the back end of a new configuration (`run.backend:
+   auto`), which is NVIDIA's cuPotential plugin in the official image; `--backend openmm` uses
+   OpenMM's own forces and integrator. Each run is:
    - `gpu-tests`: `pytest -m gpu`;
    - the items of `fmeta check` (`src/fmeta/check.py`, criteria in `CRITERIA` there): `platform`,
      `forces`, `toy_restart`, `toy_free_energy`, `pdb_sdf_openff`, `pdb_sdf_gaff`, `prepare`,
-     `equilibrate`, `periodic_images`, `production`, `walkers`, `replicas_sequential`,
-     `replicas_parallel`, `analysis`, `benchmark`, `membrane_build`, `membrane_run`.
+     `equilibrate`, `backend`, `periodic_images`, `production`, `walkers`, `replicas_sequential`,
+     `replicas_parallel`, `analysis`, `benchmark`, `membrane_build`, `membrane_run`,
+     `membrane_backend` (19 items; `backend` and `membrane_backend` since FM-D18).
    A skipped item is not a pass. The two `replicas_*` items (FM-D14) run real child processes
    and check their record `schedule.jsonl`, their hills and their `device.json`; they are
    skipped when `nvidia-smi` reports no memory in use for the GPU (then the device of a replica
    cannot be confirmed), and off a GPU platform.
    While iterating use `fmeta check --quick` or `scripts/gpu_gates.py --quick` (not recorded).
-3. On ALL PASSED the script writes `bench/results/<date>-<commit>-gpu-gates.json` and updates
-   `bench/results/index.json`. The record names the image, the hash of the lock and the UUIDs of
-   the GPUs. Commit both files (CI validates the index), and update `PROGRESS.md` → Current
-   Status if the gate status changed.
+3. On ALL PASSED a run writes its record and updates `bench/results/index.json`:
+   `bench/results/<date>-<commit>-cupotential-gpu-gates.json` for the cuPotential back end,
+   `bench/results/<date>-<commit>-gpu-gates.json` for OpenMM's. The record names the back end
+   its test runs were made with, the image, the hash of the lock and the UUIDs of the GPUs. A
+   record of the cuPotential back end holds no speed and no duration: the licence of the plugin
+   forbids the disclosure of performance data without NVIDIA's permission (FM-D13), the script
+   leaves them out, and `scripts/verify_bench_results.py` refuses a record that has them. They
+   stay in `gates_work/`, which Git does not track. Commit the two records and the index (CI
+   validates the index), and update `PROGRESS.md` → Current Status if the gate status changed.
 4. On failure: `gates_work/gpu-gates-not-recorded.json` lists every item with its detail, and
    `gates_work/<item>.traceback.txt` holds the traceback. Never relax a criterion to pass; a
    criterion changes only by a design amendment recorded in `docs/design/` and `PROGRESS.md`.
@@ -58,7 +80,9 @@ the items and reports them, and records nothing.
 
 ## After a change of the environment
 
-Packages change in `environment.yml`. Then:
+Packages change in `environment.yml`; the release of NVIDIA's cuPotential plugin, the file of
+the CUDA compatibility libraries and the file of the MPS programs of the same driver, each with
+its sha256, in `docker/nvidia.pins`. Then:
 
 ```bash
 scripts/update_lock.sh                           # solves the lock in a container
@@ -66,13 +90,18 @@ scripts/in_docker.sh --build pytest              # rebuilds the image and runs t
 scripts/in_docker.sh pytest -m slow
 ```
 
+When only the compatibility libraries or the MPS programs changed, `scripts/update_lock.sh
+--pins` rewrites their two lines of the lock and leaves the packages as they are. The hash of
+the lock changes either way.
+
 Commit the lock, and rerun the gates on that commit (the procedure above): the evidence of the
 old lock does not cover the new image.
 
 ## Diagnostics
 
 Wall time and the `benchmark` item (ns/day with and without the bias over the same stretch of
-the test system, and the cost of a checkpoint) are recorded but never decide a verdict.
+the test system, and the cost of a checkpoint) never decide a verdict. They are recorded for
+OpenMM's back end and left out of a record of the cuPotential back end (step 3).
 `scripts/in_docker.sh --gpus 6 fmeta doctor` prints the platforms, the optional packages and
 the cost of a bias table update without running anything long.
 
@@ -106,8 +135,15 @@ the scheduler terminates its child processes before it returns, and `runs/tb/sch
 records what ran where. Running the same `fmeta run` command again continues from the last
 checkpoints. Look at
 `runs/tb/prepared/funnel.pdb` with the structure before spending GPU time. Record the outcome
-(`summary.json`, the commit, the image, the value with its interval and the diagnostics) in the
-example's README and in `PROGRESS.md`.
+(`summary.json`, the commit, the image, the back end, the value with its interval and the
+diagnostics) in the example's README and in `PROGRESS.md`.
+
+The production run uses the cuPotential plugin by default (`run.backend: auto`). `fmeta status`
+names the back end of every replica; `run.yaml` and `device.json` of a replica also hold the
+parts the plugin provided (`backend_parts`), or the reason why OpenMM's own was used
+(`backend_reason`). `--backend openmm` (or `run: {backend: openmm}`) asks for OpenMM's. A run
+keeps the back end it was started with. A speed measured with the plugin goes to no tracked
+file, commit message or GitHub text (`.claude/rules/docker-execution.md`).
 
 ### Several replicas on one GPU (NVIDIA MPS)
 
@@ -125,6 +161,24 @@ scripts/mps.sh stop                              # ends every client: stop the r
 
 Only containers started with `--mps` are clients of the daemon. If the MPS server of a GPU
 fails, all its clients end; the same `fmeta run` command continues from the checkpoints.
+
+`scripts/mps.sh` starts the daemon with MPS protocol 3 (`nvidia-cuda-mps-control -f --protocol
+3`); a client needs no setting for it. Do not start the daemon of driver R615 by hand with its
+default protocol: it stops reading its log pipe at the first client, the pipe is full after
+about 50 client starts, and the daemon and every client that starts after that wait for ever
+(FM-D13, third amendment of 2026-11-17). The log of the daemon and of its servers is `docker
+logs fmeta-mps`. Clients that hang at their start with the GPUs idle are the sign of a daemon
+that was started another way: stop the runs, `scripts/mps.sh stop`, `scripts/mps.sh start`, and
+run the same commands again.
+
+The daemon, its server and the CUDA driver library of a client must be of one driver version.
+With a host driver of R615 or newer they are all the host's. With an older one the containers
+load the compatibility libraries of the image (615.71.10), and the entry of the image
+(`fmeta-entry`, `docker/entrypoint.sh`) then takes the MPS programs of the same driver from the
+image (`/opt/fmeta/mps/bin`) and hides NVIDIA's OpenCL library from a client: under that daemon
+the OpenCL library of the host does not return from its start, and `import openmm` would wait
+for ever. Such a client has the CUDA platform and no OpenCL platform (FM-D13). A command that
+bypasses the entry (`docker run --entrypoint ...`, `docker exec`) gets neither.
 
 The scheduler starts every replica with one math-library thread (`OMP_NUM_THREADS`,
 `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS`; a value the caller sets is kept). With the default

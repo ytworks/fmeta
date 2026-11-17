@@ -68,8 +68,8 @@ Every command runs in the official image (rule above); write `scripts/in_docker.
 - CPU: `scripts/in_docker.sh ruff check .`, `... python scripts/check_progress_size.py`,
   `... python scripts/verify_bench_results.py`, `... pytest` (the four checks of CI).
   Long CPU tests: `scripts/in_docker.sh pytest -m slow`.
-- GPU: `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`
-  (see `docs/gpu-runbook.md`).
+- GPU: `scripts/in_docker.sh --gpus 6,7 python scripts/gpu_gates.py --gpus 0,1`, then the same
+  with `--backend openmm`: one record per back end (see `docs/gpu-runbook.md`).
 - Before a commit: run the commands above and read the exit status of the command itself.
   A pipe (`pytest | tail`) reports the status of its last stage and hides a failure.
 - Commit in small steps and push each one; the PR is the review unit.

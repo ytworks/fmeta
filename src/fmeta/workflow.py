@@ -28,6 +28,7 @@ import openmm.unit as unit
 
 from .analysis import analyze_replicas, walker_directories
 from .config import Config
+from .engine.backend import build, resolve, settle
 from .engine.bias import FunnelBias
 from .engine.equilibration import equilibrate
 from .engine.platform import GPU_PLATFORMS, device_record, resolve_devices, select_platform, visible_gpus
@@ -37,6 +38,7 @@ from .engine.runner import (
     check_same_run,
     discard_run_without_checkpoint,
     rollback_to_checkpoint,
+    system_conditions,
 )
 from .funnel.geometry import KB, Funnel
 from .funnel.validate import validate_funnel
@@ -179,6 +181,7 @@ def run_stage(config: Config, workdir, replica: int = 0, device: Optional[int] =
 def _run(config: Config, workdir: Path, directory: Path, replica: int, device: Optional[int],
          length_ns: Optional[float], walker: Optional[int]) -> None:
     run_cfg, temperature = config.run, config.system.temperature
+    requested, parts = settle(run_cfg.backend, directory, workdir)    # refuses before a device or a file is touched
     prepared = load_prepared(workdir, config)
     with open(workdir / "equil" / "state.xml") as handle:
         state = mm.XmlSerializer.deserialize(handle.read())
@@ -190,12 +193,13 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
     gpus_before = visible_gpus() if run_cfg.platform == "auto" or run_cfg.platform in GPU_PLATFORMS else None
     platform, properties = select_platform(run_cfg.platform, run_cfg.precision, device)
     bias = FunnelBias(system, prepared.funnel, config.metad, platform=platform.getName())
-    integrator = mm.LangevinMiddleIntegrator(temperature * unit.kelvin,
-                                             run_cfg.friction / unit.picosecond,
-                                             dt * unit.picosecond)
+    box = state.getPeriodicBoxVectors()
+    backend = resolve(requested, platform.getName(), run_cfg.precision, system, box, parts)
+    if backend.reason:
+        log.warning("run.backend auto: this run is made with OpenMM itself, because %s", backend.reason)
+    conditions = dict(backend.record(), system=system_conditions(system))     # before forces are replaced
     seed = run_cfg.seed + 1000 * replica + (walker or 0) if run_cfg.seed else 0
-    if seed:
-        integrator.setRandomNumberSeed(seed)
+    integrator = build(backend, system, temperature, run_cfg.friction, dt, seed, box=box, bias=bias)
     simulation = app.Simulation(prepared.topology, system, integrator, platform, properties)
     simulation.context.setState(state)
     # fresh velocities decorrelate replicas and walkers (a restart overwrites them again)
@@ -215,9 +219,11 @@ def _run(config: Config, workdir: Path, directory: Path, replica: int, device: O
         trajectory_hills=round(run_cfg.trajectory_ps / hill_ps) if run_cfg.trajectory_ps else 0,
         trajectory_atoms=[int(i) for i in solute] if run_cfg.trajectory_solute_only else None,
         walker_dirs=walker_dirs, sync_hills=run_cfg.walker_sync_hills)
-    run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings)
+    run = MetadynamicsRun(simulation, bias, directory, prepared.restraint_group, settings,
+                          conditions=conditions)
     with open(directory / "device.json", "w") as handle:    # after a restart was accepted or refused
-        json.dump(device_record(simulation.context, device, gpus_before), handle, indent=2)
+        json.dump(dict(device_record(simulation.context, device, gpus_before), **backend.record(),
+                       restored_from=run.restored), handle, indent=2)
     length = run_cfg.length_ns if length_ns is None else length_ns
     run.run(round(length * 1000.0 / hill_ps))
     run.close()
@@ -273,7 +279,8 @@ def replica_jobs(config: Config, workdir, length_ns: Optional[float] = None) -> 
         tasks = []
         for walker in walkers:
             name = f"rep{replica}" if walker is None else f"rep{replica}_w{walker}"
-            command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir), "--replica", str(replica)]
+            command = [sys.executable, "-m", "fmeta.cli", "run", str(workdir), "--replica", str(replica),
+                       "--backend", config.run.backend]
             if walker is not None:
                 command += ["--walker", str(walker)]
             if length_ns is not None:
@@ -281,9 +288,12 @@ def replica_jobs(config: Config, workdir, length_ns: Optional[float] = None) -> 
             tasks.append(Task(name, command, workdir / f"{name}.log"))
         before_start = None
         if n_walkers > 1:
+            conditions = dict(bias=config.metad.to_dict(), timestep_ps=config.run.timestep_fs / 1000.0)
+            if config.run.backend != "auto":        # auto follows what each walker was run with
+                conditions["backend"] = config.run.backend
             before_start = functools.partial(
                 _rollback_walkers, [replica_directory(workdir, replica, walker) for walker in walkers],
-                dict(bias=config.metad.to_dict(), timestep_ps=config.run.timestep_fs / 1000.0))
+                conditions)
         jobs.append(Job(f"rep{replica}", tasks, devices=n_walkers, before_start=before_start))
     return jobs
 
@@ -368,7 +378,7 @@ def status_table(workdir) -> list[dict]:
             directory = replica_directory(workdir, replica, walker)
             row = dict(name=f"rep{replica}" if walker is None else f"rep{replica}/w{walker}",
                        hills=0, target_hills=round(config.run.length_ns * 1000.0 / hill_ps),
-                       time_ns=0.0, speed_ns_day=None, device=None)
+                       time_ns=0.0, speed_ns_day=None, device=None, backend=None)
             progress = None
             if (directory / "run.log").exists():
                 progress = _PROGRESS.search(_last_line(directory / "run.log"))
@@ -380,6 +390,7 @@ def status_table(workdir) -> list[dict]:
                 with open(directory / "device.json") as handle:
                     device = json.load(handle)
                 row["device"] = " ".join(filter(None, [device["platform"], device.get("device_index")]))
+                row["backend"] = device.get("backend")
             if is_locked(directory):
                 row["state"] = "running"
             elif progress and row["hills"] >= row["target_hills"]:
@@ -393,11 +404,12 @@ def status_table(workdir) -> list[dict]:
 
 
 def format_status(rows: Sequence[dict]) -> str:
-    lines = [f"{'replica':10s} {'state':12s} {'time / target (ns)':>22s} {'ns/day':>9s}  device"]
+    lines = [f"{'replica':10s} {'state':12s} {'time / target (ns)':>22s} {'ns/day':>9s}  device (back end)"]
     for row in rows:
         speed = "" if row["speed_ns_day"] is None else f"{row['speed_ns_day']:.1f}"
         progress = f"{row['time_ns']:.3f} / {row['target_ns']:.3f}"
-        lines.append(f"{row['name']:10s} {row['state']:12s} {progress:>22s} {speed:>9s}  {row['device'] or ''}")
+        device = " ".join(filter(None, [row["device"], row.get("backend") and f"({row['backend']})"]))
+        lines.append(f"{row['name']:10s} {row['state']:12s} {progress:>22s} {speed:>9s}  {device}")
     return "\n".join(lines)
 
 

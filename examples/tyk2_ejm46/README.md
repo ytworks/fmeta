@@ -49,6 +49,11 @@ scripts/in_docker.sh fmeta analyze runs/tyk2 --plot        # after the run, or d
 checkpoints. With one GPU use `--gpus 0` and `--mode sequential`: the replicas then run one
 after another.
 
+In the official image the production run is made with NVIDIA's cuPotential plugin of OpenMM:
+`run.backend` is `auto` by default (FM-D18, `docs/design/engine.md`). `fmeta status` names the
+back end of every replica; `run: {backend: openmm}` in `fmeta.yaml` gives OpenMM's own forces
+and integrator.
+
 ## What the preparation gives (measured on 2026-11-15 UTC, commit 8d1f10a)
 
 - Removed from the entry: 0X5 × 1, HOH × 119. One missing heavy atom rebuilt, 2307 hydrogens
@@ -70,6 +75,10 @@ five replicas ran at the same time on one GPU with NVIDIA MPS
 300 ns/day each. The numbers are those of `fmeta analyze runs/tyk2 --plot` with the analysis of
 the third amendment of FM-D9 (`docs/design/engine.md`): the value of a replica is the mean over
 the second half of the run of dG(t) from the accumulated bias, with a block error.
+
+The run was made with OpenMM's own forces and integrator: commit 47e84f7 is from before
+`run.backend` existed, and today that is `run.backend: openmm`. A run of the full length with
+the cuPotential back end has not been made.
 
 | Quantity | fmeta | Experiment |
 |---|---|---|
