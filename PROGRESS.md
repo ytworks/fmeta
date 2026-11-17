@@ -28,14 +28,13 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted;
-FM-D2, D4, D5, D6, D7, D9, D10, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). `main` is the work of PR #1 (merged; final code d4041f9; plan
-`docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`: every run ended, every check this
-machine can run has run, three review rounds fixed). In progress on branch
-`claude/cupotential-backend` (draft PR #3): NVIDIA cuPotential as the default back end (owner
-request 2026-11-17; plan `docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4). M0 to M3
-are done, NVIDIA MPS included; M4 is open (`auto` as the default, the gate records of the two
-back ends, the examples); the owner: everything is developed in that PR.
+Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
+D5, D6, D7 and D9 to D17 amended since, see the Change Log). `main` is the work of PR #1
+(merged; final code d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`).
+In progress on branch `claude/cupotential-backend` (draft PR #3): NVIDIA cuPotential as the
+default back end (owner request 2026-11-17; plan `docs/plans/2026-11-17-cupotential-backend.md`,
+M0 to M4). M0 to M3 are done, NVIDIA MPS included; M4 is open (`auto` as the default, the gate
+records of the two back ends, the examples); the owner: everything is developed in that PR.
 
 | Milestone | Status |
 |---|---|
@@ -72,49 +71,36 @@ back ends, the examples); the owner: everything is developed in that PR.
   kJ/mol, criteria 2.0 and 3.0. Speed (1481 ns/day plain, 1406 with the bias, 932 membrane)
   decides nothing. Before it: abd4548 (lock 0b6c344f…, the same packages without the MPS
   programs); on `main` (lock d061e45a…, OpenMM 8.6.1): d4041f9.
-- Review of PR #1: three rounds, 9 findings, each fixed in its own commit (6fa7cd2, a4b09b1,
-  5792001, 3e652e0, ab8f906, 4f976cb; 97bcd70, 7c731c5; d4041f9; FM-D5, FM-D9, FM-D10, FM-D11,
-  FM-D15). All 9 threads answered and resolved.
-- Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
-  every function of PR #1 that the gates do not reach has run once; table in `README.md`
-  ("機能ごとの動作確認"). One defect found and fixed in c59ec99.
-- Other checks, in the image (lock d061e45a…): `ruff check .` passes and `pytest` 175 passed on
-  d4041f9; the two slow walker tests (`-m slow tests/test_walkers.py`) last ran on 4f976cb.
-  Operation on a CPU platform is not guaranteed (owner, 2026-11-16, FM-D12): `pytest -m slow`
-  (6 passed) and `fmeta check --platform CPU` last ran on the source of 2c4ad4e.
+- Review of PR #1: three rounds, 9 findings, each fixed in its own commit (FM-D5, FM-D9, FM-D10,
+  FM-D11, FM-D15); all 9 threads answered and resolved.
+- Function checks on real systems (783ecff, GPU, short runs): every function of PR #1 that the
+  gates do not reach has run once (table in `README.md`); one defect, fixed in c59ec99.
+- Other checks on `main`, in its image (lock d061e45a…): `ruff check .` and `pytest` (175
+  passed) on d4041f9. Operation on a CPU platform is not guaranteed (owner, 2026-11-16, FM-D12):
+  `fmeta check --platform CPU` last ran on the source of 2c4ad4e.
 - CI: green on d4041f9, the final code of `main`, and on PR #3 on 150b1c2, ba45dfa and 10d833d
-  (run 44044334116, all three jobs; read with `gh` on 2026-11-17). The red runs on cc789b3 and
-  565b359 were the 20 ns toy test, whose tolerances now come from its scatter over 48 seeds
-  (2.0 and 3.0 kJ/mol; FM-D12 amendment of 2026-11-17, Change Log). Not read: the commit of M3.
+  (all three jobs; read with `gh`). The red runs on cc789b3 and 565b359 were the 20 ns toy test
+  (FM-D12 amendment of 2026-11-17, Change Log). Not read: the commit of M3.
 - Not verified yet:
-  - a binding free energy of a real protein-ligand system with a narrow interval (trypsin with
-    the defaults: 95% intervals −66.9 to 10.4 and −80.5 to −7.6 kJ/mol in two runs, and the
-    value depends on the bias setting; TYK2 with ejm_46: −26.6 to −3.1, 32 kJ/mol above
-    experiment; A2A with theophylline: −33.3 to −4.0, 14 kJ/mol above the measurement on the
-    construct; the 18 ligands of the benchmark sets: intervals 18 to 121 kJ/mol wide);
+  - a binding free energy of a real system with a narrow interval (95% intervals in kJ/mol:
+    trypsin −66.9 to 10.4 and −80.5 to −7.6 in two runs, and the value depends on the bias
+    setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
+    to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
   - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
-    owner until everything is shown to work; the accuracy of walkers on trypsin is not measured;
-  - reading HILLS with PLUMED itself; the publish workflow (never run).
+    owner; reading HILLS with PLUMED itself; the publish workflow (never run).
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
-  directory prepared before 2026-11-16 keeps periodic funnel walls in `prepared/system.xml` and
-  must be prepared again; the gate `toy_free_energy` had 0.04 kJ/mol to spare with the former
-  reweighting (about 1 run in 30 of its 10 ns missed the criterion on every platform, FM-D12);
-  with the estimate from the samples its error is 0.19 kJ/mol for the gate's seed in the
-  present image (1.00 in the image of `main`), and the scatter of that estimate over seeds at
-  10 ns is not measured.
+  directory prepared before 2026-11-16 keeps periodic funnel walls and must be prepared again;
+  the scatter over seeds of the gate `toy_free_energy` (10 ns, estimate from the samples) is
+  not measured: its error is 0.19 kJ/mol for the gate's seed in the present image (FM-D12).
 - GPUs (owner, 2026-11-16: all 8 are for this task): idle between the short runs of the
-  cuPotential plan; the MPS daemon is stopped. Speed of stock OpenMM in the image
-  of `main` (second wave, 47e84f7, 2026-11-16):
-  88k atoms 606 ns/day alone, 1283 / 1541 / 1620 per GPU with 4 / 6 / 8 replicas under MPS;
-  the A2A set about 1015 per GPU with 6, the A2A example about 506 with 5. Stock OpenMM in the
-  new image (M2, short runs with the bias): the TYK2 example 628 alone, 1425 / 1569 / 1609 with
-  4 / 6 / 8 (8 again, 4 runs: 1585 to 1609); the A2A example 302 alone, 526 / 528 / 524.
+  cuPotential plan; the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
+  `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
+  image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
+  A2A example 302 alone, 526 / 528 / 524.
 - Blockers: none known. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
-  CUDA 13.4) with the MPS programs of the image (FM-D13, second amendment of 2026-11-17) and a
-  daemon started by `scripts/mps.sh` (protocol 3, third amendment); the host driver is not
-  raised (owner, 2026-11-17). With stock OpenMM in the new image, 4 replicas on one GPU under
-  MPS: 925 to 934 ns/day each (soluble test system, 24062 atoms).
+  CUDA 13.4) with the MPS programs of the image and a daemon started by `scripts/mps.sh`
+  (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
 
 ## Change Log
 
@@ -142,23 +128,3 @@ back ends, the examples); the owner: everything is developed in that PR.
 - What: `scripts/gpu_gates.py` on clean 565b359 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded, back end `openmm`, ended 06:46 UTC): all 18 passed. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 1.2e-06 nm, wall energy 1.4e-10 kJ/mol; `toy_free_energy` −4.76 (samples) and −4.34 (bias) against −4.95 kJ/mol, the values of abd4548. The membrane test system has 37422 atoms. Speed of stock OpenMM (a diagnostic): 1481 ns/day plain, 1406 with the bias, membrane 932 (abd4548: 1413, 1410, 967). `pytest -m slow` in the same image: 7 passed. This closes "Not run in the new image" of the entry below. CI is red on cc789b3 and 565b359 (`docker` job; both `cpu` jobs pass): `test_toy_binding_free_energy_end_to_end` (20 ns, seed 12) gives −5.955 kJ/mol from the samples, 1.0015 from the exact value against a tolerance of 1.0; the same code and packages give −5.295 on the GPU machine, so the trajectory of the fixed seed depends on the CPU. Not fixed in this commit.
 - Why: FM-D13: after a change of the lock the tests and the gates are taken again in the new image (owner, 2026-11-17: if the MPS programs work, they go into the image and the gates are taken again).
 - Refs: `bench/results/2026-11-17-565b3592d-gpu-gates.json`, `bench/results/index.json`, `README.md`; commit 565b359; CI runs 44029977738, 44033031759.
-
-### 2026-11-17 — [amendment] FM-D13: the image holds the MPS programs of the driver of its compatibility libraries; NVIDIA MPS works on the R595 host
-- What: `docker/nvidia.pins` names NVIDIA's `libnvidia-compute` 615.71.10 with its sha256, the lock holds it as a second comment line (`scripts/update_lock.sh --pins`: no new solve, the packages are unchanged; lock 0b6c344f… → ee32ef34…), and the build puts `nvidia-cuda-mps-control` and `nvidia-cuda-mps-server` into `/opt/fmeta/mps/bin` with the licence text and refuses a version other than that of the compatibility libraries. The entry of the image puts them first on `PATH` exactly when the loader resolves `libcuda.so.1` to the compatibility libraries, and hides NVIDIA's OpenCL library from an MPS client (under that daemon the OpenCL library of the host does not return, and `import openmm` waited for ever): such a client has no OpenCL platform. `scripts/mps.sh start` starts the daemon through the entry. Verified in image 648480d3… on this host (driver 595.99.02): `PATH` and platforms with a GPU, without one and as a client; 4 replicas at once on one GPU as MPS clients, with the cuPotential back end and with stock OpenMM (0.5 ns, 503 lines in every HILLS, exit 0; stock 925 to 934 ns/day per replica at 24062 atoms); `ruff`, `pytest` 193 passed. Not run in the new image: `pytest -m slow`, the GPU gates (they follow on this commit). No test covers MPS: CI has no GPU.
-- Why: owner, 2026-11-17: the driver of the host is not raised for now, and the MPS programs of R615 may be tried in a container. Several replicas per GPU are where the throughput is (FM-D14); the daemon of the host with a client on the compatibility library, and a client on the library of the host, both fail (the FM-D13 entry below). This replaces the stop condition "the host driver must be raised" of the plan.
-- Refs: FM-D13, second amendment of 2026-11-17 (`docs/design/engine.md`); `docker/nvidia.pins`, `docker/install_nvidia.sh`, `docker/entrypoint.sh`, `scripts/mps.sh`, `scripts/update_lock.sh`, `conda-linux-64.lock`, `Dockerfile`, `.claude/rules/docker-execution.md`, `docs/gpu-runbook.md`, `README.md`.
-
-### 2026-11-17 — [design] FM-D18: `run.backend`, NVIDIA's cuPotential plugin as the back end of a run (an option; the default stays `openmm`)
-- What: M1 of the cuPotential plan. `src/fmeta/engine/backend.py` replaces, in memory and just before the Context of a run is made, OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator` by the classes of the plugin; the funnel forces, `prepared/system.xml`, the build, the equilibration and the analysis stay OpenMM's own. `cupotential` under a condition the plugin does not support (platform, precision, PME, tolerance 5e-4, automatic mesh, box of 3 cutoffs, the plugin loads) is an error before a file is touched; `auto` gives OpenMM there with the reason on record. A run keeps the back end it began with (`run.yaml`, `device.json`, `fmeta status`); another one by name is refused before a device or a file is touched, with walkers before a rollback. The hash of a benchmark configuration with `openmm` is the one of the reports of 7386d28. Gate records: one per back end; the one of cuPotential holds no speed and no duration, and CI rejects one that does. Verified: `ruff`, `pytest` 193 passed, `verify_bench_results.py` (9 records); on a GPU both test systems with `run.backend: cupotential`: run, continue, `docker stop`, continue to 1.5 ns, refusal of `--backend openmm`. Not run: `pytest -m slow`, GPU gates on this code, CI on it.
-- Why: owner request of 2026-11-17 (cuPotential as the default). An option first: which parts of the plugin are used and how accurate they are is measured before the default changes (M2, M3). The licence of the plugin forbids publishing benchmark results without NVIDIA's permission, hence the record without speeds.
-- Refs: FM-D18 (`docs/design/engine.md`), `docs/plans/2026-11-17-cupotential-backend.md`; `src/fmeta/engine/backend.py`, `src/fmeta/workflow.py`, `src/fmeta/engine/runner.py`, `src/fmeta/check.py`, `src/fmeta/benchmark.py`, `scripts/gpu_gates.py`, `scripts/verify_bench_results.py`, `docs/configuration.md`, `tests/test_backend.py`, `tests/test_walkers.py`, `tests/test_benchmark.py`, `tests/test_harness.py`.
-
-### 2026-11-17 — [progress] GPU gates pass in the image with the cuPotential plugin, on stock OpenMM 8.4.0 (abd4548)
-- What: `scripts/gpu_gates.py` on clean abd4548 (2 GPUs, in the image of lock 0b6c344f…, host driver 595.99.02, `libcuda` 615.71.10 loaded, 04:10 to 04:15 UTC): all 18 passed. No item uses the plugin: this is the record of stock OpenMM 8.4.0 on CUDA 13.4 that the change of the lock requires. Forces against Reference: CV 3.8e-07 nm, energy 7.2e-06, force 7.1e-06; `periodic_images`: CV 1.2e-06 nm, wall energy 5.6e-04 kJ/mol; `toy_free_energy` −4.76 (samples) and −4.34 (bias) against −4.95 kJ/mol (d4041f9 in the old image: −3.95 and −3.46). The membrane test system has 37419 atoms (old image: 37401). Speed of stock OpenMM (a diagnostic): 1413 ns/day plain, 1410 with the bias, membrane 967 (d4041f9, old image: 1284, 1295, 927). The record names the driver, the `libcuda`, the CUDA runtime (13.4) and the plugin (0.3.5). Not run: CI on the new lock (it runs for the pull request).
-- Why: the change gate and FM-D13: after a change of the lock the tests and the gates are taken again in the new image. With this, M0 of the cuPotential plan is complete except for NVIDIA MPS (Blockers).
-- Refs: `bench/results/2026-11-17-abd4548c9-gpu-gates.json`, `bench/results/index.json`, `README.md`; commit abd4548.
-
-### 2026-11-17 — [amendment] FM-D13: the image holds NVIDIA's cuPotential plugin, on OpenMM 8.4.0 and CUDA 13.4; NVIDIA MPS does not work with it on the R595 host
-- What: M0 of the cuPotential plan, on branch `claude/cupotential-backend`; no code under `src/fmeta/` changed. `environment.yml`: `openmm=8.4.*`, `cuda-version=13.4`, `nv-openmm-plugin=0.3.5`; `docker/nvidia.pins` names the release of the plugin and the `.deb` of the CUDA compatibility libraries (615.71.10) with their sha256, and the lock names both (the plugin as a package line, the libraries as a comment line that `docker/install_nvidia.sh` reads), so the hash of the lock still decides what an official image is. NVIDIA's licence texts are in the image (`/opt/fmeta/licenses`). A gate record names the host driver, the loaded `libcuda`, the CUDA runtime and the plugin. With OpenMM the ligand tools went from `openmmforcefields` 0.16.0 and AmberTools 26.0 to 0.15.1 and 24.8: the parameters of the TYK2 ligand ejm_46 are identical in both images (charges, sigma, epsilon: largest difference 0; bonded terms equal; OpenFF and GAFF). In the new image (f7d97cf1…, lock 0b6c344f…, host driver 595.99.02, `libcuda` 615.71.10 loaded): `ruff check .` passes, `pytest` 175 passed, `pytest -m slow` 7 passed, `openmm.testInstallation` computes forces on 4 platforms, directories of OpenMM 8.6.1 load and run, and a Context with the plugin steps on the rhombic dodecahedron (24062 atoms) and on a membrane box (37401 atoms) with the funnel forces and the bias, energies finite, 1.3e-5 and 1.1e-5 (relative) from stock PME at the starting state. Failed: a container as an MPS client (`cuInit` does not return with the compatibility `libcuda`; with the host's `libcuda` the kernels of CUDA 13.4 do not load, `CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). Not run: GPU gates in the new image; CI (`docker` job) on the new lock.
-- Why: owner request of 2026-11-17 (cuPotential as the default back end); the plugin is built only for OpenMM 8.4, CUDA 13.4 and Python 3.12, and one image stays the rule. Speeds measured with the plugin are kept out of tracked files (owner, 2026-11-17: the licence forbids their disclosure without NVIDIA's permission). The MPS failure is the first stop condition of the plan: several replicas per GPU gave the best throughput so far (1620 against 606 ns/day at 88k atoms, old image).
-- Refs: FM-D13 amendment (`docs/design/engine.md`), `docs/plans/2026-11-17-cupotential-backend.md`; `environment.yml`, `docker/nvidia.pins`, `docker/install_nvidia.sh`, `scripts/update_lock.sh`, `conda-linux-64.lock`, `Dockerfile`, `scripts/gpu_gates.py`, `tests/test_harness.py`, `.claude/rules/docker-execution.md`, `docs/gpu-runbook.md`, `README.md`.
