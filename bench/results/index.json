@@ -71,6 +71,15 @@
    "gpus": 2,
    "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
    "all_passed": true
+  },
+  {
+   "file": "2026-11-17-abd4548c9-gpu-gates.json",
+   "date": "2026-11-17",
+   "commit": "abd4548c92baafff5fad2ec8cdf13ffd95470c47",
+   "dirty": false,
+   "gpus": 2,
+   "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+   "all_passed": true
   }
  ]
 }
