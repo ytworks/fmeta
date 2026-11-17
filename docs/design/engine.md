@@ -13,9 +13,10 @@ replicas on one GPU with NVIDIA MPS, `run.per_gpu`; one math-library thread per 
 amended three times (2026-11-16, owner: the first 2 ns are not used; then: a replica does not
 converge on its own, the set of replicas is the measurement and there is no verdict; then: the
 value of a replica is measured by the published procedure, from the bias), with FM-D16 and
-FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16): FM-D5 (a restart
-under other conditions is refused), FM-D11 (a complex is split only with the SMILES of the
-ligand).
+FM-D17 amended to follow; amendments from the review of PR #1 (2026-11-16 and 17): FM-D5 (a
+restart under other conditions is refused), FM-D11 (a complex is split only with the SMILES of
+the ligand), FM-D15 (an amino acid without a backbone atom is rebuilt before the chains are
+split, never dropped).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -547,6 +548,24 @@ field accepted it; caps of a prepared file were removed as hetero components and
 became charged; a rebuild turned HIP and HIE of a prepared file into HID. Each of these changes
 the charge or the shape of the protein at the pocket without a message, and the binding free
 energy with it. Parameters are never invented: only templates of the force field are used.
+Amendment (2026-11-17, review of PR #1): a residue named as an amino acid (the 20 standard
+names and the names that state a protonation state) that lacks N, CA or C is never removed with
+the non-protein residues. With PDBFixer its atoms are built on the structure as read, before the
+model is made, so gaps and caps are judged on the repaired backbone. That pass builds only the
+missing atoms of the residues present: no terminal oxygen (it would read as a chain end the
+input states) and no replacement of non-standard residues; both stay in the pass after the
+model. Without PDBFixer `prepare` stops and names the residues and their missing atoms. The
+notes and `info.protein_input.backbone_rebuilt` list what was rebuilt. A file without such a
+residue is read exactly as before. Not covered: a non-standard residue (MSE, ...) without its
+backbone atoms is not known by its name and is removed as before, named in the note
+"removed from the protein file". Measured on the test protein, one backbone atom deleted from
+each of five residues: the rebuilt atom lies 0.004 to 0.022 nm from the atom of the complete
+file, and the model is the one of the complete file in chains, residues and atoms (1, 35, 582).
+Why: a residue counted as an amino acid only with all three atoms. LEU1 without its CA was
+dropped as a hetero residue (34 residues, note "removed from the protein file: LEU x1"), and
+ALA16 without its C stopped `prepare` with a message about SER15 and PHE17, although PDBFixer,
+which ran afterwards, rebuilds the atom. A chain that is shorter or cut without an error changes
+the protein the free energy is computed for.
 
 ### FM-D16 — Official defaults: presets in the package, and one reference of the keys
 Accepted 2026-11-16. The official defaults are the defaults of the settings dataclasses, and

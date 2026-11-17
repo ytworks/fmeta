@@ -549,6 +549,27 @@ def test_gap_of_one_residue_is_refused(inputs, tmp_path):
         read_protein(path, fix=False)
 
 
+@pytest.mark.parametrize("index, name", [(0, "CA"), (15, "C")])
+def test_residue_without_a_backbone_atom_is_rebuilt_not_dropped(inputs, tmp_path, amber, index, name):
+    """An amino acid that lacks N, CA or C is not removed with the hetero residues (the chain
+    then lost its first residue, or was cut at the residue): its atoms are rebuilt before the
+    chains are split, and without PDBFixer the file is refused."""
+    whole = read_structure(inputs[0])[0]
+    residue = list(whole.residues())[index]
+    path = edited(tmp_path / "broken.pdb", inputs[0],
+                  skip=lambda atom: atom.residue.index == index and atom.name == name)
+    with pytest.raises(ValueError, match=rf"A:{residue.name}{residue.id} \({name}\)"):
+        read_protein(path, fix=False)
+
+    pytest.importorskip("pdbfixer")
+    topology, positions, protein = modelled(path, amber, fix=True)
+    assert (topology.getNumChains(), topology.getNumResidues(), topology.getNumAtoms()) == (1, 35, 582)
+    assert protein.info["removed"] == {} and protein.info["gaps_capped"] == []
+    assert any(f"A:{residue.name}{residue.id} ({name})" in note for note in protein.notes)
+    # measured: 0.004 to 0.022 nm from the atom of the complete file, over five residues
+    assert np.linalg.norm(atom_position(topology, positions, index, name) - atoms_of(inputs[0])[index, name]) < 0.05
+
+
 @pytest.mark.parametrize("stated", ["OXT", "H3"])
 def test_chain_end_stated_by_the_input_is_not_capped(inputs, tmp_path, amber, stated):
     """Two chains under one identifier with the numbering going on (a file from an MD

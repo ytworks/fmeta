@@ -10,7 +10,15 @@ import numpy as np
 import openmm.app as app
 import openmm.unit as unit
 
-from .protein import VARIANT_NAMES, ProteinInput, build_model, read_states, scan_pdb
+from .protein import (
+    VARIANT_NAMES,
+    ProteinInput,
+    backbone_listing,
+    build_model,
+    incomplete_backbone,
+    read_states,
+    scan_pdb,
+)
 
 
 def _nm(positions) -> np.ndarray:
@@ -124,10 +132,12 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     residues in ``keep_hetero`` to keep them; the force-field files must then
     cover them. With ``fix`` (default: whenever PDBFixer is installed)
     non-standard amino acids are replaced by their standard parents and missing
-    heavy atoms are built. Unresolved loops are not modelled: the chain is split
-    there and its two ends are capped with NME and ACE. Caps of the input are
-    kept, and so are the protonation states its hydrogens or residue names state
-    (``system/protein.py``, FM-D15).
+    heavy atoms are built. A residue named as an amino acid that lacks N, CA or
+    C is never removed with the rest: its atoms are built before anything else,
+    and without the repair the file is refused. Unresolved loops are not
+    modelled: the chain is split there and its two ends are capped with NME and
+    ACE. Caps of the input are kept, and so are the protonation states its
+    hydrogens or residue names state (``system/protein.py``, FM-D15).
 
     Returns the topology, the positions in nm, the protonation states to build
     (``variants``, for ``complete_hydrogens``), notes saying what was changed
@@ -136,16 +146,27 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     topology, positions = read_structure(path)
     pdb = Path(path).suffix.lower() in (".pdb", ".ent")
     altlocs, names = scan_pdb(path) if pdb else ([], {})
+    use_fixer = pdbfixer_available() if fix is None else fix
+    incomplete, rebuilt = backbone_listing(incomplete_backbone(topology)), []
+    if incomplete and use_fixer:
+        # which residues follow each other, and where a chain is split and capped, is read
+        # from the backbone atoms: they have to be there before the model is made
+        modeller, rebuilt = _fix_with_pdbfixer(app.Modeller(topology, positions * unit.nanometer),
+                                               atoms_only=True)
+        topology, positions = modeller.topology, _nm(modeller.positions)
+        rebuilt.insert(0, "backbone atoms missing in the file, rebuilt before the chains were split: "
+                       + ", ".join(incomplete))
     protein = build_model(topology, positions, keep_hetero, keep_water, names)
     if not any(_BACKBONE <= {atom.name for atom in residue.atoms()}
                for residue in protein.topology.residues()):
         raise ValueError(f"{path} contains no amino-acid residues")
+    protein.notes += rebuilt
+    protein.info["backbone_rebuilt"] = incomplete
     protein.info["alternate_locations"] = altlocs
     if altlocs:
         protein.notes.append("alternate locations: the first listed was taken ("
                              + ", ".join(f"{found['residue']} {found['kept']}" for found in altlocs) + ")")
 
-    use_fixer = pdbfixer_available() if fix is None else fix
     if use_fixer:
         modeller = app.Modeller(protein.topology, protein.positions * unit.nanometer)
         modeller, fixed = _fix_with_pdbfixer(modeller)
@@ -157,7 +178,10 @@ def read_protein(path, fix: Optional[bool] = None, keep_water: bool = False,
     return protein
 
 
-def _fix_with_pdbfixer(modeller: app.Modeller) -> tuple[app.Modeller, list[str]]:
+def _fix_with_pdbfixer(modeller: app.Modeller, atoms_only: bool = False) -> tuple[app.Modeller, list[str]]:
+    """Replace the non-standard amino acids and build the missing heavy atoms, the chain ends
+    included. ``atoms_only``: only the missing atoms of the standard residues (the pass before
+    the chains are split: an OXT added there would read as a chain end the input states)."""
     try:
         from pdbfixer import PDBFixer
     except ImportError as error:
@@ -168,13 +192,16 @@ def _fix_with_pdbfixer(modeller: app.Modeller) -> tuple[app.Modeller, list[str]]
     fixer = PDBFixer(pdbfile=io.StringIO(text.getvalue()))
     fixer.findMissingResidues()
     fixer.missingResidues = {}                    # unresolved loops are not modelled
-    fixer.findNonstandardResidues()
     notes = []
-    if fixer.nonstandardResidues:
-        swaps = sorted({f"{residue.name} -> {standard}" for residue, standard in fixer.nonstandardResidues})
-        notes.append("non-standard residues replaced: " + ", ".join(swaps))
-        fixer.replaceNonstandardResidues()
+    if not atoms_only:
+        fixer.findNonstandardResidues()
+        if fixer.nonstandardResidues:
+            swaps = sorted({f"{residue.name} -> {standard}" for residue, standard in fixer.nonstandardResidues})
+            notes.append("non-standard residues replaced: " + ", ".join(swaps))
+            fixer.replaceNonstandardResidues()
     fixer.findMissingAtoms()
+    if atoms_only:
+        fixer.missingTerminals = {}
     n_missing = (sum(len(atoms) for atoms in fixer.missingAtoms.values())
                  + sum(len(atoms) for atoms in fixer.missingTerminals.values()))
     if n_missing:

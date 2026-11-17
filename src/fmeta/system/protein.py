@@ -29,6 +29,9 @@ VARIANT_NAMES = {"HID": ("HIS", "HID"), "HIE": ("HIS", "HIE"), "HIP": ("HIS", "H
                  "HSD": ("HIS", "HID"), "HSP": ("HIS", "HIP"), "ASH": ("ASP", "ASH"),
                  "GLH": ("GLU", "GLH"), "LYN": ("LYS", "LYN"), "CYX": ("CYS", "CYX"),
                  "CYM": ("CYS", "CYX")}
+# residues that are amino acids by their name, whatever atoms the file has of them
+AMINO_ACIDS = {"ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET",
+               "PHE", "PRO", "SER", "THR", "TRP", "TYR", "VAL"} | set(VARIANT_NAMES)
 # geometry of the peptide bond to a cap (nm, degrees; the Amber equilibrium values)
 _C_N, _N_CH3, _C_O, _C_CH3 = 0.1335, 0.1449, 0.1229, 0.1522
 _C_N_C, _C_C_N, _O_C_N = 121.9, 116.6, 122.9
@@ -212,12 +215,30 @@ def _existing_caps(topology, positions, amino, pieces) -> tuple[set, list[str]]:
     return used, found
 
 
+def incomplete_backbone(topology: app.Topology) -> list[tuple]:
+    """The residues named as amino acids that lack one of N, CA and C, each with the names of
+    the atoms it lacks."""
+    found = []
+    for residue in topology.residues():
+        if residue.name.strip().upper() in AMINO_ACIDS:
+            missing = BACKBONE - {atom.name for atom in residue.atoms()}
+            if missing:
+                found.append((residue, sorted(missing)))
+    return found
+
+
+def backbone_listing(incomplete) -> list[str]:
+    return [f"{label(residue)} ({', '.join(missing)})" for residue, missing in incomplete]
+
+
 def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
                 keep_water: bool = False, names: dict | None = None) -> ProteinInput:
     """The protein of a structure as it will be simulated.
 
     Amino-acid residues (N, CA and C present) are kept; of the rest only water with
     ``keep_water`` and the residues named in ``keep_hetero``, in chains of their own. A
+    residue named as an amino acid without one of the three atoms is refused: removed with
+    the rest it would shorten or cut the chain (``read_protein`` rebuilds its atoms first). A
     chain is split where the C-N distance of consecutive residues is above ``GAP_NM``
     (residues missing from the structure), with or without a TER record there: the two ends
     are capped with NME and ACE. Where the input states a terminus nothing is added: after
@@ -226,6 +247,14 @@ def build_model(topology: app.Topology, positions: np.ndarray, keep_hetero=(),
     become the standard name plus a variant. ``names`` are the residue names of the file
     where OpenMM renamed them (``scan_pdb``).
     """
+    incomplete = incomplete_backbone(topology)
+    if incomplete:
+        raise ValueError(
+            "amino-acid residues without their backbone atoms N, CA and C: "
+            f"{', '.join(backbone_listing(incomplete))}. "
+            "A residue like this cannot be simulated, and without it the chain would end or be cut "
+            "there. PDBFixer rebuilds the atoms (install it, or set system.fix_protein); or delete the "
+            "residue from the file, and the chain ends, or is split and capped, at that place")
     names = names or {}
     keep = {name.strip().upper() for name in keep_hetero}
     heavy = [atom.index for atom in topology.atoms() if not _is_hydrogen(atom)]

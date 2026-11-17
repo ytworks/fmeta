@@ -28,8 +28,8 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-16. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
-FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
+Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D17 Accepted;
+FM-D2, D4, D5, D6, D7, D9, D11, D12, D13, D14, D15, D16 and D17 amended since, see the Change Log). Everything below is on PR #1 (not merged).
 Plan: `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`, with the run lengths, the
 scan and the GPU use as changed by the Change Log entries of 2026-11-16. Every run of it has
 ended and every check of it that this machine can run has run. Open: the result of CI.
@@ -68,9 +68,10 @@ ended and every check of it that this machine can run has run. Open: the result 
   walker without a checkpoint goes back to the start before any walker restarts (6fa7cd2); a
   restart under other conditions is refused (FM-D5); the protein of a split complex keeps the
   protonation states its residue names state (5792001); a complex is split only with the
-  SMILES of the ligand (FM-D11). Open: protein atoms repaired before residues are dropped, the
-  bias of asynchronous walkers in the cross-checks. The code after 7386d28 has no gate record
-  yet: the gates and the image check run once on the last fix.
+  SMILES of the ligand (FM-D11); an amino acid without a backbone atom is rebuilt before the
+  chains are split, never dropped (FM-D15). Open: the bias of asynchronous walkers in the
+  cross-checks. The code after 7386d28 has no gate record yet: the gates and the image check
+  run once on the last fix.
 - Function checks on real systems (code of 783ecff, GPU, short runs whose values mean nothing):
   every function of this development that the gates do not reach has run once: walkers on
   trypsin with `docker stop` and the same command, extension of a finished run, `fmeta auto`
@@ -120,6 +121,11 @@ ended and every check of it that this machine can run has run. Open: the result 
   machine as the git credential; the owner added the `workflow` scope).
 
 ## Change Log
+
+### 2026-11-17 — [amendment] FM-D15: an amino acid without a backbone atom is rebuilt before the chains are split, never dropped
+- What: a residue named as an amino acid that lacks N, CA or C is no longer removed with the non-protein residues. With PDBFixer `read_protein` builds its atoms on the structure as read, before the model is made (missing atoms only: no terminal oxygen, no replacement of non-standard residues); without PDBFixer `prepare` stops and names the residues and atoms. Notes and `info.protein_input.backbone_rebuilt` list what was rebuilt; a file without such a residue is read as before. The new test (LEU1 without CA, ALA16 without C) failed before the fix; rebuilt atoms lie 0.004 to 0.022 nm from the complete file. `ruff` passes, `pytest` 167 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).
+- Why: review of PR #1: LEU1 without its CA was dropped as a hetero residue (34 of 35 residues) and a residue in the middle stopped `prepare` with a message about its neighbours, although PDBFixer, which ran afterwards, rebuilds the atom. No committed result is affected: no amino acid was removed in the 57 `prepared/report.json` files of the runs.
+- Refs: FM-D15 protein part (amendment); `src/fmeta/system/protein.py`, `src/fmeta/system/inputs.py`, `tests/test_inputs.py`.
 
 ### 2026-11-16 — [amendment] FM-D11: a complex is split only with the SMILES of the ligand
 - What: `fmeta split` (`--smiles` is required) and `input.complex` (`input.ligand_smiles`) stop with an error before a file is written when the SMILES is missing; the route that wrote the ligand from the bonds of the structure file is removed (`_write_molfile`). In the same review (5792001): the protein of a split PDB complex keeps the residue names that state a protonation state (HIP, ASH, ...). Both new test cases failed before their fix (HIP read back as no state; the split without SMILES did not raise); `ruff` passes, `pytest` 165 passed. Not run on this code: GPU gates and the image check (once, on the last fix of the review).
