@@ -181,6 +181,23 @@ on the first N ns of the files; at the length of the run they are the output of
   in the site is 178.4, 164.4, 157.6 and 157.5 kJ/mol, and the bias in the unbound window
   76.3, 91.0, 78.1 and 81.9.
 
+- A2A to 10 ns, no fault. kJ/mol; experiment −33.0 on the simulated construct, all
+  measurements −33.0 to −27.0:
+
+  | Length, ns | Mean | 95% interval | Half-width | From the experimental range | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 2.5 | −71.71 | −88.61 to −54.81 | 16.90 | 38.71 | −74.6, −58.4, −69.8, −84.0 | 2/0, 2/0, 1/0, 1/0 |
+  | 5 | −46.41 | −58.89 to −33.93 | 12.48 | 13.41 | −47.7, −35.1, −50.1, −52.8 | 3/0, 1/0, 3/0, 3/0 |
+  | 7.5 | −35.64 | −52.67 to −18.61 | 17.03 | 2.64 | −37.7, −20.9, −46.6, −37.4 | 3/0, 1/0, 3/0, 4/0 |
+  | 10 | −30.98 | −50.51 to −11.45 | 19.53 | 0.00 | −35.9, −15.9, −44.7, −27.5 | 3/0, 4/1, 3/0, 4/0 |
+
+  `fmeta analyze` at 10 ns gives the same mean and interval. The mean is inside the
+  experimental range at 10 ns. The rule is not met at any length: the half-width is 12.48 to
+  19.53 against 8.4, and one replica of four has a passage back into the site (between 7.5 and
+  10 ns; the first of round 2). The half-width is smallest at 5 ns and grows after it: the
+  replica values are 17.7 apart at 5 ns and 28.8 apart at 10 ns. Both systems go on in steps
+  of 10 ns (points 5 and 6).
+
 **What the choice means.** The setting is chosen on these two systems with their experimental
 values in view. Its agreement with experiment there is the outcome of the choice, not a
 validation of the method, and the READMEs and FM-D19 say so. The package defaults do not
