@@ -225,6 +225,19 @@ on the first N ns of the files; at the length of the run they are the output of
   for), and two replicas of four have a passage back. The mean is inside the experimental
   range from 10 to 15 ns and 1.75 above it at 20 ns; it rises by 1.1 to 1.7 per 2.5 ns, and
   one replica (−9.9 at 20 ns) rises faster than the other three. Both systems go on to 30 ns.
+- TYK2 to 30 ns, no fault:
+
+  | Length, ns | Mean | 95% interval | Half-width | From experiment | Replicas | Passages out / back |
+  |---|---|---|---|---|---|---|
+  | 22.5 | −58.56 | −74.24 to −42.88 | 15.68 | 11.26 | −72.2, −56.6, −56.9, −48.6 | 4/1, 4/0, 4/1, 5/3 |
+  | 25 | −57.09 | −72.24 to −41.95 | 15.15 | 9.79 | −69.5, −56.8, −55.7, −46.4 | 4/1, 4/0, 4/1, 6/3 |
+  | 27.5 | −55.86 | −70.00 to −41.73 | 14.14 | 8.56 | −66.4, −57.1, −55.1, −44.8 | 4/1, 4/0, 4/1, 6/3 |
+  | 30 | −55.11 | −68.83 to −41.39 | 13.72 | 7.81 | −63.9, −57.8, −55.4, −43.3 | 4/1, 4/0, 4/1, 7/3 |
+
+  At 30 ns the mean is within 8.4 of experiment for the first time. The half-width (13.72)
+  and the passages back (three replicas of four) do not meet the rule at 25 or at 30 ns. The
+  two middle replicas have stayed within 1.6 of their values of 20 ns; the lowest rises
+  (−75.4 to −63.9) and the highest rises (−51.6 to −43.3).
 - The count of passages at a length is not the count at a shorter length plus the new ones.
   The analysis calls the ligand bound below the minimum of the profile along `s` plus 0.3 nm,
   and that minimum moves while the surface fills (A2A, second replica: threshold 1.70 nm at
