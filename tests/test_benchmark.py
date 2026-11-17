@@ -266,6 +266,27 @@ def test_prepare_writes_a_work_directory_per_ligand_and_one_configuration_only(t
         prepared_ligands(benchmark, work)
 
 
+def _names_openmm(data) -> None:
+    data["config"]["run"].update(backend="openmm")
+
+
+def test_a_work_directory_from_before_the_back_end_key_goes_on_once_the_set_names_openmm(tmp_path, inputs):
+    """The default back end is ``auto`` (FM-D18), which is another configuration than OpenMM. A
+    work directory from before ``run.backend`` existed (the hash of its marker is the one OpenMM
+    keeps, and its ``config.yaml`` has no such key) is refused with the way to go on, and goes on,
+    with OpenMM, once the set names it."""
+    work = tmp_path / "work"
+    prepare_set(load_set(write_set(tmp_path / "before", inputs, _names_openmm)), work)
+    for path in work.glob("*/config.yaml"):
+        data = yaml.safe_load(path.read_text())
+        del data["run"]["backend"]
+        path.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValueError, match="backend: openmm"):
+        prepared_ligands(load_set(write_set(tmp_path / "default", inputs)), work)
+    items = prepared_ligands(load_set(write_set(tmp_path / "named", inputs, _names_openmm)), work)
+    assert [(item.ligand.name, item.config.run.backend) for item in items] == [("a", "openmm"), ("b D", "openmm")]
+
+
 # ---- the order of the jobs and the restart ----------------------------------
 
 class Ended:
@@ -443,13 +464,17 @@ def run_toy(directory, seed) -> None:
 @pytest.fixture(scope="module")
 def reported(tmp_path_factory, inputs):
     """The report of a set of which ``a`` has two replicas, ``b D`` one and a second without
-    a hill, and ``c`` none: ``(directory of the reports, path of the JSON file)``."""
+    a hill, and ``c`` none: ``(directory of the reports, path of the JSON file)``. The second
+    replica of ``a`` has the record of a run of the cuPotential back end; the others have no
+    such entry, as runs from before it existed."""
     root = tmp_path_factory.mktemp("reported")
     benchmark = load_set(write_set(root / "set", inputs))
     work = root / "work"
     prepare_set(benchmark, work, "all")
     for replica, seed in (("a/rep0", 1), ("a/rep1", 2), ("b_D/rep0", 3)):
         run_toy(work / replica, seed)
+    record = work / "a" / "rep1" / "run.yaml"
+    record.write_text(yaml.safe_dump(dict(yaml.safe_load(record.read_text()), backend="cupotential")))
     (work / "b_D" / "rep1").mkdir()
     (work / "b_D" / "rep1" / "HILLS").write_text("")
     call = dict(commit=VERSION[0], dirty=False, image="sha256:0a", lock_sha256="0b")
@@ -474,6 +499,7 @@ def test_a_report_keeps_every_ligand_gives_both_units_and_compares_the_values_it
     assert c["dg"] is None and c["error"] == "no replica has hills yet"
     assert a["experiment"]["dg"] == dict(kj_mol=-33.472, kcal_mol=-8.0)
     assert [call["time"] for call in report["runs"]] == ["2026-11-14T00:00:00+00:00"]    # one code, its first call
+    assert [replica["backend"] for replica in a["replicas"] + b["replicas"]] == ["openmm", "cupotential", "openmm"]
 
     statistics = report["statistics"]
     fmeta, fep = (statistics[key] for key in ("fmeta_vs_experiment", "fep_vs_experiment"))
@@ -485,6 +511,7 @@ def test_a_report_keeps_every_ligand_gives_both_units_and_compares_the_values_it
     text = path.with_suffix(".md").read_text()
     assert "## Ligands (kcal/mol)" in text and "## Ligands (kJ/mol)" in text
     assert f"| a | 2 (2 / 2) | {a['dg']['kcal_mol']:.2f} |" in text and "| c | 0 (0 / 2) |  |" in text
+    assert "- Back end of the analysed replicas: openmm in 2, cupotential in 1 (a, rep1)." in text    # both count
     index = json.loads((reports / "index.json").read_text())
     assert index == dict(entries=[dict(file=path.name, date="2026-11-16", commit=VERSION[0], dirty=False, set="toy")])
 

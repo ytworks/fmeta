@@ -33,6 +33,7 @@ import yaml
 
 from .analysis import KCAL, analyze_replicas, analyze_run, walker_directories
 from .config import Config
+from .engine.backend import recorded
 from .engine.platform import resolve_devices
 from .funnel.geometry import KB, STANDARD_VOLUME
 from .scheduler import Job, Task, directory_lock, is_locked, read_schedule, run_jobs
@@ -537,11 +538,25 @@ def _plan(config: Config) -> tuple:
     return float(config.run.length_ns), int(config.run.replicas)
 
 
+def _saved_config(path: Path) -> Config:
+    """The configuration that 'fmeta benchmark prepare' wrote for a ligand. It writes every key,
+    so a file without ``run.backend`` is from before the key existed and was written for OpenMM
+    (FM-D18): it is read so, and not with the default of today."""
+    config = Config.load(path)
+    with open(path) as handle:
+        if "backend" not in (yaml.safe_load(handle).get("run") or {}):
+            config.run.backend = "openmm"
+    return config
+
+
 def _stored(benchmark: BenchmarkSet, workdir: Path) -> list:
     """The ligands of the set that have a work directory, in the order of the set. A work
     directory of another configuration or set definition is an error: one work directory,
     one configuration."""
-    expected = configuration_hash(benchmark, set_config(benchmark))
+    base = set_config(benchmark)
+    expected = configuration_hash(benchmark, base)
+    base.run.backend = "openmm"
+    with_openmm = configuration_hash(benchmark, base)        # also of a work directory from before run.backend
     stored = []
     for ligand in benchmark.ligands:
         directory = workdir / ligand.directory
@@ -549,9 +564,14 @@ def _stored(benchmark: BenchmarkSet, workdir: Path) -> list:
             continue
         marker = json.loads((directory / MARKER).read_text())
         if marker.get("configuration_sha256") != expected or marker.get("ligand") != ligand.name:
+            remedy = "use a new work directory"
+            if marker.get("configuration_sha256") == with_openmm and marker.get("ligand") == ligand.name:
+                remedy = ("this one was prepared for the openmm back end, and the set asks for another one "
+                          "(the default is auto). To go on with it, put 'run: {backend: openmm}' into the "
+                          "config of set.yaml; for another back end use a new work directory")
             raise ValueError(f"{directory} was prepared with another configuration or set definition. Results "
-                             "of two configurations do not go into one report: use a new work directory")
-        config = Config.load(directory / "config.yaml")
+                             f"of two configurations do not go into one report: {remedy}")
+        config = _saved_config(directory / "config.yaml")
         if configuration_hash(benchmark, config) != expected:
             raise ValueError(f"{directory}/config.yaml was changed after 'fmeta benchmark prepare'. The ligands "
                              "of a set run with one configuration: change set.yaml and use a new work directory")
@@ -1029,6 +1049,13 @@ def _analysed(directory: Path) -> tuple:
     return summary, failures
 
 
+def _backend(replica: Path) -> Optional[str]:
+    """The back end that made a replica (FM-D18), from the record of its run, or of its walkers,
+    which share one; None without a record."""
+    names = {recorded(directory) for directory in (walker_directories(replica) or [replica])}
+    return names.pop() if len(names) == 1 else None
+
+
 def ligand_result(item: Prepared, reference: Reference) -> dict:
     """What the replicas of one ligand give, beside its reference values.
 
@@ -1037,11 +1064,11 @@ def ligand_result(item: Prepared, reference: Reference) -> dict:
     of them is judged on its own, and ``diagnostics`` holds the notes of the analysis on them.
     ``no_binding`` says that the value is within 1 kT of what the empty funnel gives: then it
     is not a binding free energy. A ligand without a value keeps its place in the list, with
-    ``error``."""
+    ``error``. A replica names the back end that made it (``backend``, FM-D18)."""
     summary, failures = _analysed(item.directory)
     replicas = [dict(name=Path(run["workdir"]).name, simulated_ns=_rounded(run["simulated_ns"]),
                      dg=_energy(run["dG"]), rebinding_events=int(run["rebinding_events"]),
-                     no_binding=bool(run["no_binding"]))
+                     no_binding=bool(run["no_binding"]), backend=_backend(Path(run["workdir"])))
                 for run in (summary["replicas"] if summary else [])]
     rows = _replica_rows(item)
     dg = _energy(summary["dG"]) if summary else None
@@ -1222,6 +1249,23 @@ def _statistics_table(statistics: dict, unit: str) -> list:
     return lines
 
 
+def _backend_line(ligands: Sequence[dict]) -> list:
+    """The back end of the analysed replicas as a line of the header (none without a replica).
+    Replicas of more than one back end are a diagnostic, and all of them count: the line then
+    names the replicas of every back end but the most frequent one."""
+    made: dict = {}
+    for ligand in ligands:
+        for replica in ligand["replicas"]:
+            made.setdefault(replica["backend"] or "not recorded", []).append(f"{ligand['name']}, {replica['name']}")
+    order = sorted(made, key=lambda name: (-len(made[name]), name))
+    if len(order) < 2:
+        return [f"- Back end of the analysed replicas: {name}" for name in order]
+    counts = [f"{order[0]} in {len(made[order[0]])}"]
+    counts += [f"{name} in {len(made[name])} ({'; '.join(made[name])})" for name in order[1:]]
+    return [f"- Back end of the analysed replicas: {', '.join(counts)}. The replicas were made with more than "
+            "one back end; all of them count"]
+
+
 def format_report(report: dict) -> str:
     """The report of :func:`report_set` as Markdown: every table in kcal/mol and in kJ/mol."""
     environment, definition, conditions = report["environment"], report["definition"], report["conditions"]
@@ -1246,6 +1290,7 @@ def format_report(report: dict) -> str:
            else ""),
         f"- Plan: {conditions['replicas']} replica(s) of {conditions['length_ns']:g} ns per ligand at "
         f"{conditions['temperature_k']:g} K",
+        *_backend_line(ligands),
         f"- Standard state: {conditions['standard_state']} (V0 = {conditions['standard_volume_nm3']:.4f} nm^3)",
         f"- Experimental values: {conditions['experiment']}", "",
         "This report states what was measured. It holds no verdict.", ""]

@@ -77,7 +77,7 @@ class RunConfig:
     pace_ps: float = 1.0                     # time between hills
     platform: str = "auto"                   # auto, CUDA, OpenCL, HIP, CPU, Reference
     precision: str = "mixed"
-    backend: str = "openmm"                  # auto, cupotential, openmm (FM-D18)
+    backend: str = "auto"                    # auto, cupotential, openmm (FM-D18)
     mode: str = "auto"                       # auto, parallel (one replica per GPU), sequential (one GPU)
     gpus: Optional[list | str] = None        # device numbers, or "all": every GPU that is visible
     per_gpu: int = 1                         # replicas that share one GPU at a time (above 1: with NVIDIA MPS)

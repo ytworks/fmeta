@@ -101,7 +101,7 @@ run:
   pace_ps: 1.0                    # [ps] time between hills
   platform: auto                  # [-] auto: the first usable of CUDA, HIP, OpenCL, CPU, Reference; or one of these names
   precision: mixed                # [-] precision of a GPU platform: single, mixed or double
-  backend: openmm                 # [-] what computes the nonbonded forces and moves the atoms: openmm, cupotential (NVIDIA's plugin of the CUDA platform) or auto
+  backend: auto                   # [-] what computes the nonbonded forces and moves the atoms: auto (NVIDIA's cuPotential plugin of the CUDA platform where it can take part, OpenMM elsewhere), cupotential or openmm
   mode: auto                      # [-] parallel: one replica per GPU; sequential: one after another on one GPU; auto: parallel if gpus is set
   gpus: null                      # [-] the GPUs of the run: device numbers such as [0, 1], or all; null: one device, picked by the platform
   per_gpu: 1                      # [-] replicas that share one GPU at a time; above 1: start the container with scripts/in_docker.sh --mps (NVIDIA MPS)

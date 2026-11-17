@@ -159,6 +159,13 @@ def _recorded(directory: Path) -> dict:
                 parts=tuple(record.get("backend_parts", ())) or None)
 
 
+def recorded(directory) -> Optional[str]:
+    """The back end that made the run in ``directory`` (a replica or a walker), as its
+    ``run.yaml`` says; None where no run is recorded."""
+    directory = Path(directory)
+    return _recorded(directory)["backend"] if (directory / "run.yaml").exists() else None
+
+
 def settle(requested: str, directory, workdir) -> tuple:
     """What a run of ``directory`` (a replica or a walker under ``workdir``) asks for, given the
     runs that are on disk: the name, and the parts the plugin provided in the run that

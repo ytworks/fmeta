@@ -29,7 +29,9 @@ option until its configuration and its accuracy are measured); FM-D12 amended (2
 tolerances of the default 20 ns toy test come from its measured scatter over 48 seeds, after a
 CI failure by 0.0015 kJ/mol on another CPU; the criteria of the gate and of the `slow` test are
 unchanged); FM-D13 amended a third time (2026-11-17: the MPS daemon runs with protocol 3, after
-the daemon of the default protocol stopped answering at about 50 client starts).
+the daemon of the default protocol stopped answering at about 50 client starts); FM-D18 in
+force as the default (2026-11-17: `run.backend` is `auto`; a benchmark set names the back end
+of every replica).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1068,13 +1070,13 @@ Why: choosing ligands by a check that almost no replica of 40 ns passes would de
 subset picked by noise.
 
 ### FM-D18 — The back end of a run: NVIDIA's cuPotential plugin in place of OpenMM's nonbonded force and integrator
-Status: **Accepted** (2026-11-17, owner request). In force as an option: `run.backend` is
-`openmm` unless a configuration says otherwise. The parts the plugin provides for each kind of
-system are chosen from measurements (M2 of the plan
-`docs/plans/2026-11-17-cupotential-backend.md`), and `fmeta check` has the items of the back
-end with their criteria (M3): they passed item by item with `--backend openmm`, `cupotential`
-and `auto` on 2026-11-17, and no gate record holds them yet. Open (M4): `auto` as the default,
-and the gate records of the final code for the two back ends.
+Status: **Accepted** (2026-11-17, owner request). In force as the default: `run.backend` is
+`auto` unless a configuration says otherwise (M4 of the plan
+`docs/plans/2026-11-17-cupotential-backend.md`, 2026-11-17; until then an option, with `openmm`
+as the default). The parts the plugin provides for each kind of system are chosen from
+measurements (M2), and `fmeta check` has the items of the back end with their criteria (M3):
+they passed item by item with `--backend openmm`, `cupotential` and `auto` on 2026-11-17, and
+no gate record holds them yet. Open: the gate records of the final code for the two back ends.
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
@@ -1125,9 +1127,22 @@ follows its record; another back end by name is refused before a device is chose
 touched (`settle`), and with walkers before any walker is rolled back. A new replica under
 `auto` follows the replicas that are in the work directory. `fmeta status` shows the back end
 beside the device; `fmeta run --backend` and `fmeta check --backend` set it for one call.
+The default is `auto` (M4): in the code, in the two presets, and for `fmeta check` and the GPU
+gates without `--backend`. A calculation that began with OpenMM is not changed by it: a run
+that continues follows its record, and a new replica follows the replicas of its work
+directory. On every platform but CUDA, and in an installation without the plugin (pip; the
+`cpu` job of CI), `auto` gives OpenMM with the reason on record, so the default tests need no
+plugin and no GPU.
 Benchmark sets (FM-D17): the back end is part of the hash of the configuration; with `openmm`
-the hash is the one from before the key existed, so the work directories of the reported sets
-go on.
+the hash is the one from before the key existed. With `auto` as the default, a set that names
+no back end is another configuration than the one of the sets reported so far, which were made
+with OpenMM. A work directory prepared for OpenMM is therefore refused by such a set, with the
+way to go on (`run: {backend: openmm}` in the `config` of `set.yaml`), and a `config.yaml`
+written before the key existed is read as `openmm`, not with the default of today. A report
+names the back end of every replica (`backend`, from its `run.yaml`) and has one line for them
+in its header. Under `auto` the ligands of a set may get different back ends (the conditions of
+the plugin are those of each system): replicas of more than one back end are named in that
+line as a diagnostic, and all of them count.
 Evidence: a gate record is labelled with the back end its test runs used, and the two back ends
 of one commit are two records (`<date>-<commit>-gpu-gates.json` and
 `<date>-<commit>-cupotential-gpu-gates.json`). The record of cuPotential holds the verdicts and
