@@ -14,13 +14,16 @@ AFFINITY_M = {"tyk2": 4.8e-9, "a2a": 1.64e-6}
 ARMS = {"a": (4, 8, 0.05, 0.10, 1), "b": (8, 4, 0.05, 0.10, 1),
         "c": (8, 4, 0.025, 0.030, 2), "d": (32, 1, 0.025, 0.030, 2)}
 ENDPOINTS = (20, 40, 80, 100)
-# E measures one shared history for a selected example, outside the paired scheduler.
-TRIAL_ARMS = {**ARMS, "e": (1, 32, *ARMS["c"][2:])}
+# Explicit trials outside the scheduler include the single shared history E and the D hill-period comparison.
+TRIAL_ARMS = {**ARMS, "e": (1, 32, *ARMS["c"][2:]), "d1ps": (*ARMS["d"][:-1], 1)}
+D1PS_HELP = "d1ps uses trial D with hills deposited every 1 ps"
 E_ENDPOINTS = (5, 10, 15, 20)
+D_ENDPOINTS = (20, 25, 30, 35, 40, 80, 100)
 # Explicit trials include D's finer checkpoints. The paired sweep continues to use ENDPOINTS.
 TRIAL_ENDPOINTS = {
     **dict.fromkeys(ARMS, ENDPOINTS),
-    "d": (20, 25, 30, 35, 40, 80, 100),
+    "d": D_ENDPOINTS,
+    "d1ps": D_ENDPOINTS,
     "e": E_ENDPOINTS,
 }
 
@@ -121,7 +124,7 @@ def score_pair(arm, length, pairs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("arm", choices=TRIAL_ARMS)
+    parser.add_argument("arm", choices=TRIAL_ARMS, help=D1PS_HELP)
     parser.add_argument("length_ns", type=int)
     for name in EXAMPLES:
         parser.add_argument("--" + name, nargs=2, type=Path, metavar=("ENERGY_JSON", "STRUCTURE_JSON"))

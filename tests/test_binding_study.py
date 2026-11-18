@@ -63,13 +63,34 @@ def test_fresh_pair_preserves_preparation_and_uses_one_sampling_protocol(
     assert protocols[0] == protocols[1]
 
 
-@pytest.mark.parametrize("cut", [25, 30, 35])
-def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, cut):
+@pytest.mark.parametrize("example", ["tyk2_ejm46", "a2a_theophylline"])
+def test_d_one_ps_changes_only_the_hill_period_at_the_same_seed(tmp_path, monkeypatch, example):
+    repo = Path(__file__).parents[1]
+    monkeypatch.syspath_prepend(str(repo / "scripts"))
+    prepare = importlib.import_module("prepare_binding_trial").prepare_trial
+    source = tmp_path / "source"
+    (source / "prepared").mkdir(parents=True)
+    (source / "equil").mkdir()
+    (source / "equil/state.xml").write_text(example)
+    Config.load(repo / "examples" / example / "fmeta.yaml").save(source / "config.yaml")
+    configs = {}
+    for arm in ("d", "d1ps"):
+        prepare(source, tmp_path / arm, arm, 35, 19511801)
+        configs[arm] = Config.load(tmp_path / arm / "config.yaml").to_dict()
+    expected = configs["d"]
+    assert (expected["run"]["pace_ps"], expected["metad"]["pace"]) == (2, 500)
+    expected["run"]["pace_ps"], expected["metad"]["pace"] = 1, 250
+    assert configs["d1ps"] == expected
+    assert "d1ps" not in importlib.import_module("binding_study").ARMS
+
+
+@pytest.mark.parametrize(("arm", "pace", "cut"), [("d", 2, 25), ("d", 2, 30), ("d", 2, 35), ("d1ps", 1, 35)])
+def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, arm, pace, cut):
     repo = Path(__file__).parents[1]
     monkeypatch.syspath_prepend(str(repo / "scripts"))
     score = importlib.import_module("score_binding")
     bias = dict(sigma_s=.025, sigma_rho=.03, height=1.5, bias_factor=10, temperature=300)
-    protocol = dict(replicas=32, walkers=1, pace_ps=2, timestep_fs=4, sync_hills=1, bias=bias)
+    protocol = dict(replicas=32, walkers=1, pace_ps=pace, timestep_fs=4, sync_hills=1, bias=bias)
     replica = dict(n_walkers=1, backend="cupotential", sync_hills=1, timestep_ps=.004, bias=bias)
     walkers = [dict(walker=f"rep{i}", departures=1, returns=1, site_frames=3, site_contact_frames=3,
                     bulk_frames=2, bulk_clear_frames=2, bulk_core_frames=1, bulk_core_clear_frames=1,
@@ -84,11 +105,11 @@ def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, cut):
                       dG=dg, dG_core=dg, dG_bias=dg, ci95=[dg-1., dg+1.], no_binding=False)
         structure = dict(cut_ns=cut, base_seed=10, region=regions, walkers=walkers, reference_wall_kj_mol={})
         pairs[name] = energy, structure
-    assert score.score_pair("d", cut, pairs)["passes"]
+    assert score.score_pair(arm, cut, pairs)["passes"]
     for energy, structure in pairs.values():
         energy["cut_ns"] = structure["cut_ns"] = 27
     with pytest.raises(ValueError, match="inconsistent cut"):
-        score.score_pair("d", 27, pairs)
+        score.score_pair(arm, 27, pairs)
 
 
 def test_single_shared_bias_trial_keeps_all_walkers_in_one_tyk2_history(tmp_path, monkeypatch):

@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import copytree
 from tempfile import TemporaryDirectory
 
-from score_binding import TRIAL_ARMS, TRIAL_ENDPOINTS
+from score_binding import D1PS_HELP, TRIAL_ARMS, TRIAL_ENDPOINTS
 
 from fmeta.config import Config
 
@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, help="prepared example work directory")
     parser.add_argument("target", type=Path, help="new candidate work directory")
-    parser.add_argument("--arm", required=True, choices=TRIAL_ARMS)
+    parser.add_argument("--arm", required=True, choices=TRIAL_ARMS, help=D1PS_HELP)
     parser.add_argument("--length-ns", required=True, type=int)
     parser.add_argument("--seed", required=True, type=int)
     args = parser.parse_args()
