@@ -28,11 +28,11 @@ from Evans et al. At 20 ns per walker it gave **−16.99 kcal/mol** (95% interva
 −14.84), 5.57 kcal/mol below the experimental reference. The 32 walkers made 19 confirmed
 departures. No pocket return was observed in the structures recorded every 100 ps. [Candidate C measurements](../binding-study/results/c-screen.json)
 
-Candidate D gave each of the 32 walkers its own bias. At 20 ns the WT surface integral was
-finite for all 32. Averaging each surface over 11–20 ns gave **−13.20 kcal/mol** for D and
-**−16.69 kcal/mol** for C. Relative to the 300 K reference, their absolute differences were
-1.78 and 5.27 kcal/mol. D had one confirmed pocket return and C had none. One bias shared
-by all 32 walkers has yet to be tested. [Matched energy and coverage comparison](../../docs/plans/2026-11-18-paper-binding.md)
+Candidate D gave each of the 32 walkers its own bias. Its primary reweighted ΔG° was finite
+in 29 of 32 histories at 20 ns. Their mean was **−13.15 kcal/mol**. Three histories had no bulk
+observations, so the mean over all 32 histories is unavailable. A separate pilot (E) uses a
+single bias shared by all 32 walkers. Its primary ΔG° at 5, 10 and 15 ns was **−27.31,
+−24.67 and −21.81 kcal/mol**, respectively. [Matched reweighted binding free energies](../../docs/plans/2026-11-18-paper-binding.md)
 
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at

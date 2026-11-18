@@ -93,11 +93,11 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
     to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
   - a shared production protocol meeting the affinity and precision criteria on both examples.
-    PR #4 holds extensions after comparing the matched 20 ns TYK2 pilots. Four-walker sharing (C)
-    sampled a broader surface. Independent walkers (D) gave a late WT mean closer to experiment
-    (absolute errors 5.27 and 1.78 kcal/mol). The TYK2 single-bias 32-walker trial (E, seed 19711801)
-    reached 10 ns per walker. The primary reweighted ΔG° was −24.67 kcal/mol (absolute error 13.25)
-    after −27.31 kcal/mol at 5 ns. Measurements continue at 15/20 ns. A2A has no measurement of E.
+    PR #4 holds C/D extensions. TYK2 C gave a primary ΔG° of −16.99 kcal/mol (8/8 groups);
+    D gave −13.15 kcal/mol over the finite 29/32 histories. The TYK2 single-bias trial (E, seed 19711801)
+    reached 15 ns per walker. The primary reweighted ΔG° was −21.81 kcal/mol (absolute error 10.40).
+    C/D were reanalyzed at identical cuts and all published finite values at 20 ns reproduced.
+    E continues to 20 ns. A2A has no measurement of E.
   - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
