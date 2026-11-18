@@ -156,6 +156,12 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
 6. Amended 2026-11-17 on the owner's second word, with no round 2 reading made in between: the
    limit of point 5 is 100 ns. The lengths of point 2 go on in steps of 5 ns to 100 ns, and
    point 3 applies if none qualifies up to 100 ns. Nothing else of the rule changes.
+7. Amended 2026-11-18 on the owner's third word, given after the readings at 80 ns below and
+   before any reading beyond them: if the rule is not met, another way is tried, and no setting
+   is made without the owner. Point 3 is withdrawn. If no length qualifies up to 100 ns, no
+   setting is written into the repository: the readings are reported, and what is tried next
+   is the owner's decision. Points 1, 2 and 4 stay as they are, thresholds included, and the
+   runs go on to 100 ns as before.
 
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
@@ -414,11 +420,12 @@ validation of the method, and the READMEs and FM-D19 say so. The package default
 change (FM-D16: never tuned against experiment); whether they should follow is a separate
 question for the owner, with this evidence.
 
-**Into the repository.** The same `metad` and `run` values in the two `fmeta.yaml` files (a
-test keeps them equal), the READMEs with the new result and the run command (walkers,
-`--per-gpu`, MPS), FM-D19 with the table of every arm, `PROGRESS.md`, `README.md` and
-`docs/roadmap.md` where they give the results of the two examples. No speed measured with the
-cuPotential plugin goes to a tracked file.
+**Into the repository**, only if a length qualifies (point 7; otherwise the two examples and
+their documents stay as they are, and this plan holds the readings). The same `metad` and
+`run` values in the two `fmeta.yaml` files (a test keeps them equal), the READMEs with the new
+result and the run command (walkers, `--per-gpu`, MPS), FM-D19 with the table of every arm,
+`PROGRESS.md`, `README.md` and `docs/roadmap.md` where they give the results of the two
+examples. No speed measured with the cuPotential plugin goes to a tracked file.
 
 ## GPU fault at the first start of round 1 (2026-11-17)
 
@@ -451,7 +458,7 @@ cuPotential plugin goes to a tracked file.
 | Part of the request | Done when |
 |---|---|
 | Search | rounds 1 and 2 have ended and every arm is in the table of FM-D19 with its numbers |
-| A common, accurate, short setting | the rule has chosen it (or its third point has, stated as such); both `fmeta.yaml` hold it; the configuration that each example file gives equals the `config.yaml` of the round 2 runs that measured it |
+| A common, accurate, short setting | the rule has chosen it; both `fmeta.yaml` hold it; the configuration that each example file gives equals the `config.yaml` of the round 2 runs that measured it. If no length qualifies up to 100 ns, nothing is set (point 7): the readings go to the owner, and this row stays open |
 | Documents | READMEs of the two examples, FM-D19, `PROGRESS.md`, `README.md`, `docs/roadmap.md` agree with the measured numbers |
 | Checks | `ruff`, the progress size, `verify_bench_results`, `pytest` pass in the image; pushed; CI green |
 
