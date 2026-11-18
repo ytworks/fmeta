@@ -8,6 +8,12 @@ of +3.25 kcal/mol. It comes from the stabilised receptor's SPR affinity of appro
 2, 2, 0 and 4 contact-confirmed returns. The frozen region definition for this preparation
 is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
 
+In the new eight-GPU screen, candidate B (eight independent groups of four walkers)
+at 20 ns per walker gave **−5.22 kcal/mol**, with a 95% interval of −7.35 to −3.09.
+The signed error was +2.72 kcal/mol and the interval half-width was 2.13 kcal/mol,
+both above the 0.96 kcal/mol limit. Four groups had a contact-confirmed return to the pocket.
+[Candidate B measurements](../binding-study/results/b-screen.json)
+
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
 theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the steps below ran
 to a binding free energy with the official defaults: dG0 = −18.6 kJ/mol (−4.45 kcal/mol), 95%
