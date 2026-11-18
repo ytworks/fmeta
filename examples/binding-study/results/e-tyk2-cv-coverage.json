@@ -1,0 +1,91 @@
+{
+  "arm": "e",
+  "system": "tyk2",
+  "analysis_commit": "c8e15da999ad240168636bf507de1ffe8e5a7ac3",
+  "length_unit": "ns/walker",
+  "cv_unit": "nm",
+  "visited_cv_area_unit": "nm²",
+  "base_seed": 19711801,
+  "frozen_inputs": {
+    "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+    "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+    "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+    "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+    "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+  },
+  "endpoints": [
+    {
+      "cut_ns": 5.0,
+      "discard_ns": 2.0,
+      "base_seed": 19711801,
+      "prepared_hashes": {
+        "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+        "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+        "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+        "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+        "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+      },
+      "physical_walkers": 32,
+      "independent_bias_histories": 1,
+      "records_outside_native_rectangle": 0,
+      "grid_origin_nm": [
+        0.0,
+        0.0
+      ],
+      "cell_size_nm": [
+        0.025,
+        0.03
+      ],
+      "native_grid_domain_nm": [
+        0.4002406500207519,
+        4.950240650020751,
+        0.0,
+        1.012215986365802
+      ],
+      "site_nm": [
+        0.7002406500207519,
+        2.1157086226804243
+      ],
+      "bulk_nm": [
+        4.066907316687418,
+        4.5502406500207515
+      ],
+      "zones": {
+        "all": {
+          "records": 48000,
+          "physical_walkers_any": 32,
+          "independent_histories_any": 1,
+          "union_cells": 2619,
+          "union_area_nm2": 1.9642499999999998,
+          "median_walker_cells": 169.0,
+          "median_walker_area_nm2": 0.12675,
+          "median_history_cells": 2619.0,
+          "median_history_area_nm2": 1.964250000000001
+        },
+        "site": {
+          "records": 38625,
+          "physical_walkers_any": 29,
+          "independent_histories_any": 1,
+          "union_cells": 1295,
+          "union_area_nm2": 0.9653170177818191,
+          "median_walker_cells": 84.5,
+          "median_walker_area_nm2": 0.06184192274226998,
+          "median_history_cells": 1295.0,
+          "median_history_area_nm2": 0.965317017781819
+        },
+        "bulk": {
+          "records": 776,
+          "physical_walkers_any": 3,
+          "independent_histories_any": 1,
+          "union_cells": 172,
+          "union_area_nm2": 0.12294946349564213,
+          "median_walker_cells": 0.0,
+          "median_walker_area_nm2": 0.0,
+          "median_history_cells": 172.0,
+          "median_history_area_nm2": 0.12294946349564215
+        }
+      },
+      "walkers_both_site_and_bulk": 1
+    }
+  ]
+}
