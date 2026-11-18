@@ -16,6 +16,12 @@ ARMS = {"a": (4, 8, 0.05, 0.10, 1), "b": (8, 4, 0.05, 0.10, 1),
 ENDPOINTS = (20, 40, 80, 100)
 
 
+def precision_passes(score):
+    """Require complete estimates, binding, a pocket return and a sufficiently narrow replica interval."""
+    return all(score["checks"][key] for key in (
+        "all_replicas_available", "binding", "contact_confirmed_roundtrip", "ci_halfwidth_within_limit"))
+
+
 def score_system(name, arm, length, energy, structure):
     n_rep, n_walk, sigma_s, sigma_rho, pace = ARMS[arm]
     protocol = energy["protocol"]
@@ -68,7 +74,7 @@ def score_system(name, arm, length, energy, structure):
         row["weighted_contact_wall"] = saved_contact_wall(run, walkers)
     observed = [w["lipid_checkpoint"] for w in walkers
                 if (w.get("lipid_checkpoint") or {}).get("status") == "observed"]
-    return dict(passes=all(checks.values()), checks=checks, reference_M=AFFINITY_M[name],
+    result = dict(passes=all(checks.values()), checks=checks, reference_M=AFFINITY_M[name],
                 reference_kj_mol=reference, tolerance_kj_mol=limit, dG=dg, ci95=ci,
                 affinity_M=math.exp(dg / kT) if valid else None, error_kj_mol=error,
                 fold_error=math.exp(error / kT) if valid else None, ci_halfwidth_kj_mol=halfwidth,
@@ -85,6 +91,8 @@ def score_system(name, arm, length, energy, structure):
                 observed_bulk_lipid_checkpoints=len(observed),
                 cutoff_clear_bulk_lipid_checkpoints=sum(v["cutoff_clear"] for v in observed),
                 replicas=support)
+    result["precision_passes"] = precision_passes(result)
+    return result
 
 
 def score_pair(arm, length, pairs):
@@ -92,7 +100,8 @@ def score_pair(arm, length, pairs):
     if pairs["tyk2"][0]["protocol"] != pairs["a2a"][0]["protocol"]:
         raise ValueError("the two systems used different sampling protocols")
     return dict(arm=arm, length_ns=length, protocol=pairs["tyk2"][0]["protocol"],
-                systems=results, passes=all(v["passes"] for v in results.values()))
+                systems=results, passes=all(v["passes"] for v in results.values()),
+                precision_passes=all(v["precision_passes"] for v in results.values()))
 
 
 def main():

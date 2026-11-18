@@ -92,9 +92,9 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     trypsin −66.9 to 10.4 and −80.5 to −7.6 in two runs, and the value depends on the bias
     setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
     to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
-  - a shared production protocol meeting the fivefold affinity and independent-replica precision
-    criteria on both examples. PR #4 has cuPotential trajectories to 90 ns (TYK2) and 80 ns (A2A).
-    The paired follow-up uses 20/40/80/100 ns checkpoints, reviewed primary methods and fresh validation seeds.
+  - a shared production protocol meeting the affinity and precision criteria on both examples.
+    PR #4 ranks 20 ns TYK2 pilots by independent-replica SD, deepens one candidate at a time and
+    checks experimental agreement in fresh paired validation. Checkpoints are 20/40/80/100 ns.
   - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
@@ -114,6 +114,12 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
   (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
 
 ## Change Log
+
+### 2026-11-18 — [amendment] prioritize independent-replica scatter in the TYK2 pilot
+- What: Rank complete 20 ns TYK2 pilots by the sample SD of independent replica free energies, then extend the selected candidate and follow it in A2A. Use the experimental reference at final independent validation.
+- Why: The owner prioritizes reproducibility during candidate exploration and wants to reserve the longer A2A calculations for the candidate selected in TYK2.
+- Verification: Official Docker passed lint, the progress and benchmark record checks, and 237 CPU tests. The live selector queued only the D TYK2 pilot.
+- Refs: PR #4, `docs/plans/2026-11-18-paper-binding.md`, `scripts/binding_study.py`, `examples/binding-study/results/`.
 
 ### 2026-11-18 — [amendment] reweighted finite-site binding for the paired examples
 - What: opt-in sample estimator with synchronized walker biases, wall-free disk cross-check, fixed structural regions and independent-replica intervals. At 80 ns, R2 gave TYK2 −44.13 [−71.19, −17.07] and A2A −19.64 [−28.79, −10.48] kJ/mol. Official image: 224 CPU tests and four slow analysis/walker tests passed. The new eight-GPU search is active.

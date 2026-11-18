@@ -30,12 +30,14 @@
       "length_ns": 20,
       "purpose": "screening",
       "passes": null,
+      "precision_passes": null,
       "systems": {
         "tyk2": {
           "comparison_kcal_mol": {
             "reference": -11.419260542630683,
             "predicted_mean": -16.975882100258993,
             "signed_error_predicted_minus_reference": -5.55662155762831,
+            "independent_replica_sd": 2.574700785771454,
             "ci95_independent_replicas": [
               -19.128385824100384,
               -14.823378376417597
@@ -64,6 +66,7 @@
           ],
           "affinity_fold_error": 11166.44279289334,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               0,

@@ -120,12 +120,14 @@
       "length_ns": 20,
       "purpose": "screening",
       "passes": false,
+      "precision_passes": false,
       "systems": {
         "tyk2": {
           "comparison_kcal_mol": {
             "reference": -11.419260542630683,
             "predicted_mean": -16.24659516905688,
             "signed_error_predicted_minus_reference": -4.8273346264261985,
+            "independent_replica_sd": 3.793848153347258,
             "ci95_independent_replicas": [
               -22.28345418827058,
               -10.209736149843183
@@ -154,6 +156,7 @@
           ],
           "affinity_fold_error": 3285.7940232965802,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               0,
@@ -289,6 +292,7 @@
             "reference": -7.941353663933476,
             "predicted_mean": -6.4279405220312,
             "signed_error_predicted_minus_reference": 1.5134131419022756,
+            "independent_replica_sd": 3.5593493344751574,
             "ci95_independent_replicas": [
               -12.091659591388444,
               -0.764221452673956
@@ -317,6 +321,7 @@
           ],
           "affinity_fold_error": 12.661892047842692,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               1,
@@ -453,12 +458,14 @@
       "length_ns": 40,
       "purpose": "screening",
       "passes": false,
+      "precision_passes": false,
       "systems": {
         "tyk2": {
           "comparison_kcal_mol": {
             "reference": -11.419260542630683,
             "predicted_mean": -13.774189234490109,
             "signed_error_predicted_minus_reference": -2.354928691859426,
+            "independent_replica_sd": 3.3394676757700688,
             "ci95_independent_replicas": [
               -19.088027517674522,
               -8.460350951305696
@@ -487,6 +494,7 @@
           ],
           "affinity_fold_error": 51.943351702383886,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               1,
@@ -622,6 +630,7 @@
             "reference": -7.941353663933476,
             "predicted_mean": -4.885724513852129,
             "signed_error_predicted_minus_reference": 3.055629150081347,
+            "independent_replica_sd": 2.067692552880479,
             "ci95_independent_replicas": [
               -8.175884776540688,
               -1.5955642511635704
@@ -650,6 +659,7 @@
           ],
           "affinity_fold_error": 168.25952784603643,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               1,
@@ -786,12 +796,14 @@
       "length_ns": 80,
       "purpose": "screening",
       "passes": false,
+      "precision_passes": false,
       "systems": {
         "tyk2": {
           "comparison_kcal_mol": {
             "reference": -11.419260542630683,
             "predicted_mean": -10.547261253776837,
             "signed_error_predicted_minus_reference": 0.8719992888538464,
+            "independent_replica_sd": 4.064721254785039,
             "ci95_independent_replicas": [
               -17.01513982342624,
               -4.079382684127436
@@ -820,6 +832,7 @@
           ],
           "affinity_fold_error": 4.317559250822542,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               2,
@@ -955,6 +968,7 @@
             "reference": -7.941353663933476,
             "predicted_mean": -4.692928019287948,
             "signed_error_predicted_minus_reference": 3.2484256446455273,
+            "independent_replica_sd": 1.3753658162665698,
             "ci95_independent_replicas": [
               -6.881441949483476,
               -2.504414089092421
@@ -983,6 +997,7 @@
           ],
           "affinity_fold_error": 232.50323453518635,
           "passes": false,
+          "precision_passes": false,
           "structure": {
             "returns_by_replica": [
               2,
@@ -1119,12 +1134,14 @@
       "length_ns": 90.0,
       "purpose": "drift_only",
       "passes": null,
+      "precision_passes": null,
       "systems": {
         "tyk2": {
           "comparison_kcal_mol": {
             "reference": -11.419260542630683,
             "predicted_mean": -10.010754086188033,
             "signed_error_predicted_minus_reference": 1.40850645644265,
+            "independent_replica_sd": 4.216695776234315,
             "ci95_independent_replicas": [
               -16.720458032979188,
               -3.3010501393968763
@@ -1153,6 +1170,7 @@
           ],
           "affinity_fold_error": null,
           "passes": null,
+          "precision_passes": null,
           "structure": null,
           "replicas": [
             {

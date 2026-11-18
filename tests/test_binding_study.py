@@ -1,4 +1,4 @@
-"""The result of a sweep is the fastest eligible protocol that passes a fresh paired trial."""
+"""Paired and TYK2-first study decisions on independent replicas and fresh validation seeds."""
 
 import hashlib
 import importlib
@@ -108,3 +108,121 @@ def test_report_converts_prediction_reference_interval_and_signed_error_to_kcal(
     report = (tmp_path / "report.md").read_text()
     assert "kcal/mol" in report
     assert "| -12.00 | -10.00 [-11.00, -9.00] | +2.00 | 1.00 | 3 |" in report
+    score = trial["systems"]["tyk2"]
+    score["checks"]["all_replicas_available"] = True
+    score["replicas"] = [dict(status="available", dG=v) for v in (-50., -45., -40., -35.)]
+    study.save_json(tmp_path / "partials/b-tyk2-20.json", trial)
+    study.save_json(tmp_path / "strategy-tyk2-first.json", {"screening":{"b-tyk2-20":{"phase":"tyk2_pilot"}}})
+    study.final_report(tmp_path, {"selection":None, "strategy":"tyk2-first",
+                                  "pilot_ranking":[{"arm":"b", "replica_sd_kj_mol":study.replica_sd(score)}]})
+    report = (tmp_path / "report.md").read_text()
+    assert "| TYK2 予備計算 | B | 20 |" in report and "| 3 | 適格 | 1.543 |" in report
+
+
+@pytest.fixture
+def adaptive(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    study = importlib.import_module("binding_study")
+    args = SimpleNamespace(control=tmp_path / "control", output=tmp_path / "scores", strategy="tyk2-first")
+    (args.control / "requests").mkdir(parents=True)
+    partials, pairs = {}, {}
+
+    def system(system, arm, length, sd, precise, accurate=False):
+        checks = dict(all_replicas_available=sd is not None, binding=True, contact_confirmed_roundtrip=True,
+                      ci_halfwidth_within_limit=precise, affinity_within_fivefold=accurate)
+        base = 10000 if system == "tyk2" else 200000
+        score = dict(checks=checks, passes=all(checks.values()), base_seed=base)
+        partials[system, arm, length] = dict(arm=arm, system=system, length_ns=length, replica_sd_kj_mol=sd,
+                                              precision_passes=study.precision_passes(score), systems={system: score})
+
+    def pair(arm, length, holdout=None):
+        systems = {name: dict(partials[name, arm, length]["systems"][name]) for name in study.EXAMPLES}
+        if holdout is not None:
+            for score in systems.values():
+                score["base_seed"] += 400000
+                score["checks"] = dict(score["checks"], affinity_within_fivefold=holdout)
+                score["passes"] = all(score["checks"].values())
+        result = dict(arm=arm, length_ns=length, passes=all(r["passes"] for r in systems.values()), systems=systems,
+                      protocol=dict(zip(("replicas", "walkers"), study.ARMS[arm][:2])))
+        pairs[arm, length, holdout is not None] = result
+        return result
+
+    monkeypatch.setattr(study, "get_system_score", lambda n, a, l, args: partials.get((n, a, l)))
+    monkeypatch.setattr(study, "get_score", lambda a, l, h, args: pairs.get((a, l, h)))
+
+    def requests():
+        return {p.stem: json.loads(p.read_text()) for p in (args.control / "requests").iterdir()}
+
+    return SimpleNamespace(study=study, args=args, system=system, pair=pair, requests=requests)
+
+
+def test_tyk2_first_ignores_screening_affinity_and_stops_at_first_heldout_pair(adaptive):
+    a = adaptive
+    for arm, sd in (("a", 5.), ("b", 1.), ("c", 1.)):
+        # On the SD tie, B wins by arm ID despite its out-of-range screening estimate.
+        a.system("tyk2", arm, 20, sd, precise=True, accurate=arm != "b")
+    (a.args.control / "d-tyk2-20.done").touch()
+    assert not a.study.step(a.args) and not a.requests()  # D's analysis is pending, no duplicate MD.
+    a.system("tyk2", "d", 20, None, precise=False)
+    assert not a.study.step(a.args)
+    assert a.requests() == {"4101": {"action":"screen-system", "arm":"b", "system":"a2a", "length_ns":20}}
+    progress = json.loads((a.args.output / "strategy-tyk2-first.json").read_text())
+    assert [p["arm"] for p in progress["ranking"]] == ["b", "c", "a", "d"]
+    assert progress["phase"] == "a2a_followup"
+    assert not a.study.step(a.args) and len(a.requests()) == 1  # restart reuses the same request
+    a.system("a2a", "b", 20, 2., precise=True, accurate=False)
+    screening = a.pair("b", 20)
+    assert not screening["passes"]
+    assert not a.study.step(a.args)
+    assert a.requests()["9100"] == {"action":"validate", "arm":"b", "length_ns":20}
+    a.pair("b", 20, holdout=True)
+    assert a.study.step(a.args)
+    assert set(a.requests()) == {"4101", "9100", "9999"}
+    decision = json.loads((a.args.output / "decision.json").read_text())
+    assert decision["selection"]["arm"] == "b"
+    assert decision["strategy"] == "tyk2-first"
+    assert "標本標準偏差" in (a.args.output / "report.md").read_text()
+
+
+def test_tyk2_first_catches_up_selected_a2a_then_extends_after_a_failed_holdout(adaptive):
+    a = adaptive
+    for arm, sd in (("a", None), ("b", 6.), ("c", 1.), ("d", 7.)):
+        a.system("tyk2", arm, 20, sd, precise=False)
+    assert not a.study.step(a.args) and set(a.requests()) == {"4210"}
+    a.system("tyk2", "c", 40, 2., precise=True)
+    assert not a.study.step(a.args) and "4201" in a.requests() and "4211" not in a.requests()
+    a.system("a2a", "c", 20, 4., precise=False)
+    assert not a.study.step(a.args) and "4211" in a.requests()
+    a.system("a2a", "c", 40, 1., precise=True)
+    a.pair("c", 40)
+    assert not a.study.step(a.args) and "9210" in a.requests()
+    a.pair("c", 40, holdout=False)
+    assert not a.study.step(a.args) and "4220" in a.requests()
+    a.system("tyk2", "c", 80, 5., precise=False)
+    a.system("tyk2", "c", 100, 5., precise=False)
+    assert not a.study.step(a.args) and "4221" in a.requests()  # collect A2A at the computable TYK2 cap
+    a.system("a2a", "c", 80, 2., precise=False)
+    assert not a.study.step(a.args) and "4231" in a.requests()
+    a.system("a2a", "c", 100, 2., precise=True)
+    a.pair("c", 100)
+    assert not a.study.step(a.args) and "4110" in a.requests()  # next-ranked arm after exhausting C
+    assert "9230" not in a.requests() and "9999" not in a.requests()
+    assert not any(p.get("system") == "a2a" and p["arm"] != "c" for p in a.requests().values())
+
+
+def test_pilot_sd_uses_every_independent_primary_estimate_with_n_minus_one(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    study = importlib.import_module("binding_study")
+    args = SimpleNamespace(analysis=tmp_path/"analysis", geometry=tmp_path/"geometry", output=tmp_path/"output")
+    sources = study.measurement_paths("tyk2", "a", 20, False, args)
+    for p in sources:
+        study.save_json(p, {})
+    checks = dict(all_replicas_available=True, contact_confirmed_roundtrip=True, binding=True,
+                  ci_halfwidth_within_limit=False, affinity_within_fivefold=False)
+    rows = [dict(status="available", dG=x) for x in (0., 4., 8., 12.)]
+    monkeypatch.setattr(study, "score_system", lambda *args: dict(checks=checks, replicas=rows))
+    result = study.get_system_score("tyk2", "a", 20, args)
+    assert result["replica_sd_kj_mol"] == pytest.approx((80 / 3)**.5)
+    rows[-1]["status"] = "unavailable"
+    (args.output / "partials/a-tyk2-20.json").unlink()
+    assert study.get_system_score("tyk2", "a", 20, args)["replica_sd_kj_mol"] is None

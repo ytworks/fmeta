@@ -5,6 +5,7 @@ import json
 import math
 import re
 from pathlib import Path
+from statistics import stdev
 
 from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair, score_system
 
@@ -54,9 +55,18 @@ def comparison_kcal_mol(name, energy):
     reference = kT * math.log(AFFINITY_M[name])
     predicted = energy["dG"] / KCAL if energy["dG"] is not None else None
     ci = [v / KCAL for v in energy["ci95"]] if energy["ci95"] is not None else None
+    replicas = energy["replicas"]
+    expected = energy["protocol"]["replicas"]
+    complete = (energy["status"] == "available" and predicted is not None and ci is not None
+                and expected >= 2 and expected == energy["n_replicas"] == len(replicas)
+                and all(r["status"] == "available" and r["dG"] is not None and math.isfinite(r["dG"])
+                        for r in replicas))
+    # ddof=1 across independent bias histories. Shared walkers belong to a single history.
+    sd = stdev(r["dG"] for r in replicas) / KCAL if complete else None
     return dict(reference=reference, predicted_mean=predicted,
                 signed_error_predicted_minus_reference=predicted - reference if predicted is not None else None,
-                ci95_independent_replicas=ci, ci95_halfwidth=(ci[1] - ci[0]) / 2 if ci is not None else None,
+                independent_replica_sd=sd, ci95_independent_replicas=ci,
+                ci95_halfwidth=(ci[1] - ci[0]) / 2 if ci is not None else None,
                 fivefold_limit=kT * math.log(5),
                 core_mean=energy["dG_core"] / KCAL if energy["dG_core"] is not None else None,
                 accumulated_wt_mean=energy["dG_bias"] / KCAL if energy["dG_bias"] is not None else None)
@@ -94,7 +104,8 @@ def measurements(name, energy, score=None):
                 base_seed=energy["base_seed"], status=energy["status"], dG=energy["dG"], ci95=energy["ci95"],
                 dG_core=energy["dG_core"], ci95_core=energy["ci95_core"], dG_bias=energy["dG_bias"],
                 ci95_bias=energy["ci95_bias"], affinity_fold_error=score["fold_error"] if score else None,
-                passes=score["passes"] if score else None, structure=physical, replicas=rows)
+                passes=score["passes"] if score else None,
+                precision_passes=score["precision_passes"] if score else None, structure=physical, replicas=rows)
 
 
 def main():
@@ -107,8 +118,9 @@ def main():
     parser.add_argument("--analysis-commit", required=True)
     parser.add_argument("--paired", action="append", nargs=4, default=[],
                         metavar=("TYK2_ENERGY", "TYK2_STRUCTURE", "A2A_ENERGY", "A2A_STRUCTURE"))
-    parser.add_argument("--provisional", nargs=3, metavar=("SYSTEM", "ENERGY", "STRUCTURE"),
-                        help="one completed system at a pending paired endpoint")
+    parser.add_argument("--provisional", action="append", nargs=3, default=[],
+                        metavar=("SYSTEM", "ENERGY", "STRUCTURE"),
+                        help="one completed system at a pending paired endpoint; repeat for different lengths")
     parser.add_argument("--drift", nargs=2, metavar=("SYSTEM", "ENERGY"))
     args = parser.parse_args()
     if not re.fullmatch("[0-9a-f]{40}", args.analysis_commit):
@@ -117,8 +129,7 @@ def main():
     for filenames in args.paired:
         ty, ty_struct, aa, aa_struct = map(read, filenames)
         groups.append({"tyk2": (ty, ty_struct), "a2a": (aa, aa_struct)})
-    if args.provisional:
-        name, energy_file, structure_file = args.provisional
+    for name, energy_file, structure_file in args.provisional:
         if name not in EXAMPLES:
             parser.error("unknown provisional system")
         groups.append({name: (read(energy_file), read(structure_file))})
@@ -130,11 +141,12 @@ def main():
         length = int(energy["cut_ns"])
         if any(p["length_ns"] == length for p in results):
             parser.error("duplicate endpoint")
-        endpoint = dict(length_ns=length, purpose=args.phase, passes=None, systems={})
+        endpoint = dict(length_ns=length, purpose=args.phase, passes=None, precision_passes=None, systems={})
         if len(group) == len(EXAMPLES):
             pair_score = score_pair(args.arm, length, group)
             scores = pair_score["systems"]
             endpoint["passes"] = pair_score["passes"]
+            endpoint["precision_passes"] = pair_score["precision_passes"]
         else:
             scores = {name: score_system(name, args.arm, length, energy, structure)}
             endpoint["pending_systems"] = sorted(set(EXAMPLES) - group.keys())
@@ -154,7 +166,7 @@ def main():
         if (runs.get(name) != (energy["protocol"], energy["base_seed"])
                 or {key: energy["regions"][key] for key in HASH_FIELDS} != inputs[name]):
             parser.error("drift diagnostic has different inputs, seed or protocol")
-        results.append(dict(length_ns=energy["cut_ns"], purpose="drift_only", passes=None,
+        results.append(dict(length_ns=energy["cut_ns"], purpose="drift_only", passes=None, precision_passes=None,
                             systems={name: measurements(name, energy)}))
     report = dict(arm=args.arm, energy_unit="kJ/mol", length_unit="ns/walker",
                   production_source=production_source(args.production_source, results),
