@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import copytree
 from tempfile import TemporaryDirectory
 
-from score_binding import E_ENDPOINTS, ENDPOINTS, TRIAL_ARMS
+from score_binding import TRIAL_ARMS, TRIAL_ENDPOINTS
 
 from fmeta.config import Config
 
@@ -17,7 +17,7 @@ def prepare_trial(source, target, arm, length_ns, seed):
         raise FileExistsError(target)
     replicas, walkers, sigma_s, sigma_rho, pace = TRIAL_ARMS[arm]
     data = Config.load(source / "config.yaml").to_dict()
-    if length_ns not in (E_ENDPOINTS if arm == "e" else ENDPOINTS):
+    if length_ns not in TRIAL_ENDPOINTS[arm]:
         raise ValueError(f"unsupported endpoint for trial {arm.upper()}: {length_ns} ns")
     data["metad"].update(bias_factor=10.0, height=1.5, sigma_s=sigma_s, sigma_rho=sigma_rho)
     data["run"].update(replicas=replicas, walkers=walkers, seed=seed, length_ns=length_ns,

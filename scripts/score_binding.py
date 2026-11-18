@@ -17,6 +17,12 @@ ENDPOINTS = (20, 40, 80, 100)
 # E measures one shared history for a selected example, outside the paired scheduler.
 TRIAL_ARMS = {**ARMS, "e": (1, 32, *ARMS["c"][2:])}
 E_ENDPOINTS = (5, 10, 15, 20)
+# Explicit trials include D's finer checkpoints. The paired sweep continues to use ENDPOINTS.
+TRIAL_ENDPOINTS = {
+    **dict.fromkeys(ARMS, ENDPOINTS),
+    "d": (20, 25, 30, 35, 40, 80, 100),
+    "e": E_ENDPOINTS,
+}
 
 
 def precision_passes(score):
@@ -33,8 +39,7 @@ def score_system(name, arm, length, energy, structure):
     frozen = json.loads(region_file.read_text())
     if energy["regions"] != frozen or structure["region"] != frozen:
         raise ValueError(f"{name}: results differ from the frozen region definition")
-    endpoints = E_ENDPOINTS if arm == "e" else ENDPOINTS
-    if (energy["cut_ns"] != length or structure["cut_ns"] != length or length not in endpoints
+    if (energy["cut_ns"] != length or structure["cut_ns"] != length or length not in TRIAL_ENDPOINTS[arm]
             or energy["discard_ns"] != 2 or energy["base_seed"] != structure["base_seed"]):
         raise ValueError(f"{name}: inconsistent cut, seed or discarded interval")
     if (protocol["replicas"], protocol["walkers"], bias["sigma_s"], bias["sigma_rho"], protocol["pace_ps"]

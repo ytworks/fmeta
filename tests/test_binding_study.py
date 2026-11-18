@@ -31,13 +31,15 @@ def test_paper_analysis_rejects_another_equilibration_and_incomplete_ensemble(tm
         analyze_paper_stage(tmp_path, region_file)
 
 
-def test_fresh_pair_preserves_preparation_and_uses_one_sampling_protocol(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("arm", "cut", "n_rep", "n_walk"), [("c", 20, 8, 4), ("d", 25, 32, 1)])
+def test_fresh_pair_preserves_preparation_and_uses_one_sampling_protocol(
+        tmp_path, monkeypatch, arm, cut, n_rep, n_walk):
     repo = Path(__file__).parents[1]
     monkeypatch.syspath_prepend(str(repo / "scripts"))
     prepare = importlib.import_module("prepare_binding_trial").prepare_trial
     protocols = []
     for seed, name in enumerate(("tyk2_ejm46", "a2a_theophylline"), start=99):
-        source, target = tmp_path / name, tmp_path / "c" / name
+        source, target = tmp_path / name, tmp_path / arm / name
         (source / "prepared").mkdir(parents=True)
         (source / "equil").mkdir()
         (source / "equil/state.xml").write_text(name)
@@ -45,17 +47,48 @@ def test_fresh_pair_preserves_preparation_and_uses_one_sampling_protocol(tmp_pat
         (source / "rep0/HILLS").write_text("old hills")
         config = Config.load(repo / "examples" / name / "fmeta.yaml")
         config.save(source / "config.yaml")
-        prepare(source, target, "c", 20, seed)
+        prepare(source, target, arm, cut, seed)
         trial = Config.load(target / "config.yaml")
         assert trial.system == config.system and trial.membrane == config.membrane
         assert (target / "equil/state.xml").read_text() == name and not (target / "rep0").exists()
-        assert (trial.run.replicas, trial.run.walkers, trial.run.seed, trial.metad.pace) == (8, 4, seed, 500)
+        assert (trial.run.length_ns, trial.run.replicas, trial.run.walkers, trial.run.seed, trial.metad.pace) == (
+            cut, n_rep, n_walk, seed, 500)
         protocol = trial.to_dict()
         del protocol["run"]["seed"]
         protocols.append((protocol["run"], protocol["metad"]))
         with pytest.raises(FileExistsError):
-            prepare(source, target, "c", 40, seed)
+            prepare(source, target, arm, 40, seed)
+        with pytest.raises(ValueError, match="unsupported endpoint"):
+            prepare(source, target.with_name(name + "-unsupported"), arm, 27, seed)
     assert protocols[0] == protocols[1]
+
+
+@pytest.mark.parametrize("cut", [25, 30, 35])
+def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, cut):
+    repo = Path(__file__).parents[1]
+    monkeypatch.syspath_prepend(str(repo / "scripts"))
+    score = importlib.import_module("score_binding")
+    bias = dict(sigma_s=.025, sigma_rho=.03, height=1.5, bias_factor=10, temperature=300)
+    protocol = dict(replicas=32, walkers=1, pace_ps=2, timestep_fs=4, sync_hills=1, bias=bias)
+    replica = dict(n_walkers=1, backend="cupotential", sync_hills=1, timestep_ps=.004, bias=bias)
+    walkers = [dict(walker=f"rep{i}", departures=1, returns=1, site_frames=3, site_contact_frames=3,
+                    bulk_frames=2, bulk_clear_frames=2, bulk_core_frames=1, bulk_core_clear_frames=1,
+                    site_contact_wall_above_kT_frames=0, bound_contact_wall_above_kT_frames=0,
+                    maximum_bound_contact_wall_kj_mol=0.) for i in range(32)]
+    pairs = {}
+    for name, example in score.EXAMPLES.items():
+        regions = json.loads((repo / "examples" / example / "paper-regions.json").read_text())
+        dg = -48. if name == "tyk2" else -33.
+        energy = dict(cut_ns=cut, discard_ns=2, base_seed=10, protocol=protocol, regions=regions,
+                      recorded_backends=["cupotential"], n_replicas=32, replicas=[replica] * 32, status="available",
+                      dG=dg, dG_core=dg, dG_bias=dg, ci95=[dg-1., dg+1.], no_binding=False)
+        structure = dict(cut_ns=cut, base_seed=10, region=regions, walkers=walkers, reference_wall_kj_mol={})
+        pairs[name] = energy, structure
+    assert score.score_pair("d", cut, pairs)["passes"]
+    for energy, structure in pairs.values():
+        energy["cut_ns"] = structure["cut_ns"] = 27
+    with pytest.raises(ValueError, match="inconsistent cut"):
+        score.score_pair("d", 27, pairs)
 
 
 def test_single_shared_bias_trial_keeps_all_walkers_in_one_tyk2_history(tmp_path, monkeypatch):
