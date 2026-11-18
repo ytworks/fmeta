@@ -95,9 +95,9 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
   - a shared production protocol meeting the affinity and precision criteria on both examples.
     PR #4 holds C/D extensions. TYK2 C gave a primary ΔG° of −16.99 kcal/mol (8/8 groups);
     D gave −13.15 kcal/mol over the finite 29/32 histories. The TYK2 single-bias trial (E, seed 19711801)
-    reached 15 ns per walker. The primary reweighted ΔG° was −21.81 kcal/mol (absolute error 10.40).
+    completed 20 ns per walker. The primary reweighted ΔG° was −20.48 kcal/mol (absolute error 9.06).
     C/D were reanalyzed at identical cuts and all published finite values at 20 ns reproduced.
-    E continues to 20 ns. A2A has no measurement of E.
+    E recorded ten departures and no pocket returns. A2A has no measurement of E.
   - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a

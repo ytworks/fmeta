@@ -366,6 +366,17 @@
     },
     "first_report_discussing_wt_endpoint": "91357d79db85fd5814b6eae1168a7f82b2d7ce4f",
     "first_report_using_reweighted_as_primary": "a91e328436e4e8ac13777a4e00a92b021e42aaad",
+    "final_cumulative_record": {
+      "artifact": "e-tyk2.json",
+      "sha256": "ce3b424dd83c43ea25e74fdad9ce79f0f6fc8db91e00d08efff771b01582b638",
+      "cut_ns": 20,
+      "prior_endpoints_with_identical_scientific_content": [
+        5,
+        10,
+        15
+      ],
+      "comparison": "Each complete earlier endpoint object has the same canonical SHA256 in this cumulative record as at its first public revision."
+    },
     "history_digest": "SHA256 of each complete public endpoint rendered by jq -cS with its terminating newline.",
     "points": [
       {

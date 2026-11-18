@@ -232,6 +232,79 @@
         }
       },
       "walkers_both_site_and_bulk": 8
+    },
+    {
+      "cut_ns": 20.0,
+      "discard_ns": 2.0,
+      "base_seed": 19711801,
+      "prepared_hashes": {
+        "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+        "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+        "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+        "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+        "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+      },
+      "physical_walkers": 32,
+      "independent_bias_histories": 1,
+      "records_outside_native_rectangle": 0,
+      "grid_origin_nm": [
+        0.0,
+        0.0
+      ],
+      "cell_size_nm": [
+        0.025,
+        0.03
+      ],
+      "native_grid_domain_nm": [
+        0.4002406500207519,
+        4.950240650020751,
+        0.0,
+        1.012215986365802
+      ],
+      "site_nm": [
+        0.7002406500207519,
+        2.1157086226804243
+      ],
+      "bulk_nm": [
+        4.066907316687418,
+        4.5502406500207515
+      ],
+      "zones": {
+        "all": {
+          "records": 288000,
+          "physical_walkers_any": 32,
+          "independent_histories_any": 1,
+          "union_cells": 3038,
+          "union_area_nm2": 2.2785,
+          "median_walker_cells": 447.5,
+          "median_walker_area_nm2": 0.33562500000000006,
+          "median_history_cells": 3038.0,
+          "median_history_area_nm2": 2.2785000000000024
+        },
+        "site": {
+          "records": 200436,
+          "physical_walkers_any": 31,
+          "independent_histories_any": 1,
+          "union_cells": 1449,
+          "union_area_nm2": 1.0804155449516484,
+          "median_walker_cells": 208.0,
+          "median_walker_area_nm2": 0.15451003472165087,
+          "median_history_cells": 1449.0,
+          "median_history_area_nm2": 1.0804155449516482
+        },
+        "bulk": {
+          "records": 9197,
+          "physical_walkers_any": 10,
+          "independent_histories_any": 1,
+          "union_cells": 212,
+          "union_area_nm2": 0.14970668299626472,
+          "median_walker_cells": 0.0,
+          "median_walker_area_nm2": 0.0,
+          "median_history_cells": 212.0,
+          "median_history_area_nm2": 0.14970668299626472
+        }
+      },
+      "walkers_both_site_and_bulk": 9
     }
   ]
 }

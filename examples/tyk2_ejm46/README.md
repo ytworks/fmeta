@@ -31,8 +31,9 @@ departures. No pocket return was observed in the structures recorded every 100 p
 Candidate D gave each of the 32 walkers its own bias. Its primary reweighted ΔG° was finite
 in 29 of 32 histories at 20 ns. Their mean was **−13.15 kcal/mol**. Three histories had no bulk
 observations, so the mean over all 32 histories is unavailable. A separate pilot (E) uses a
-single bias shared by all 32 walkers. Its primary ΔG° at 5, 10 and 15 ns was **−27.31,
-−24.67 and −21.81 kcal/mol**, respectively. [Matched reweighted binding free energies](../../docs/plans/2026-11-18-paper-binding.md)
+single bias shared by all 32 walkers. Its primary ΔG° at 5, 10, 15 and 20 ns was **−27.31,
+−24.67, −21.81 and −20.48 kcal/mol**, respectively. At 20 ns the absolute difference from
+the 300 K reference was 9.06 kcal/mol. [Matched reweighted binding free energies](../../docs/plans/2026-11-18-paper-binding.md)
 
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at
