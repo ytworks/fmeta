@@ -14,9 +14,11 @@ from fmeta.engine.runner import load_run_metadata
 CELL_NM = np.array([0.025, 0.030])  # Fixed, zero-origin grid of the published TYK2 C/D comparison.
 
 
-def coverage(root, regions, cut_ns, discard_ns=2.):
+def coverage(root, regions, cut_ns, discard_ns=2., observation_ps=None):
     if not 0 <= discard_ns < cut_ns or not np.isfinite(cut_ns):
         raise ValueError("the cutoff must be finite and later than the discard")
+    if observation_ps is not None and not (np.isfinite(observation_ps) and observation_ps > 0):
+        raise ValueError("the common observation period must be finite and positive")
     hashes = identity(root)
     if any(regions.get(key) != value for key, value in hashes.items()):
         raise ValueError("the frozen regions belong to a different prepared system")
@@ -33,6 +35,7 @@ def coverage(root, regions, cut_ns, discard_ns=2.):
     seen = {name: np.zeros((len(paths), np.prod(shape)), dtype=bool) for name in zones}
     totals = {name: [] for name in zones}
     histories = []
+    native_strides = {}
     outside = 0
     for i, path in enumerate(paths):
         meta = load_run_metadata(path)
@@ -43,12 +46,21 @@ def coverage(root, regions, cut_ns, discard_ns=2.):
         start, end = 1000 * discard_ns, 1000 * cut_ns
         keep = (t > start) & (t <= end + 1.e-6)
         stride = (meta["settings"].get("colvar_stride") or meta["bias"]["pace"]) * meta["timestep_ps"]
-        expected = stride * np.arange(int(np.floor(start / stride)) + 1, int(np.floor((end + 1.e-6) / stride)) + 1)
+        native_strides[str(path.relative_to(root))] = stride
+        cycles = np.arange(int(np.floor(start / stride)) + 1, int(np.floor((end + 1.e-6) / stride)) + 1)
+        expected = stride * cycles
         if not expected.size or t[keep].size != expected.size or not np.allclose(t[keep], expected, rtol=0, atol=1.e-6):
             raise ValueError(f"{path} lacks the full recording window {discard_ns:g}–{cut_ns:g} ns")
         samples = np.column_stack([data[k][keep] for k in ("s", "rho")])
         if not np.isfinite(samples).all():
             raise ValueError(f"{path} has nonfinite CV samples")
+        if observation_ps is not None:
+            multiple = int(round(observation_ps / stride))
+            if multiple < 1 or not np.isclose(multiple * stride, observation_ps, rtol=0, atol=1.e-8):
+                raise ValueError(f"{path}: the common period must be an integer multiple of the recorded period")
+            samples = samples[cycles % multiple == 0]
+            if not len(samples):
+                raise ValueError("no observations on the requested time grid in this window")
         inside = np.all((samples >= lower) & (samples <= upper), axis=1)
         outside += int((~inside).sum())
         indices = np.clip(np.floor(samples[inside] / CELL_NM).astype(int) - first, 0, shape - 1)
@@ -77,6 +89,7 @@ def coverage(root, regions, cut_ns, discard_ns=2.):
                             median_history_cells=float(np.median(by_history.sum(axis=1))),
                             median_history_area_nm2=float(np.median(by_history @ area)))
     return dict(cut_ns=cut_ns, discard_ns=discard_ns, base_seed=run.seed, prepared_hashes=hashes,
+                native_periods_ps_by_walker=native_strides, common_observation_period_ps=observation_ps,
                 physical_walkers=len(paths), independent_bias_histories=len(history_names),
                 records_outside_native_rectangle=outside, grid_origin_nm=[0., 0.], cell_size_nm=CELL_NM.tolist(),
                 native_grid_domain_nm=[lower[0], upper[0], lower[1], upper[1]], site_nm=regions["site"],
@@ -90,9 +103,11 @@ def main():
     parser.add_argument("--regions", type=Path, required=True)
     parser.add_argument("--length-ns", type=float, required=True)
     parser.add_argument("--discard-ns", type=float, default=2.)
+    parser.add_argument("--observation-ps", type=float, help="retain only multiples of this period from time zero")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    report = coverage(args.workdir, json.loads(args.regions.read_text()), args.length_ns, args.discard_ns)
+    report = coverage(args.workdir, json.loads(args.regions.read_text()), args.length_ns,
+                      args.discard_ns, args.observation_ps)
     args.output.write_text(json.dumps(report, allow_nan=False, indent=2) + "\n")
 
 
