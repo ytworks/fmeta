@@ -3,7 +3,6 @@
   "arm": "d",
   "protein": "4gih.pdb",
   "ligand": "ejm_46.sdf",
-  "analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
   "production_engine_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
   "production_src_fmeta_tree": "db75005c9dabba6877fbcd462d26b8aee1100d33",
   "source": "Actual per-replica immutable prefixes of the same 32 independent trajectories, which continued from the measured 20 ns baseline. The statistics at successive cutoffs share trajectories.",
@@ -764,7 +763,31 @@
           "pocket_returns": 0,
           "verified_bulk_frames": 4
         }
-      ]
+      ],
+      "analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+      "source_provenance": {
+        "production_segment_end_ns": 40,
+        "production_wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+        "production_wrapper_dirty": false,
+        "snapshot": "Immutable exact checkpoint and synchronized output prefix for each of the original 32 independent walkers.",
+        "base_seed": 19511801,
+        "primary_analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "primary_analysis_entry_point": "fmeta analyze --paper-regions",
+        "coverage_and_structure_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_entry_point": "scripts/export_binding_checkpoint_scan.py",
+        "baseline_20_primary_analysis_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90"
+      },
+      "primary_observation_grid": {
+        "native_colvar_ps": 2,
+        "fitted_absolute_observation_ps": 2,
+        "samples_per_replica": 11500,
+        "observed_sample_fraction_of_full_post_discard_grid": 1.0,
+        "slice_width_ps": 250,
+        "occupied_bias_states_per_replica": 92,
+        "observed_state_fraction_of_full_250ps_grid": 1.0,
+        "bias_history": "All deposited native hills retained. For D, native sampling and the 2 ps matched observation grid coincide."
+      }
     },
     {
       "cut_ns": 30.0,
@@ -1590,7 +1613,31 @@
           "pocket_returns": 0,
           "verified_bulk_frames": 12
         }
-      ]
+      ],
+      "analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+      "source_provenance": {
+        "production_segment_end_ns": 40,
+        "production_wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+        "production_wrapper_dirty": false,
+        "snapshot": "Immutable exact checkpoint and synchronized output prefix for each of the original 32 independent walkers.",
+        "base_seed": 19511801,
+        "primary_analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "primary_analysis_entry_point": "fmeta analyze --paper-regions",
+        "coverage_and_structure_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_entry_point": "scripts/export_binding_checkpoint_scan.py",
+        "baseline_20_primary_analysis_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90"
+      },
+      "primary_observation_grid": {
+        "native_colvar_ps": 2,
+        "fitted_absolute_observation_ps": 2,
+        "samples_per_replica": 14000,
+        "observed_sample_fraction_of_full_post_discard_grid": 1.0,
+        "slice_width_ps": 250,
+        "occupied_bias_states_per_replica": 112,
+        "observed_state_fraction_of_full_250ps_grid": 1.0,
+        "bias_history": "All deposited native hills retained. For D, native sampling and the 2 ps matched observation grid coincide."
+      }
     },
     {
       "cut_ns": 35.0,
@@ -2418,7 +2465,31 @@
           "pocket_returns": 0,
           "verified_bulk_frames": 12
         }
-      ]
+      ],
+      "analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+      "source_provenance": {
+        "production_segment_end_ns": 40,
+        "production_wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+        "production_wrapper_dirty": false,
+        "snapshot": "Immutable exact checkpoint and synchronized output prefix for each of the original 32 independent walkers.",
+        "base_seed": 19511801,
+        "primary_analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "primary_analysis_entry_point": "fmeta analyze --paper-regions",
+        "coverage_and_structure_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_entry_point": "scripts/export_binding_checkpoint_scan.py",
+        "baseline_20_primary_analysis_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90"
+      },
+      "primary_observation_grid": {
+        "native_colvar_ps": 2,
+        "fitted_absolute_observation_ps": 2,
+        "samples_per_replica": 16500,
+        "observed_sample_fraction_of_full_post_discard_grid": 1.0,
+        "slice_width_ps": 250,
+        "occupied_bias_states_per_replica": 132,
+        "observed_state_fraction_of_full_250ps_grid": 1.0,
+        "bias_history": "All deposited native hills retained. For D, native sampling and the 2 ps matched observation grid coincide."
+      }
     },
     {
       "cut_ns": 40.0,
@@ -3246,7 +3317,31 @@
           "pocket_returns": 0,
           "verified_bulk_frames": 12
         }
-      ]
+      ],
+      "analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+      "source_provenance": {
+        "production_segment_end_ns": 40,
+        "production_wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+        "production_wrapper_dirty": false,
+        "snapshot": "Immutable exact checkpoint and synchronized output prefix for each of the original 32 independent walkers.",
+        "base_seed": 19511801,
+        "primary_analysis_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "primary_analysis_entry_point": "fmeta analyze --paper-regions",
+        "coverage_and_structure_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_commit": "98fbeabcb75f06ddcb0f005a8efb150494bc1acf",
+        "exporter_entry_point": "scripts/export_binding_checkpoint_scan.py",
+        "baseline_20_primary_analysis_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90"
+      },
+      "primary_observation_grid": {
+        "native_colvar_ps": 2,
+        "fitted_absolute_observation_ps": 2,
+        "samples_per_replica": 19000,
+        "observed_sample_fraction_of_full_post_discard_grid": 1.0,
+        "slice_width_ps": 250,
+        "occupied_bias_states_per_replica": 152,
+        "observed_state_fraction_of_full_250ps_grid": 1.0,
+        "bias_history": "All deposited native hills retained. For D, native sampling and the 2 ps matched observation grid coincide."
+      }
     }
   ]
 }
