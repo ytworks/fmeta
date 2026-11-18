@@ -309,7 +309,7 @@ TYK2で32本が各自のバイアスを積むDを優先する。20 nsで単一�
 
 ¹ 面積はnm²、各軌跡では32本の中央値。ΔG°、参照との差、変化量、SDの単位はkcal/mol。20・25 nsで有限なのは同じ29群で、rep16・17・24は両時点ともバルク観測0件。25 nsの29群の平均変化は +1.30 kcal/mol。構造上の復帰は異なる3本で各1回。各群の (2, 25] nsの11,500観測を250 psの92区間で再重み付けした。[延長各時点の全群の値・重み・空間探索](../../examples/binding-study/results/d-tyk2-checkpoint-scan.json)
 
-25 nsの保存点で生のHILLSとCOLVARから独立実装が得た有限29群の平均は −11.850955 kcal/mol。群ごとの差の最大は 5.98 × 10⁻⁸ kcal/mol、残る3群のバルク観測0件も一致した。[Dの延長軌跡の独立検算](../../examples/binding-study/results/tyk2-d-extension-independent-replay.json)
+生のHILLSとCOLVARから独立実装で計算した有限群平均は、25 nsで −11.850955 kcal/mol（29群）、40 nsで −10.154040 kcal/mol（30群）だった。各群のΔG°が主実装と異なる量の最大はそれぞれ 5.98 × 10⁻⁸ と 5.36 × 10⁻⁸ kcal/mol。バルク観測0件の群も各時点で一致した。[Dの延長軌跡の独立検算](../../examples/binding-study/results/tyk2-d-extension-independent-replay.json)
 
 30 nsでrep17が初めて有限になり、主推定は −19.70 kcal/mol、バルク411点。rep16・24のバルクは0点。25 nsの有限29群を固定した平均変化は +0.79 kcal/mol。30 nsの平均は参照から0.07 kcal/molだが、群間SDは5.10 kcal/molある。この時点を短時間候補として、35 ns以降の同じ群の変化・復帰を追う。
 

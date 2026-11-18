@@ -227,6 +227,221 @@
           "difference_kcal_mol": 2.7030985449982836e-08
         }
       ]
+    },
+    {
+      "cut_ns": 40,
+      "expected_report_sha256": "4250ce23bb2545413591a802f2879cb08ee2ba2fa6690a1176c6e24ba8c57933",
+      "n_independent": 32,
+      "n_finite": 30,
+      "unavailable_ids": [
+        16,
+        24
+      ],
+      "samples_per_replica": 19000,
+      "states_per_replica": 152,
+      "all_replica_independent_mean_kcal_mol": null,
+      "finite_subset_independent_mean_kcal_mol": -10.15404044760721,
+      "max_abs_binding_difference_kcal_mol": 5.355608934110023e-08,
+      "max_abs_physical_wall_regularization_shift_kcal_mol": 1.4093908159651392e-05,
+      "max_abs_logged_bias_error_kj_mol": 0.0002007951302438471,
+      "total_logged_bias_probes": 128,
+      "max_fixed_point_residual": 9.732836758757912e-11,
+      "unknown_sync_samples": 0,
+      "postcut_sync_samples": 0,
+      "replicas": [
+        {
+          "replica": 0,
+          "reported_kcal_mol": -14.37037318312284,
+          "independent_kcal_mol": -14.370373154656436,
+          "difference_kcal_mol": 2.8466404344840157e-08
+        },
+        {
+          "replica": 1,
+          "reported_kcal_mol": -11.816299144679434,
+          "independent_kcal_mol": -11.81629911729928,
+          "difference_kcal_mol": 2.7380153255762707e-08
+        },
+        {
+          "replica": 2,
+          "reported_kcal_mol": -3.283710216860591,
+          "independent_kcal_mol": -3.283710173262199,
+          "difference_kcal_mol": 4.359839200773763e-08
+        },
+        {
+          "replica": 3,
+          "reported_kcal_mol": -13.603714520181429,
+          "independent_kcal_mol": -13.603714493045729,
+          "difference_kcal_mol": 2.713569990930864e-08
+        },
+        {
+          "replica": 4,
+          "reported_kcal_mol": -11.411512190025688,
+          "independent_kcal_mol": -11.41151216021683,
+          "difference_kcal_mol": 2.9808857604507466e-08
+        },
+        {
+          "replica": 5,
+          "reported_kcal_mol": -13.924371982921471,
+          "independent_kcal_mol": -13.924371957539426,
+          "difference_kcal_mol": 2.5382044910315926e-08
+        },
+        {
+          "replica": 6,
+          "reported_kcal_mol": -11.392062301942047,
+          "independent_kcal_mol": -11.392062275724047,
+          "difference_kcal_mol": 2.6218000215294524e-08
+        },
+        {
+          "replica": 7,
+          "reported_kcal_mol": -3.664910243990024,
+          "independent_kcal_mol": -3.6649102201830352,
+          "difference_kcal_mol": 2.38069888247594e-08
+        },
+        {
+          "replica": 8,
+          "reported_kcal_mol": -12.20221066061541,
+          "independent_kcal_mol": -12.2022106310562,
+          "difference_kcal_mol": 2.9559210190654994e-08
+        },
+        {
+          "replica": 9,
+          "reported_kcal_mol": -8.28755887281663,
+          "independent_kcal_mol": -8.287558840448966,
+          "difference_kcal_mol": 3.236766410452674e-08
+        },
+        {
+          "replica": 10,
+          "reported_kcal_mol": -7.212028279660734,
+          "independent_kcal_mol": -7.212028282790797,
+          "difference_kcal_mol": -3.13006331964516e-09
+        },
+        {
+          "replica": 11,
+          "reported_kcal_mol": -14.70270358043052,
+          "independent_kcal_mol": -14.70270356087789,
+          "difference_kcal_mol": 1.9552629737518146e-08
+        },
+        {
+          "replica": 12,
+          "reported_kcal_mol": -14.13637764665646,
+          "independent_kcal_mol": -14.13637761737327,
+          "difference_kcal_mol": 2.9283189206807947e-08
+        },
+        {
+          "replica": 13,
+          "reported_kcal_mol": -5.436723513992633,
+          "independent_kcal_mol": -5.436723475538378,
+          "difference_kcal_mol": 3.845425489146237e-08
+        },
+        {
+          "replica": 14,
+          "reported_kcal_mol": -6.309241966823009,
+          "independent_kcal_mol": -6.30924195398312,
+          "difference_kcal_mol": 1.2839889151905481e-08
+        },
+        {
+          "replica": 15,
+          "reported_kcal_mol": -9.979972405768974,
+          "independent_kcal_mol": -9.979972373180283,
+          "difference_kcal_mol": 3.2588690856982794e-08
+        },
+        {
+          "replica": 16,
+          "reported_kcal_mol": null,
+          "independent_kcal_mol": null,
+          "difference_kcal_mol": null
+        },
+        {
+          "replica": 17,
+          "reported_kcal_mol": -17.26184499922052,
+          "independent_kcal_mol": -17.261844980341966,
+          "difference_kcal_mol": 1.8878555607670933e-08
+        },
+        {
+          "replica": 18,
+          "reported_kcal_mol": -9.106775198527027,
+          "independent_kcal_mol": -9.106775170185724,
+          "difference_kcal_mol": 2.8341302638068555e-08
+        },
+        {
+          "replica": 19,
+          "reported_kcal_mol": -5.507496729302478,
+          "independent_kcal_mol": -5.507496700137524,
+          "difference_kcal_mol": 2.9164954007399047e-08
+        },
+        {
+          "replica": 20,
+          "reported_kcal_mol": -12.44827467243405,
+          "independent_kcal_mol": -12.44827461887796,
+          "difference_kcal_mol": 5.355608934110023e-08
+        },
+        {
+          "replica": 21,
+          "reported_kcal_mol": -8.593838872790997,
+          "independent_kcal_mol": -8.593838841065544,
+          "difference_kcal_mol": 3.172545248730785e-08
+        },
+        {
+          "replica": 22,
+          "reported_kcal_mol": -8.679244600062804,
+          "independent_kcal_mol": -8.679244575284903,
+          "difference_kcal_mol": 2.4777900620165383e-08
+        },
+        {
+          "replica": 23,
+          "reported_kcal_mol": -9.923347965632788,
+          "independent_kcal_mol": -9.923347936768225,
+          "difference_kcal_mol": 2.8864562295893847e-08
+        },
+        {
+          "replica": 24,
+          "reported_kcal_mol": null,
+          "independent_kcal_mol": null,
+          "difference_kcal_mol": null
+        },
+        {
+          "replica": 25,
+          "reported_kcal_mol": -20.242239819848475,
+          "independent_kcal_mol": -20.24223979038336,
+          "difference_kcal_mol": 2.9465116568871963e-08
+        },
+        {
+          "replica": 26,
+          "reported_kcal_mol": -9.516893924244647,
+          "independent_kcal_mol": -9.516893903656165,
+          "difference_kcal_mol": 2.0588482030348132e-08
+        },
+        {
+          "replica": 27,
+          "reported_kcal_mol": 3.392280453037719,
+          "independent_kcal_mol": 3.3922804818397516,
+          "difference_kcal_mol": 2.880203275879012e-08
+        },
+        {
+          "replica": 28,
+          "reported_kcal_mol": -11.425635662700646,
+          "independent_kcal_mol": -11.425635633329724,
+          "difference_kcal_mol": 2.9370921694749086e-08
+        },
+        {
+          "replica": 29,
+          "reported_kcal_mol": -4.339921897401537,
+          "independent_kcal_mol": -4.339921859506003,
+          "difference_kcal_mol": 3.789553471023055e-08
+        },
+        {
+          "replica": 30,
+          "reported_kcal_mol": -15.061779221880384,
+          "independent_kcal_mol": -15.061779185458148,
+          "difference_kcal_mol": 3.642223589395144e-08
+        },
+        {
+          "replica": 31,
+          "reported_kcal_mol": -14.172430458611036,
+          "independent_kcal_mol": -14.172430427884949,
+          "difference_kcal_mol": 3.072608656395914e-08
+        }
+      ]
     }
   ],
   "base_seed": 19511801,
