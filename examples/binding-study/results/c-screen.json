@@ -1,0 +1,311 @@
+{
+  "arm": "c",
+  "energy_unit": "kJ/mol",
+  "length_unit": "ns/walker",
+  "production_source": {
+    "tracked_source_base_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+    "tracked_src_fmeta_tree": "db75005c9dabba6877fbcd462d26b8aee1100d33",
+    "wrapper_segments": {
+      "tyk2": [
+        {
+          "end_ns": 20,
+          "wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+          "wrapper_dirty": false
+        }
+      ]
+    }
+  },
+  "analysis_commit": "d04d61371f89dc1f33d69ded512c1bb7b116f7fe",
+  "frozen_inputs": {
+    "tyk2": {
+      "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+      "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+      "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+      "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+      "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+    }
+  },
+  "endpoints": [
+    {
+      "length_ns": 20,
+      "purpose": "screening",
+      "passes": null,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -16.975882100258993,
+            "signed_error_predicted_minus_reference": -5.55662155762831,
+            "ci95_independent_replicas": [
+              -19.128385824100384,
+              -14.823378376417597
+            ],
+            "ci95_halfwidth": 2.1525037238413933,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -16.953624567927466,
+            "accumulated_wt_mean": -16.68595058180146
+          },
+          "base_seed": 19311801,
+          "status": "available",
+          "dG": -71.02709070748362,
+          "ci95": [
+            -80.03316628803601,
+            -62.02101512693123
+          ],
+          "dG_core": -70.93396519220852,
+          "ci95_core": [
+            -80.03723322674966,
+            -61.83069715766737
+          ],
+          "dG_bias": -69.8140172342573,
+          "ci95_bias": [
+            -78.39673806566944,
+            -61.231296402845174
+          ],
+          "affinity_fold_error": 11166.44279289334,
+          "passes": false,
+          "structure": {
+            "returns_by_replica": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "departures": 19,
+            "counts": {
+              "site_frames": 4229,
+              "site_contact_frames": 4229,
+              "bulk_frames": 211,
+              "bulk_clear_frames": 207,
+              "bulk_core_frames": 139,
+              "bulk_core_clear_frames": 136,
+              "site_contact_wall_above_kT_frames": 124,
+              "bound_contact_wall_above_kT_frames": 31
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "dG": -62.61651385014077,
+              "dG_core": -62.526335265521524,
+              "dG_bias": -60.72926660244301,
+              "bulk_pmf_sd": 0.3024116737691793,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 14507,
+                  "ess": 803.3657178514558
+                },
+                "bulk": {
+                  "count": 2114,
+                  "ess": 1482.5187545447222
+                },
+                "core": {
+                  "count": 1223,
+                  "ess": 932.9808931642674
+                }
+              },
+              "weighted_site_above_1kT": 9.645947477105339e-14,
+              "weighted_site_contact_above_1kT": 3.243004420440817e-14,
+              "weighted_bound_contact_above_1kT": 0.0
+            },
+            {
+              "replica": 1,
+              "dG": -92.02396937199963,
+              "dG_core": -92.3790730608276,
+              "dG_bias": -91.82820163946242,
+              "bulk_pmf_sd": 1.312138036244252,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 29773,
+                  "ess": 1804.0302056479059
+                },
+                "bulk": {
+                  "count": 444,
+                  "ess": 267.6167864490679
+                },
+                "core": {
+                  "count": 269,
+                  "ess": 169.4796390742185
+                }
+              },
+              "weighted_site_above_1kT": 5.339444479677999e-16,
+              "weighted_site_contact_above_1kT": 5.224416171120458e-16,
+              "weighted_bound_contact_above_1kT": 0.0
+            },
+            {
+              "replica": 2,
+              "dG": -63.23275442062767,
+              "dG_core": -62.81858887975673,
+              "dG_bias": -65.18860885741182,
+              "bulk_pmf_sd": 0.7345404378285494,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 23679,
+                  "ess": 498.90167125576374
+                },
+                "bulk": {
+                  "count": 1096,
+                  "ess": 850.5326718592376
+                },
+                "core": {
+                  "count": 661,
+                  "ess": 553.6716549092348
+                }
+              },
+              "weighted_site_above_1kT": 7.821580894122736e-12,
+              "weighted_site_contact_above_1kT": 7.070549745727926e-12,
+              "weighted_bound_contact_above_1kT": 6.202445144270198e-14
+            },
+            {
+              "replica": 3,
+              "dG": -77.496575731826,
+              "dG_core": -77.14542519254437,
+              "dG_bias": -72.4853293672291,
+              "bulk_pmf_sd": 0.40132799404747754,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 20569,
+                  "ess": 1416.8642661365254
+                },
+                "bulk": {
+                  "count": 1634,
+                  "ess": 1425.5438095783702
+                },
+                "core": {
+                  "count": 942,
+                  "ess": 864.188873206742
+                }
+              },
+              "weighted_site_above_1kT": 5.622646943579338e-15,
+              "weighted_site_contact_above_1kT": 8.043268487425292e-15,
+              "weighted_bound_contact_above_1kT": 0.0
+            },
+            {
+              "replica": 4,
+              "dG": -66.1461175783878,
+              "dG_core": -66.06408251894098,
+              "dG_bias": -65.58132716369133,
+              "bulk_pmf_sd": 2.1949048316746613,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 21205,
+                  "ess": 1327.700694711631
+                },
+                "bulk": {
+                  "count": 1733,
+                  "ess": 840.5458096970028
+                },
+                "core": {
+                  "count": 1017,
+                  "ess": 597.8658477735784
+                }
+              },
+              "weighted_site_above_1kT": 5.702966430323234e-15,
+              "weighted_site_contact_above_1kT": 4.232686468175148e-15,
+              "weighted_bound_contact_above_1kT": 0.0
+            },
+            {
+              "replica": 5,
+              "dG": -74.9107753467208,
+              "dG_core": -74.88021755004286,
+              "dG_bias": -73.1791001282727,
+              "bulk_pmf_sd": 2.514603108659692,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 22443,
+                  "ess": 799.2941639896532
+                },
+                "bulk": {
+                  "count": 1189,
+                  "ess": 481.9491038548817
+                },
+                "core": {
+                  "count": 697,
+                  "ess": 312.4399328365395
+                }
+              },
+              "weighted_site_above_1kT": 4.837249307794447e-11,
+              "weighted_site_contact_above_1kT": 4.089650132216749e-11,
+              "weighted_bound_contact_above_1kT": 4.03581851579762e-11
+            },
+            {
+              "replica": 6,
+              "dG": -58.5964311081377,
+              "dG_core": -58.63421294657862,
+              "dG_bias": -59.20372448104615,
+              "bulk_pmf_sd": 1.0536742647808028,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 21261,
+                  "ess": 414.625258842683
+                },
+                "bulk": {
+                  "count": 1396,
+                  "ess": 792.252469867544
+                },
+                "core": {
+                  "count": 820,
+                  "ess": 559.9318814192155
+                }
+              },
+              "weighted_site_above_1kT": 3.1191624399553426e-13,
+              "weighted_site_contact_above_1kT": 1.006977836464892e-13,
+              "weighted_bound_contact_above_1kT": 1.6288052398796687e-13
+            },
+            {
+              "replica": 7,
+              "dG": -73.19358825202863,
+              "dG_core": -73.02378612345541,
+              "dG_bias": -70.31657963450199,
+              "bulk_pmf_sd": 0.353026154148432,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 26263,
+                  "ess": 1384.9985321621311
+                },
+                "bulk": {
+                  "count": 899,
+                  "ess": 764.7015230636667
+                },
+                "core": {
+                  "count": 509,
+                  "ess": 461.74336461605407
+                }
+              },
+              "weighted_site_above_1kT": 3.2752971250686927e-15,
+              "weighted_site_contact_above_1kT": 1.3618735330499555e-15,
+              "weighted_bound_contact_above_1kT": 7.299345483874481e-17
+            }
+          ]
+        }
+      },
+      "pending_systems": [
+        "a2a"
+      ]
+    }
+  ]
+}

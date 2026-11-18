@@ -23,6 +23,11 @@ at 20 ns per walker gave **−12.23 kcal/mol**, with a 95% interval of −17.09 
 The signed error was −0.81 kcal/mol and the interval half-width was 4.86 kcal/mol.
 One walker returned to the pocket after a confirmed bulk visit. [Candidate B measurements](../binding-study/results/b-screen.json)
 
+Candidate C used the same eight groups and the Gaussian widths and deposition interval
+from Evans et al. At 20 ns per walker it gave **−16.98 kcal/mol** (95% interval −19.13 to
+−14.82), 5.56 kcal/mol below the experimental reference. The 32 walkers made 19 confirmed
+departures. No pocket return was observed in the structures recorded every 100 ps. [Candidate C measurements](../binding-study/results/c-screen.json)
+
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at
 the two ends only, so the chain has no break. The mutations are kept as they are in the entry.
