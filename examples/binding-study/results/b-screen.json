@@ -111,10 +111,13 @@
           "replicas": [
             {
               "replica": 0,
+              "status": "available",
               "dG": -76.77832766782802,
               "dG_core": -77.06267708543608,
               "dG_bias": -66.06058414399318,
               "bulk_pmf_sd": 0.40848349047771243,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -137,10 +140,13 @@
             },
             {
               "replica": 1,
+              "status": "available",
               "dG": -54.400636708658546,
               "dG_core": -54.61504878522691,
               "dG_bias": -54.02274807530646,
               "bulk_pmf_sd": 0.8737665302099675,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -163,10 +169,13 @@
             },
             {
               "replica": 2,
+              "status": "available",
               "dG": -71.67626487442067,
               "dG_core": -71.62555165783323,
               "dG_bias": -70.77070961843758,
               "bulk_pmf_sd": 1.0739022101595015,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -189,10 +198,13 @@
             },
             {
               "replica": 3,
+              "status": "available",
               "dG": -53.75261612650265,
               "dG_core": -53.762614651901686,
               "dG_bias": -52.87694720163364,
               "bulk_pmf_sd": 0.9932875347258883,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -215,10 +227,13 @@
             },
             {
               "replica": 4,
+              "status": "available",
               "dG": -5.617976397157905,
               "dG_core": -5.606837884778333,
               "dG_bias": -17.386902358104848,
               "bulk_pmf_sd": 0.757083631584631,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -241,10 +256,13 @@
             },
             {
               "replica": 5,
+              "status": "available",
               "dG": -33.82543804890629,
               "dG_core": -33.50645545355417,
               "dG_bias": -28.878885849565926,
               "bulk_pmf_sd": 1.500923172585067,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -267,10 +285,13 @@
             },
             {
               "replica": 6,
+              "status": "available",
               "dG": -74.05515159129685,
               "dG_core": -74.06387061437695,
               "dG_bias": -71.5794559523739,
               "bulk_pmf_sd": 0.41087061698185484,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -293,10 +314,13 @@
             },
             {
               "replica": 7,
+              "status": "available",
               "dG": -39.25135863519393,
               "dG_core": -39.24111041668185,
               "dG_bias": -35.21142491404992,
               "bulk_pmf_sd": 0.43450290220843446,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -384,10 +408,13 @@
           "replicas": [
             {
               "replica": 0,
+              "status": "available",
               "dG": -15.928118384618093,
               "dG_core": -15.477686805157227,
               "dG_bias": -17.81710638087979,
               "bulk_pmf_sd": 0.8485664734357035,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -410,10 +437,13 @@
             },
             {
               "replica": 1,
+              "status": "available",
               "dG": -35.17473359235479,
               "dG_core": -34.92821239953759,
               "dG_bias": -26.145834372438742,
               "bulk_pmf_sd": 0.9032262219887934,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -436,10 +466,13 @@
             },
             {
               "replica": 2,
+              "status": "available",
               "dG": -16.77920990857559,
               "dG_core": -16.460343640657676,
               "dG_bias": -17.035182752856812,
               "bulk_pmf_sd": 0.9117598902328862,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -462,10 +495,13 @@
             },
             {
               "replica": 3,
+              "status": "available",
               "dG": -7.391748865487611,
               "dG_core": -7.4154286222547645,
               "dG_bias": -4.5547573099301335,
               "bulk_pmf_sd": 1.2589143558535412,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -488,10 +524,13 @@
             },
             {
               "replica": 4,
+              "status": "available",
               "dG": -19.583289513425523,
               "dG_core": -19.109934818984666,
               "dG_bias": -18.77657050824009,
               "bulk_pmf_sd": 0.5749125567543741,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -514,10 +553,13 @@
             },
             {
               "replica": 5,
+              "status": "available",
               "dG": -15.108938981491995,
               "dG_core": -14.983546868957417,
               "dG_bias": -16.055885947827996,
               "bulk_pmf_sd": 0.4654597785984359,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -540,10 +582,13 @@
             },
             {
               "replica": 6,
+              "status": "available",
               "dG": -26.161634047954628,
               "dG_core": -25.988346364306434,
               "dG_bias": -30.596202558926695,
               "bulk_pmf_sd": 0.3588308001503906,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {
@@ -566,10 +611,13 @@
             },
             {
               "replica": 7,
+              "status": "available",
               "dG": -38.531062081705834,
               "dG_core": -38.44952354056663,
               "dG_bias": -32.84520807478562,
               "bulk_pmf_sd": 0.5465353521890038,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
               "mbar_samples": 36000,
               "mbar_states": 288,
               "support": {

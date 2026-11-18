@@ -35,6 +35,19 @@ def test_precision_gate_ignores_reference_affinity(monkeypatch):
         assert not precision_passes({"checks": {**checks, name: False}})
 
 
+def test_export_preserves_replica_status_and_observed_bulk_bins(monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    export = import_module("export_binding_results")
+    incomplete = dict(status="unavailable", dG=-10., dG_core=-11., dG_bias=-12., unbound_roughness=None,
+                      support=None, weighted_site_wall=None)
+    energy = dict(protocol={"bias": {"temperature": 300}, "replicas": 2}, status="unavailable", n_replicas=2,
+                  replicas=[{**incomplete, "bulk_bins": 10, "sampled_bulk_bins": 8}, {**incomplete, "dG": None}],
+                  dG=None, dG_core=None, dG_bias=-12., ci95=None, ci95_core=None, ci95_bias=None, base_seed=7)
+    rows = export.measurements("tyk2", energy)["replicas"]
+    assert [(r["status"], r["dG"], r["bulk_bins"], r["sampled_bulk_bins"]) for r in rows] == [
+        ("unavailable", -10., 10, 8), ("unavailable", None, None, None)]
+
+
 def test_repeated_provisional_cli_sorts_same_system_endpoints(monkeypatch, capsys):
     monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
     export = import_module("export_binding_results")

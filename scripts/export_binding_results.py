@@ -79,8 +79,9 @@ def measurements(name, energy, score=None):
         contact = score["replicas"][i]["weighted_contact_wall"] if score else None
         site_wall = replica["weighted_site_wall"]
         rows.append(dict(
-            replica=i, dG=replica["dG"], dG_core=replica["dG_core"], dG_bias=replica["dG_bias"],
-            bulk_pmf_sd=replica["unbound_roughness"],
+            replica=i, status=replica["status"], dG=replica["dG"], dG_core=replica["dG_core"],
+            dG_bias=replica["dG_bias"], bulk_pmf_sd=replica["unbound_roughness"],
+            bulk_bins=replica.get("bulk_bins"), sampled_bulk_bins=replica.get("sampled_bulk_bins"),
             mbar_samples=replica.get("n_mbar_samples"), mbar_states=replica.get("n_mbar_states"),
             support={k: {q: support[k][q] for q in ("count", "ess")} for k in ("site", "bulk", "core")}
             if support else None,
