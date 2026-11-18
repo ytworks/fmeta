@@ -96,8 +96,9 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     The owner selected D for further TYK2 testing through 100 ns. TYK2 C gave a primary ΔG° of −16.99 kcal/mol (8/8 groups);
     D gave −13.15 kcal/mol over the finite 29/32 histories. The TYK2 single-bias trial (E, seed 19711801)
     completed 20 ns per walker. The primary reweighted ΔG° was −20.48 kcal/mol (absolute error 9.06).
-    D reached 40 ns. At 25/30/35/40 ns its finite-subset means were −11.85/−11.35/−10.68/−10.15 kcal/mol
-    (29/30/30/30 of 32), with 3/7/12/14 structural pocket returns. All 32 continued from their D checkpoints.
+    At 60 ns D gave −8.42 kcal/mol (31/32, SD 4.44), with 17 structural pocket returns and one history
+    without a bulk visit. The owner paused the 100 ns extension. All 32 readable on-disk checkpoints span
+    61.50–65.00 ns. The 1 ps hill-period comparison is prepared, and neither it nor A2A D has begun MD.
     At 250 ps per bias slice and with every sample, E gave −20.45 kcal/mol. E covered the most total
     CV area (2.279 nm²), D the most per walker (median 1.332 nm²) and the most walkers visiting both
     regions (29/32). E recorded ten departures and no pocket returns. A2A has no measurement of E.
