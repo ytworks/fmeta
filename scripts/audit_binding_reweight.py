@@ -20,6 +20,9 @@ from scipy.interpolate import CubicSpline
 from scipy.optimize import root
 from scipy.special import expit, logsumexp
 
+DEFAULT_MAX_SLICES = 300
+DEFAULT_MAX_SAMPLES = 40000
+
 
 def histories(paths):
     hills, checksums = [], []
@@ -163,7 +166,10 @@ def binding(s, weights, regions, funnel, kt, eps):
     return float(-kt * (log_volume - np.log(1.e24 / Avogadro)) / 4.184)
 
 
-def audit_replica(paths, regions, cut, discard, expected):
+def audit_replica(paths, regions, cut, discard, expected, *,
+                  max_slices=DEFAULT_MAX_SLICES, max_samples=DEFAULT_MAX_SAMPLES):
+    if min(max_slices, max_samples) < 1:
+        raise ValueError('slice and sample caps must be positive')
     hills, crc = histories(paths)
     metas = [yaml.safe_load((p / 'run.yaml').read_text()) for p in paths]
     meta = metas[0]
@@ -175,7 +181,7 @@ def audit_replica(paths, regions, cut, discard, expected):
                 and np.allclose(h[:, 6], m['bias']['bias_factor']) and h[-1, 0] >= cut*1000):
             raise ValueError('HILLS geometry, tempering factor or endpoint differs')
     prefixes, probes, probe_cv, selected = [], [], [], []
-    n_slices = max(1, min(int(np.ceil(4*(cut-discard))), 300//len(paths)))
+    n_slices = max(1, min(int(np.ceil(4*(cut-discard))), max_slices//len(paths)))
     edges = np.linspace(1000*discard, 1000*cut, n_slices+1)
     mids = (edges[:-1] + edges[1:]) / 2
     unknown = postcut = 0
@@ -199,8 +205,11 @@ def audit_replica(paths, regions, cut, discard, expected):
         probes.extend(actual[at])
         probe_cv.extend(rows[at, 1:4])
     samples = np.concatenate(selected)
-    samples = samples[::int(np.ceil(len(samples)/40000))]
+    samples = samples[::int(np.ceil(len(samples)/max_samples))]
     occupied, counts = np.unique(samples[:, 2].astype(int), return_counts=True)
+    if (expected['n_mbar_samples'], expected['n_mbar_states']) != (len(samples), len(counts)):
+        raise ValueError(f"replay has {len(samples)} samples and {len(counts)} states; expected "
+                         f"{expected['n_mbar_samples']} samples and {expected['n_mbar_states']} states")
     prefixes = np.concatenate([np.asarray(prefixes)[occupied], probes])
     grid = meta['grid']
     x = np.linspace(grid['s_min'], grid['s_max'], grid['n_s'])
@@ -219,10 +228,9 @@ def audit_replica(paths, regions, cut, discard, expected):
     regularized = binding(samples[:, 0], weights, regions, meta['funnel'], kt, meta['funnel']['eps'])
     reference = expected['dG'] / 4.184 if expected['dG'] is not None else None
     gap = dg - reference if dg is not None and reference is not None else None
-    if ((dg is None) != (reference is None) or expected['n_mbar_samples'] != len(samples)
-            or expected['n_mbar_states'] != len(counts) or expected['peer_postcut_samples'] != postcut
+    if ((dg is None) != (reference is None) or expected['peer_postcut_samples'] != postcut
             or expected['unknown_samples'] != unknown):
-        raise ValueError('the two analyses used different numeric support or slices')
+        raise ValueError('the two analyses used different numeric support or synchronized history')
     return dict(samples=len(samples), states=len(counts), unknown_sync_samples=unknown, postcut_sync_samples=postcut,
                 logged_bias_probes=len(errors), max_abs_logged_bias_error_kj_mol=float(np.max(np.abs(errors))),
                 fixed_point_residual=residual, reported_kcal_mol=reference, independent_kcal_mol=dg,
@@ -235,6 +243,10 @@ def main():
     parser.add_argument('--expected', required=True, type=Path, help='paper analysis JSON of the same frozen prefix')
     parser.add_argument('--regions', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--max-slices', type=int, default=DEFAULT_MAX_SLICES,
+                        help='total midpoint slice cap per independent history, nominal width 250 ps')
+    parser.add_argument('--max-samples', type=int, default=DEFAULT_MAX_SAMPLES,
+                        help='retained COLVAR sample cap per independent history before deterministic thinning')
     args = parser.parse_args()
     expected = json.loads(args.expected.read_text())
     regions = json.loads(args.regions.read_text())
@@ -253,10 +265,13 @@ def main():
         paths = [rep / f'w{j}' for j in range(run['walkers'])] if run['walkers'] > 1 else [rep]
         if source['n_walkers'] != len(paths):
             raise ValueError('walker count differs')
-        records.append(audit_replica(paths, regions, expected['cut_ns'], expected['discard_ns'], source))
+        records.append(audit_replica(paths, regions, expected['cut_ns'], expected['discard_ns'], source,
+                                     max_slices=args.max_slices, max_samples=args.max_samples))
     report = dict(audit_commit=os.environ.get('FMETA_CODE_COMMIT'), cut_ns=expected['cut_ns'],
                   discard_ns=expected['discard_ns'], base_seed=run['seed'], prepared_hashes=hashes,
-                  independent_replicas=len(records), walkers_per_replica=run['walkers'], replicas=records)
+                  independent_replicas=len(records), walkers_per_replica=run['walkers'],
+                  nominal_slice_width_ps=250., max_slices=args.max_slices, max_samples=args.max_samples,
+                  replicas=records)
     args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
 
 
