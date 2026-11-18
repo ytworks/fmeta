@@ -68,6 +68,8 @@ A2A には `runs/r2/a2a` と `examples/a2a_theophylline/paper-regions.json` を�
 
 ## 過去軌跡の再解析
 
+R2 の各 10 ns の区切りには、それぞれの実行時に Docker が記録した Git コミットがある。当時の作業ツリーには未コミットの変更も記録されている。区切りごとの由来、全レプリカの主値・照合値・構造診断を機械可読の記録に収めた。[候補 A の科学的結果](../../examples/binding-study/results/a-r2.json)
+
 | A、ns/walker | TYK2 主値 [95% 区間] (kJ/mol) | A2A 主値 [95% 区間] (kJ/mol) | DCD の復帰数 TYK2 / A2A |
 |---:|---:|---:|---:|
 | 20 | −67.98 [−93.23, −42.72] | −26.89 [−50.59, −3.20] | 1 / 2 |
