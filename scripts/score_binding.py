@@ -18,7 +18,7 @@ ENDPOINTS = (20, 40, 80, 100)
 TRIAL_ARMS = {**ARMS, "e": (1, 32, *ARMS["c"][2:]), "d1ps": (*ARMS["d"][:-1], 1)}
 D1PS_HELP = "d1ps uses trial D with hills deposited every 1 ps"
 E_ENDPOINTS = (5, 10, 15, 20)
-D_ENDPOINTS = (20, 25, 30, 35, 40, 80, 100)
+D_ENDPOINTS = (20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100)
 # Explicit trials include D's finer checkpoints. The paired sweep continues to use ENDPOINTS.
 TRIAL_ENDPOINTS = {
     **dict.fromkeys(ARMS, ENDPOINTS),

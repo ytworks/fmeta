@@ -84,7 +84,8 @@ def test_d_one_ps_changes_only_the_hill_period_at_the_same_seed(tmp_path, monkey
     assert "d1ps" not in importlib.import_module("binding_study").ARMS
 
 
-@pytest.mark.parametrize(("arm", "pace", "cut"), [("d", 2, 25), ("d", 2, 30), ("d", 2, 35), ("d1ps", 1, 35)])
+@pytest.mark.parametrize(("arm", "pace", "cut"), [("d", 2, 25), ("d", 2, 30), ("d", 2, 35),
+                                               ("d", 2, 90), ("d1ps", 1, 35)])
 def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, arm, pace, cut):
     repo = Path(__file__).parents[1]
     monkeypatch.syspath_prepend(str(repo / "scripts"))
