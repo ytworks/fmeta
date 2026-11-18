@@ -1,0 +1,26 @@
+{
+  "system": "tyk2",
+  "arm": "d",
+  "cut_ns": 20,
+  "all_32_verified": true,
+  "samples_per_replica": 9000,
+  "states_per_replica": 72,
+  "finite_primary": 29,
+  "strict": 23,
+  "maximum_differences_kj_mol": {
+    "dG": 2.1316282072803006E-14,
+    "dG_core": 2.842170943040401E-14,
+    "dG_bias": 0.0,
+    "dG_bias_final": 0.0,
+    "bias_drift": 0.0,
+    "unbound_roughness": 2.220446049250313E-15
+  },
+  "discard_ns": 2,
+  "native_colvar_period_ps": 2,
+  "refit_observation_period_ps": 2,
+  "analysis_commit": "15bc4a239549db0c2cd69a047590ba3e025ac587",
+  "original_estimate_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90",
+  "reference": "Original measured 20 ns D/TYK2 result compared with the same 20 ns slice of the frozen 25 ns continuation. Every native deposited hill is retained.",
+  "support_counts_match": true,
+  "effective_sample_counts_match_relative_tolerance": 1E-10
+}
