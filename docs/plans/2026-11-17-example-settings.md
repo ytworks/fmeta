@@ -162,6 +162,17 @@ extended (`fmeta run --length-ns`, exact) only if the rule below is not met by t
    setting is written into the repository: the readings are reported, and what is tried next
    is the owner's decision. Points 1, 2 and 4 stay as they are, thresholds included, and the
    runs go on to 100 ns as before.
+8. Amended 2026-11-18 on the owner's fourth word, given before any reading beyond 80 ns:
+   numbers with a thin basis are not to be set here, and no decision is to be made from them.
+   The numbers of this rule were set in this plan, which gives no source for them: the
+   8.4 kJ/mol of the half-width and of the distance from experiment, the one passage each way
+   of point 4, the steps of 5 ns, and the 4 replicas of 8 walkers of round 2 (32 places of the
+   machine). None of them comes from the owner, from a criterion of the project or from a
+   measurement. The rule therefore decides nothing: "the rule is met" and "is not met" in the
+   readings say how the values stand to those numbers and are no verdict on accuracy, and no
+   setting is written because of them. What accuracy is asked for, which setting the examples
+   get and what is tried next are the owner's decisions; this work reports the values as
+   measured. The runs go on to 100 ns, the limit the owner set.
 
 Values are the headline of the product analysis (`fmeta analyze`; FM-D9, third amendment).
 The checks of a replica stay diagnostics.
@@ -420,8 +431,9 @@ validation of the method, and the READMEs and FM-D19 say so. The package default
 change (FM-D16: never tuned against experiment); whether they should follow is a separate
 question for the owner, with this evidence.
 
-**Into the repository**, only if a length qualifies (point 7; otherwise the two examples and
-their documents stay as they are, and this plan holds the readings). The same `metad` and
+**Into the repository**, only on the owner's decision for a setting (points 7 and 8; until
+then the two examples and their documents stay as they are, and this plan holds the
+readings). The same `metad` and
 `run` values in the two `fmeta.yaml` files (a test keeps them equal), the READMEs with the new
 result and the run command (walkers, `--per-gpu`, MPS), FM-D19 with the table of every arm,
 `PROGRESS.md`, `README.md` and `docs/roadmap.md` where they give the results of the two
@@ -458,7 +470,7 @@ examples. No speed measured with the cuPotential plugin goes to a tracked file.
 | Part of the request | Done when |
 |---|---|
 | Search | rounds 1 and 2 have ended and every arm is in the table of FM-D19 with its numbers |
-| A common, accurate, short setting | the rule has chosen it; both `fmeta.yaml` hold it; the configuration that each example file gives equals the `config.yaml` of the round 2 runs that measured it. If no length qualifies up to 100 ns, nothing is set (point 7): the readings go to the owner, and this row stays open |
+| A common, accurate, short setting | the owner has decided on it from the readings (points 7 and 8: the rule of this plan decides nothing); both `fmeta.yaml` hold it; the configuration that each example file gives equals the `config.yaml` of the runs that measured it. Until that decision nothing is set, and this row stays open |
 | Documents | READMEs of the two examples, FM-D19, `PROGRESS.md`, `README.md`, `docs/roadmap.md` agree with the measured numbers |
 | Checks | `ruff`, the progress size, `verify_bench_results`, `pytest` pass in the image; pushed; CI green |
 
