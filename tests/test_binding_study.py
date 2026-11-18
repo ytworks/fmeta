@@ -57,6 +57,25 @@ def test_fresh_pair_preserves_preparation_and_uses_one_sampling_protocol(tmp_pat
             prepare(source, target, "c", 40, seed)
     assert protocols[0] == protocols[1]
 
+
+def test_single_shared_bias_trial_keeps_all_walkers_in_one_tyk2_history(tmp_path, monkeypatch):
+    repo = Path(__file__).parents[1]
+    monkeypatch.syspath_prepend(str(repo / "scripts"))
+    prepare = importlib.import_module("prepare_binding_trial").prepare_trial
+    source, target = tmp_path / "r2", tmp_path / "e"
+    (source / "prepared").mkdir(parents=True)
+    (source / "equil").mkdir()
+    (source / "equil/state.xml").write_text("tyk2")
+    cfg = Config.load(repo / "examples/tyk2_ejm46/fmeta.yaml")
+    cfg.save(source / "config.yaml")
+    prepare(source, target, "e", 5, 19711801)
+    trial = Config.load(target / "config.yaml")
+    assert (trial.run.replicas, trial.run.walkers, trial.run.seed, trial.run.length_ns) == (1, 32, 19711801, 5)
+    assert (trial.metad.sigma_s, trial.metad.sigma_rho) == (.025, .03)
+    assert (trial.metad.height, trial.metad.bias_factor) == (1.5, 10)
+    assert trial.run.pace_ps == 2 and trial.run.walker_sync_hills == 1
+    assert "e" not in importlib.import_module("binding_study").ARMS
+
 def test_selection_waits_for_both_systems_and_requires_independent_confirmation(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
     study = importlib.import_module("binding_study")

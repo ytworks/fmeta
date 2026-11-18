@@ -14,6 +14,9 @@ AFFINITY_M = {"tyk2": 4.8e-9, "a2a": 1.64e-6}
 ARMS = {"a": (4, 8, 0.05, 0.10, 1), "b": (8, 4, 0.05, 0.10, 1),
         "c": (8, 4, 0.025, 0.030, 2), "d": (32, 1, 0.025, 0.030, 2)}
 ENDPOINTS = (20, 40, 80, 100)
+# E measures one shared history for a selected example, outside the paired scheduler.
+TRIAL_ARMS = {**ARMS, "e": (1, 32, *ARMS["c"][2:])}
+E_ENDPOINTS = (5, 10, 15, 20)
 
 
 def precision_passes(score):
@@ -23,14 +26,15 @@ def precision_passes(score):
 
 
 def score_system(name, arm, length, energy, structure):
-    n_rep, n_walk, sigma_s, sigma_rho, pace = ARMS[arm]
+    n_rep, n_walk, sigma_s, sigma_rho, pace = TRIAL_ARMS[arm]
     protocol = energy["protocol"]
     bias = protocol["bias"]
     region_file = Path(__file__).resolve().parents[1] / "examples" / EXAMPLES[name] / "paper-regions.json"
     frozen = json.loads(region_file.read_text())
     if energy["regions"] != frozen or structure["region"] != frozen:
         raise ValueError(f"{name}: results differ from the frozen region definition")
-    if (energy["cut_ns"] != length or structure["cut_ns"] != length or length not in ENDPOINTS
+    endpoints = E_ENDPOINTS if arm == "e" else ENDPOINTS
+    if (energy["cut_ns"] != length or structure["cut_ns"] != length or length not in endpoints
             or energy["discard_ns"] != 2 or energy["base_seed"] != structure["base_seed"]):
         raise ValueError(f"{name}: inconsistent cut, seed or discarded interval")
     if (protocol["replicas"], protocol["walkers"], bias["sigma_s"], bias["sigma_rho"], protocol["pace_ps"]
@@ -57,15 +61,16 @@ def score_system(name, arm, length, energy, structure):
     reference = kT * math.log(AFFINITY_M[name])
     limit = kT * math.log(5)
     dg, ci = energy["dG"], energy["ci95"]
-    valid = energy["status"] == "available" and dg is not None and ci is not None
-    if valid and not (all(math.isfinite(v) for v in [dg, *ci]) and ci[0] <= dg <= ci[1]):
+    valid = energy["status"] == "available" and dg is not None and (ci is not None or n_rep == 1)
+    if valid and (not math.isfinite(dg) or
+                  ci is not None and not (all(map(math.isfinite, ci)) and ci[0] <= dg <= ci[1])):
         raise ValueError(f"{name}: invalid replica interval")
     error = abs(dg - reference) if valid else None
-    halfwidth = (ci[1] - ci[0]) / 2 if valid else None
+    halfwidth = (ci[1] - ci[0]) / 2 if valid and ci is not None else None
     checks = dict(all_replicas_available=valid, binding=energy["no_binding"] is False,
                   contact_confirmed_roundtrip=sum(returns) > 0,
                   affinity_within_fivefold=valid and error <= limit,
-                  ci_halfwidth_within_limit=valid and halfwidth <= limit)
+                  ci_halfwidth_within_limit=halfwidth is not None and halfwidth <= limit)
     support = [{k: r.get(k) for k in ("status", "dG", "dG_core", "dG_bias", "support", "unbound_roughness",
                                        "site_bins", "sampled_site_bins", "bulk_bins", "sampled_bulk_bins",
                                        "rebinding_events", "unknown_samples", "peer_postcut_samples",
@@ -92,6 +97,11 @@ def score_system(name, arm, length, energy, structure):
                 cutoff_clear_bulk_lipid_checkpoints=sum(v["cutoff_clear"] for v in observed),
                 replicas=support)
     result["precision_passes"] = precision_passes(result)
+    if n_rep == 1:
+        # This exploratory, single-history experiment cannot be judged by an independent-replica CI.
+        result.update(passes=None, precision_passes=None, checks=dict(checks, ci_halfwidth_within_limit=None))
+        result["structural_walkers"] = [{k: w[k] for k in ("walker", "frames", "site_contact_frames",
+                                       "bulk_clear_frames", "departures", "returns", "passages")} for w in walkers]
     return result
 
 
@@ -106,13 +116,24 @@ def score_pair(arm, length, pairs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("arm", choices=ARMS)
-    parser.add_argument("length_ns", type=int, choices=ENDPOINTS)
+    parser.add_argument("arm", choices=TRIAL_ARMS)
+    parser.add_argument("length_ns", type=int)
     for name in EXAMPLES:
-        parser.add_argument("--" + name, required=True, nargs=2, type=Path, metavar=("ENERGY_JSON", "STRUCTURE_JSON"))
+        parser.add_argument("--" + name, nargs=2, type=Path, metavar=("ENERGY_JSON", "STRUCTURE_JSON"))
     args = parser.parse_args()
-    pairs = {name: [json.loads(p.read_text()) for p in getattr(args, name)] for name in EXAMPLES}
-    print(json.dumps(score_pair(args.arm, args.length_ns, pairs), indent=2, allow_nan=False))
+    names = [name for name in EXAMPLES if getattr(args, name)]
+    if args.arm == "e" and len(names) != 1:
+        parser.error("E requires one example's energy and structure reports")
+    if args.arm != "e" and len(names) != len(EXAMPLES):
+        parser.error("paired scoring requires both --tyk2 and --a2a")
+    pairs = {name: [json.loads(p.read_text()) for p in getattr(args, name)] for name in names}
+    if args.arm == "e":
+        name = names[0]
+        score = score_system(name, args.arm, args.length_ns, *pairs[name])
+        result = dict(arm=args.arm, length_ns=args.length_ns, systems={name: score})
+    else:
+        result = score_pair(args.arm, args.length_ns, pairs)
+    print(json.dumps(result, indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":

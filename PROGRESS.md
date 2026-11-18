@@ -95,7 +95,8 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
   - a shared production protocol meeting the affinity and precision criteria on both examples.
     PR #4 holds extensions after comparing the matched 20 ns TYK2 pilots. Four-walker sharing (C)
     sampled a broader surface. Independent walkers (D) gave a late WT mean closer to experiment
-    (absolute errors 5.27 and 1.78 kcal/mol). A single bias shared by all 32 is untested on both systems.
+    (absolute errors 5.27 and 1.78 kcal/mol). The TYK2 single-bias 32-walker trial (E, seed 19711801)
+    is in progress at 5/10/15/20 ns per walker. A2A has no measurement of this setting.
   - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a

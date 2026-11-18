@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from statistics import mean, pstdev, stdev
 
-from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair, score_system
+from score_binding import AFFINITY_M, EXAMPLES, TRIAL_ARMS, score_pair, score_system
 
 from fmeta.analysis import KCAL
 from fmeta.analysis.paper import method_statistics
@@ -126,6 +126,11 @@ def measurements(name, energy, score=None):
             weighted_bound_contact_above_1kT=contact["bound_side_contact"]["above_1kT_weight_fraction"]
             if contact else None,
         ))
+        if energy["protocol"]["replicas"] == 1:
+            rows[-1].update(unknown_samples=replica.get("unknown_samples"),
+                            peer_postcut_samples=replica.get("peer_postcut_samples"),
+                            max_peer_time_ns=replica.get("max_peer_time_ns"),
+                            wt_bias_late_drift_kcal_mol=replica["bias_drift"] / KCAL)
     physical = None
     if score:
         physical = dict(
@@ -135,6 +140,8 @@ def measurements(name, energy, score=None):
                     "site_contact_wall_above_kT_frames", "bound_contact_wall_above_kT_frames")},
             reference_wall_kj_mol={k: score["reference_wall_kj_mol"][k] for k in ("prepared", "equil")},
         )
+        if "structural_walkers" in score:
+            physical["walkers"] = score["structural_walkers"]
     finite = [r["dG"] / KCAL for r in rows if r["primary_calculable"]]
     conditional = None
     if finite and not stats["primary_reweighted"]["complete"]:
@@ -152,7 +159,7 @@ def measurements(name, energy, score=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--arm", choices=ARMS, required=True)
+    parser.add_argument("--arm", choices=TRIAL_ARMS, required=True)
     parser.add_argument("--phase", choices=("screening", "validation"), default="screening")
     parser.add_argument("--production-source", type=Path, required=True,
                         help="JSON with tracked_source_base_commit, tracked_src_fmeta_tree and "
@@ -165,6 +172,10 @@ def main():
                         help="one completed system at a pending paired endpoint; repeat for different lengths")
     parser.add_argument("--drift", nargs=2, metavar=("SYSTEM", "ENERGY"))
     args = parser.parse_args()
+    single_bias = args.arm == "e"
+    if single_bias and (args.paired or args.drift or args.phase != "screening"
+                        or len({group[0] for group in args.provisional}) != 1):
+        parser.error("E requires one example's measured energy and structure at each cut")
     if not re.fullmatch("[0-9a-f]{40}", args.analysis_commit):
         parser.error("analysis commit requires a full hexadecimal Git object ID")
     groups = []
@@ -183,7 +194,8 @@ def main():
         length = int(energy["cut_ns"])
         if any(p["length_ns"] == length for p in results):
             parser.error("duplicate endpoint")
-        endpoint = dict(length_ns=length, purpose=args.phase, passes=None, precision_passes=None, systems={})
+        purpose = "single_shared_bias" if single_bias else args.phase
+        endpoint = dict(length_ns=length, purpose=purpose, passes=None, precision_passes=None, systems={})
         if len(group) == len(EXAMPLES):
             pair_score = score_pair(args.arm, length, group)
             scores = pair_score["systems"]
@@ -191,13 +203,15 @@ def main():
             endpoint["precision_passes"] = pair_score["precision_passes"]
         else:
             scores = {name: score_system(name, args.arm, length, energy, structure)}
-            endpoint["pending_systems"] = sorted(set(EXAMPLES) - group.keys())
+            if not single_bias:
+                endpoint["pending_systems"] = sorted(set(EXAMPLES) - group.keys())
         for name, (energy, _) in group.items():
             hashes = {key: energy["regions"][key] for key in HASH_FIELDS}
             run = energy["protocol"], energy["base_seed"]
             if inputs.setdefault(name, hashes) != hashes:
                 parser.error(f"inconsistent {name} prepared inputs across endpoints")
-            runs[name] = run
+            if runs.setdefault(name, run) != run:
+                parser.error(f"inconsistent {name} protocol or seed across endpoints")
             interpolations.add(energy.get("reweighting_bias_interpolation", "legacy_bilinear"))
             endpoint["systems"][name] = measurements(name, energy, scores[name])
         results.append(endpoint)
@@ -219,6 +233,13 @@ def main():
                   production_source=production_source(args.production_source, results),
                   analysis_commit=args.analysis_commit,
                   frozen_inputs=inputs, endpoints=sorted(results, key=lambda r: r["length_ns"]))
+    if single_bias:
+        protocol, seed = next(iter(runs.values()))
+        report["sampling"] = dict(independent_bias_histories=protocol["replicas"],
+                                  walkers_per_bias=protocol["walkers"], base_seed=seed,
+                                  hill_period_ps=protocol["pace_ps"], hill_height_kj_mol=protocol["bias"]["height"],
+                                  sigma_s_nm=protocol["bias"]["sigma_s"], sigma_rho_nm=protocol["bias"]["sigma_rho"],
+                                  bias_factor=protocol["bias"]["bias_factor"])
     print(json.dumps(report, indent=2, allow_nan=False))
 
 
