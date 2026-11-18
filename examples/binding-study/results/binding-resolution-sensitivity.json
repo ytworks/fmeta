@@ -1,0 +1,715 @@
+{
+  "analysis_commit": "29631c42a3f0af6f1bb4bd168691af4097691b75",
+  "estimator": "primary_reweighted",
+  "energy_unit": "kcal/mol",
+  "discard_ns": 2,
+  "target_slice_ps": 250,
+  "standardized_slice_ps": 250,
+  "variants": {
+    "published": {
+      "max_slices_per_independent_bias": 300,
+      "max_samples_per_independent_bias": 40000
+    },
+    "fine": {
+      "max_slices_per_independent_bias": 2304,
+      "max_samples_per_independent_bias": 40000
+    },
+    "dense": {
+      "max_slices_per_independent_bias": 300,
+      "max_samples_per_independent_bias": 320000
+    },
+    "full": {
+      "max_slices_per_independent_bias": 2304,
+      "max_samples_per_independent_bias": 320000
+    },
+    "half-step": {
+      "target_slice_ps": 125,
+      "max_slices_per_independent_bias": 4608,
+      "max_samples_per_independent_bias": 40000
+    }
+  },
+  "frozen_inputs": {
+    "tyk2": {
+      "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+      "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+      "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+      "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+      "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+    },
+    "a2a": {
+      "system_sha256": "d70b60d0d41efc55ccbf5d460bcccbef5bfcb259a3ba24355fa3ed88dad5c93b",
+      "positions_sha256": "e5ed1f3a67aae9950a104fc72728800ca43252dea083adb5e042da580c63d7d5",
+      "topology_sha256": "4719610b985e71fa0e4095679620481cc406165c3ed3435ec81c2d5f06448826",
+      "funnel_sha256": "bcb380c57aada231d3f09f9827e04ca657918e0cf96bba2c81f3592fffb9091c",
+      "equil_state_sha256": "45f3f578d5c8aeb2476c66c20f96bd39e8b7fd56c2d79046c95864bd9bb9f89f"
+    }
+  },
+  "e_checkpoints": [
+    {
+      "cut_ns": 5,
+      "variants": {
+        "published": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -27.309863197906918,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -27.309863197906918
+          ],
+          "retained_mbar_samples_total": 24000,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "fine": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -27.292825048926012,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -27.292825048926012
+          ],
+          "retained_mbar_samples_total": 24000,
+          "states_per_independent_bias": [
+            384
+          ]
+        },
+        "full": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -27.275081061895246,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -27.275081061895246
+          ],
+          "retained_mbar_samples_total": 48000,
+          "states_per_independent_bias": [
+            384
+          ]
+        }
+      }
+    },
+    {
+      "cut_ns": 10,
+      "variants": {
+        "published": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -24.66605294771316,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -24.66605294771316
+          ],
+          "retained_mbar_samples_total": 32000,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "fine": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -24.41386680721509,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -24.41386680721509
+          ],
+          "retained_mbar_samples_total": 32000,
+          "states_per_independent_bias": [
+            1024
+          ]
+        },
+        "full": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -24.40801977310743,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -24.40801977310743
+          ],
+          "retained_mbar_samples_total": 128000,
+          "states_per_independent_bias": [
+            1024
+          ]
+        }
+      }
+    },
+    {
+      "cut_ns": 15,
+      "variants": {
+        "published": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -21.81480797946677,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -21.81480797946677
+          ],
+          "retained_mbar_samples_total": 34667,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "fine": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -22.254888113541767,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -22.254888113541767
+          ],
+          "retained_mbar_samples_total": 34667,
+          "states_per_independent_bias": [
+            1664
+          ]
+        },
+        "full": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -22.251643727113347,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -22.251643727113347
+          ],
+          "retained_mbar_samples_total": 208000,
+          "states_per_independent_bias": [
+            1664
+          ]
+        }
+      }
+    },
+    {
+      "cut_ns": 20,
+      "variants": {
+        "published": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.47671229531484,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.47671229531484
+          ],
+          "retained_mbar_samples_total": 36000,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "fine": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.44719894321906,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.44719894321906
+          ],
+          "retained_mbar_samples_total": 36000,
+          "states_per_independent_bias": [
+            2304
+          ]
+        },
+        "full": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.447236800144914,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.447236800144914
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            2304
+          ]
+        },
+        "dense": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.475967511063104,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.475967511063104
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "half-step": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.450088316070758,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.450088316070758
+          ],
+          "retained_mbar_samples_total": 36000,
+          "states_per_independent_bias": [
+            4608
+          ]
+        }
+      }
+    }
+  ],
+  "comparison_20ns": {
+    "tyk2": {
+      "a": {
+        "published": {
+          "n_finite": 4,
+          "n_total": 4,
+          "all_group_mean": -16.25885388628531,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 3.8035188356112513,
+          "per_group_dg_kcal_mol": [
+            -21.321419767979428,
+            -13.650845400545142,
+            -17.026137674838456,
+            -13.0370127017782
+          ],
+          "retained_mbar_samples_total": 144000,
+          "states_per_independent_bias": [
+            296,
+            296,
+            296,
+            296
+          ]
+        },
+        "full": {
+          "n_finite": 4,
+          "n_total": 4,
+          "all_group_mean": -16.259413954546115,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 3.8315452565363626,
+          "per_group_dg_kcal_mol": [
+            -21.365196079185953,
+            -13.584100503808699,
+            -17.026894297933477,
+            -13.061464937256334
+          ],
+          "retained_mbar_samples_total": 576000,
+          "states_per_independent_bias": [
+            576,
+            576,
+            576,
+            576
+          ]
+        }
+      },
+      "b": {
+        "published": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -12.235597364134954,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 5.83204305190305,
+          "per_group_dg_kcal_mol": [
+            -18.393230113913496,
+            -13.022961301590069,
+            -17.15421152752291,
+            -12.858552013184912,
+            -1.311683914328321,
+            -8.05895904419971,
+            -17.712674878177026,
+            -9.372506120163182
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        },
+        "full": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -12.236034629282225,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 5.828908746665358,
+          "per_group_dg_kcal_mol": [
+            -18.394245903969512,
+            -13.007715116605652,
+            -17.151756654753534,
+            -12.861868499522274,
+            -1.3158922123281835,
+            -8.046162324935747,
+            -17.706982519363773,
+            -9.403653802779115
+          ],
+          "retained_mbar_samples_total": 576000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        }
+      },
+      "c": {
+        "published": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -16.9880975387731,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 2.5732351215605815,
+          "per_group_dg_kcal_mol": [
+            -14.979114693400309,
+            -22.008469154075257,
+            -15.131622181886229,
+            -18.529669704668976,
+            -15.814773317751234,
+            -17.91343476803124,
+            -14.023564815321896,
+            -17.50413167504967
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        },
+        "full": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -16.9880975387731,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 2.5732351215605815,
+          "per_group_dg_kcal_mol": [
+            -14.979114693400309,
+            -22.008469154075257,
+            -15.131622181886229,
+            -18.529669704668976,
+            -15.814773317751234,
+            -17.91343476803124,
+            -14.023564815321896,
+            -17.50413167504967
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        },
+        "published_already_uses_all_observations_and_250ps": true
+      },
+      "d": {
+        "published": {
+          "n_finite": 29,
+          "n_total": 32,
+          "all_group_mean": null,
+          "finite_subset_mean": -13.151210003022081,
+          "sd_of_finite_groups": 5.779024777502849,
+          "per_group_dg_kcal_mol": [
+            -18.3782898720076,
+            -12.277493147469896,
+            -8.27928599794301,
+            -14.89371630597063,
+            -15.205030480049574,
+            -19.765182950040106,
+            -16.70239386994342,
+            -4.669482951496396,
+            -13.875765036016528,
+            -10.447670308131762,
+            -11.104277596326739,
+            -20.86863004127115,
+            -18.228795114373305,
+            -10.117522915443745,
+            -10.694892755162712,
+            -14.378712931725191,
+            null,
+            null,
+            -10.321052724959745,
+            -1.9419319684163896,
+            -14.373968554181047,
+            -9.41961536981878,
+            -11.095774298978201,
+            -14.238692251020005,
+            null,
+            -25.60265160213006,
+            -12.084831519844345,
+            1.2718771229794517,
+            -15.039319902448998,
+            -8.801985312473926,
+            -19.33121549333906,
+            -20.518785939637485
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72
+          ]
+        },
+        "full": {
+          "n_finite": 29,
+          "n_total": 32,
+          "all_group_mean": null,
+          "finite_subset_mean": -13.151210003022081,
+          "sd_of_finite_groups": 5.779024777502849,
+          "per_group_dg_kcal_mol": [
+            -18.3782898720076,
+            -12.277493147469896,
+            -8.27928599794301,
+            -14.89371630597063,
+            -15.205030480049574,
+            -19.765182950040106,
+            -16.70239386994342,
+            -4.669482951496396,
+            -13.875765036016528,
+            -10.447670308131762,
+            -11.104277596326739,
+            -20.86863004127115,
+            -18.228795114373305,
+            -10.117522915443745,
+            -10.694892755162712,
+            -14.378712931725191,
+            null,
+            null,
+            -10.321052724959745,
+            -1.9419319684163896,
+            -14.373968554181047,
+            -9.41961536981878,
+            -11.095774298978201,
+            -14.238692251020005,
+            null,
+            -25.60265160213006,
+            -12.084831519844345,
+            1.2718771229794517,
+            -15.039319902448998,
+            -8.801985312473926,
+            -19.33121549333906,
+            -20.518785939637485
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72,
+            72
+          ]
+        },
+        "published_already_uses_all_observations_and_250ps": true
+      },
+      "e": {
+        "published": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.47671229531484,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.47671229531484
+          ],
+          "retained_mbar_samples_total": 36000,
+          "states_per_independent_bias": [
+            288
+          ]
+        },
+        "full": {
+          "n_finite": 1,
+          "n_total": 1,
+          "all_group_mean": -20.447236800144914,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": null,
+          "per_group_dg_kcal_mol": [
+            -20.447236800144914
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            2304
+          ]
+        }
+      }
+    },
+    "a2a": {
+      "a": {
+        "published": {
+          "n_finite": 4,
+          "n_total": 4,
+          "all_group_mean": -6.408694609647778,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 3.556173385544239,
+          "per_group_dg_kcal_mol": [
+            -8.633622566963371,
+            -4.428989210421477,
+            -10.096562467778094,
+            -2.475604193428169
+          ],
+          "retained_mbar_samples_total": 144000,
+          "states_per_independent_bias": [
+            296,
+            296,
+            296,
+            296
+          ]
+        },
+        "full": {
+          "n_finite": 4,
+          "n_total": 4,
+          "all_group_mean": -6.373633285234588,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 3.573628826238582,
+          "per_group_dg_kcal_mol": [
+            -8.686079848134526,
+            -4.374270160309742,
+            -10.019629950801885,
+            -2.4145531816922006
+          ],
+          "retained_mbar_samples_total": 576000,
+          "states_per_independent_bias": [
+            576,
+            576,
+            576,
+            576
+          ]
+        }
+      },
+      "b": {
+        "published": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -5.199844235075837,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 2.556344439598872,
+          "per_group_dg_kcal_mol": [
+            -3.781613051945486,
+            -8.383020421553416,
+            -3.981787961770747,
+            -1.7294532902806257,
+            -4.669678591292094,
+            -3.6007834758248465,
+            -6.231232059985823,
+            -9.221185027953657
+          ],
+          "retained_mbar_samples_total": 288000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        },
+        "full": {
+          "n_finite": 8,
+          "n_total": 8,
+          "all_group_mean": -5.197215042158109,
+          "finite_subset_mean": null,
+          "sd_of_finite_groups": 2.5546029109506545,
+          "per_group_dg_kcal_mol": [
+            -3.8003134995401946,
+            -8.382671176944955,
+            -3.985829664116688,
+            -1.729713832592902,
+            -4.631689259363352,
+            -3.6036869704613603,
+            -6.224378586350685,
+            -9.219437347894736
+          ],
+          "retained_mbar_samples_total": 576000,
+          "states_per_independent_bias": [
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288,
+            288
+          ]
+        }
+      }
+    }
+  }
+}

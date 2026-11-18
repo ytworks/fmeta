@@ -1,0 +1,32 @@
+{
+  "analysis_commit": "43a14e56a2622236b6a5dc5a29c1222296246dca",
+  "energy_unit": "kcal/mol",
+  "temperature_K": 300,
+  "standard_volume_nm3": 1.6605390671738467,
+  "cases": {
+    "cylinder_well_0_kT": {
+      "exact": 2.0928088125184368,
+      "measured": 2.092808788396927,
+      "difference": -2.412150954864999e-08,
+      "tolerance": 1e-06
+    },
+    "cylinder_well_6_kT": {
+      "exact": -1.4841588530350602,
+      "measured": -1.4841588771565701,
+      "difference": -2.4121509973209465e-08,
+      "tolerance": 1e-06
+    },
+    "two_biased_ensembles_with_known_unbiased_populations": {
+      "exact": 1.1202212773267746,
+      "measured": 1.120221253223407,
+      "difference": -2.4103367485484877e-08,
+      "tolerance": 1e-06
+    },
+    "three_dimensional_gaussian_well": {
+      "exact": -1.1308118108317744,
+      "measured": -1.1308452757715712,
+      "difference": -3.3464939796971645e-05,
+      "tolerance": 0.0002390057361376673
+    }
+  }
+}

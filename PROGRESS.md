@@ -14,10 +14,9 @@ that runs on GPUs, end to end, from two files.
   `Modeller.addMembrane`, with the funnel pointing into water.
 - Engine: well-tempered metadynamics on the funnel CVs (projection `s`, extent `rho`) with
   OpenMM custom forces; replicas for error bars, shared-bias walkers for speed; exact restart.
-- Result: standard binding free energy by the published procedure: from the accumulated bias
-  over the second half of a run, with a block error. The replicas together are the measurement:
-  mean and 95 % interval, diagnostics per replica, a "no binding" statement, no convergence
-  verdict.
+- Result: standard binding free energy from a bound-to-bulk integral. The default uses the
+  accumulated bias over the second half. The paired example protocol uses reweighted samples.
+  Independent replicas give the mean and 95% interval, with diagnostics and an empty-funnel reference.
 - OpenMM only: no input from other MD programs.
 - Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
   after another on one GPU (R7); official presets (R9); real inputs (R8); a kinase and a GPCR
@@ -30,10 +29,13 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
+Snapshot date: 2026-11-18. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
 D5, D6, D7 and D9 to D18 amended since, see the Change Log). PR #1 is merged (final code
-d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). PR #3 (branch
-`claude/cupotential-backend`; the owner: everything is developed in that PR): NVIDIA
+d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). In progress on
+`claude/example-settings`: one common setting for the TYK2 and A2A examples, accurate in the
+shortest run. The previous search is in `docs/plans/2026-11-17-example-settings.md`; the
+ongoing search and the reanalysis of its trajectories are in `docs/plans/2026-11-18-paper-binding.md`.
+PR #3 is merged (c163eb2; branch `claude/cupotential-backend`): NVIDIA
 cuPotential as the default back end (owner request 2026-11-17; plan
 `docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4; roadmap R11). Final code 80d7dc7: it
 holds the three fixes from the review of PR #3 (row M4), and the gates and CI are of it. Both
@@ -90,25 +92,56 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     trypsin −66.9 to 10.4 and −80.5 to −7.6 in two runs, and the value depends on the bias
     setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
     to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
-  - a run of full length with the cuPotential back end: the examples ran 1 ns per replica with
-    it (on 1c09775); every 40 ns value and every benchmark report is from OpenMM's own forces;
-  - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
-    owner; reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
+  - a shared production protocol meeting the affinity and precision criteria on both examples.
+    The owner selected D for further TYK2 testing through 100 ns. TYK2 C gave a primary ΔG° of −16.99 kcal/mol (8/8 groups);
+    D gave −13.15 kcal/mol over the finite 29/32 histories. The TYK2 single-bias trial (E, seed 19711801)
+    completed 20 ns per walker. The primary reweighted ΔG° was −20.48 kcal/mol (absolute error 9.06).
+    At 60 ns D gave −8.42 kcal/mol (31/32, SD 4.44), with 17 structural pocket returns and one history
+    without a bulk visit. The owner paused the 100 ns extension. All 32 readable on-disk checkpoints span
+    61.50–65.00 ns. The 1 ps hill-period comparison is prepared, and neither it nor A2A D has begun MD.
+    At 250 ps per bias slice and with every sample, E gave −20.45 kcal/mol. E covered the most total
+    CV area (2.279 nm²), D the most per walker (median 1.332 nm²) and the most walkers visiting both
+    regions (29/32). E recorded ten departures and no pocket returns. A2A has no measurement of E.
+  - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls and must be prepared again;
   the scatter over seeds of the gate `toy_free_energy` (10 ns, estimate from the samples) is
   not measured: the gate's seed gives 0.19 kJ/mol with OpenMM and 0.59 with cuPotential (FM-D12).
-- GPUs (owner, 2026-11-16: all 8 are for this task): idle, nothing of this task runs on them;
-  the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
+- GPUs: the paired example experiment uses all eight under MPS with 32 processes per system.
+  Historical stock OpenMM measurements, ns/day on one GPU: in the image of
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
   A2A example 302 alone, 526 / 528 / 524.
-- Blockers: none known. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
+- Blockers: a GPU fault of one client ends every client of its MPS daemon (containers all
+  have process number 0 for the server); seen once, at 4.5 minutes of 32 processes with the
+  cuPotential back end, the faulting kernel not identified. Worked around: one daemon per run,
+  and a run that ends with a CUDA error is started again (plan of the example setting). NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
   CUDA 13.4) with the MPS programs of the image and a daemon started by `scripts/mps.sh`
   (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
 
 ## Change Log
+
+### 2026-11-18 — [amendment] binding estimates and convergence from one trajectory
+- What: Report numerical coverage and independent-replica statistics for each estimator, including the WT surface at the endpoint and its late mean. Replay the optional paper analysis with the production bias spline.
+- Why: In D at 20 ns, six replicas produced observed-ratio free energies despite incomplete bulk diagnostics. All 32 produced finite bias-surface integrals. The user needs the energy of an individual run and the evidence for its convergence.
+- Refs: FM-D9, PR #4, `src/fmeta/analysis/paper.py`, `docs/plans/2026-11-18-paper-binding.md`.
+
+### 2026-11-18 — [amendment] prioritize independent-replica scatter in the TYK2 pilot
+- What: Rank complete 20 ns TYK2 pilots by the sample SD of independent replica free energies, then extend the selected candidate and follow it in A2A. Use the experimental reference at final independent validation.
+- Why: The owner prioritizes reproducibility during candidate exploration and wants to reserve the longer A2A calculations for the candidate selected in TYK2.
+- Verification: Official Docker passed lint, the progress and benchmark record checks, and 237 CPU tests. The live selector queued only the D TYK2 pilot.
+- Refs: PR #4, `docs/plans/2026-11-18-paper-binding.md`, `scripts/binding_study.py`, `examples/binding-study/results/`.
+
+### 2026-11-18 — [amendment] reweighted finite-site binding for the paired examples
+- What: opt-in sample estimator with synchronized walker biases, wall-free disk cross-check, fixed structural regions and independent-replica intervals. At 80 ns, R2 gave TYK2 −44.13 [−71.19, −17.07] and A2A −19.64 [−28.79, −10.48] kJ/mol. Official image: 224 CPU tests and four slow analysis/walker tests passed. The new eight-GPU search is active.
+- Why: SI Fig. S3 used a reweighted PMF. The shared protocol must satisfy the same affinity and interval-width criteria on both systems in a fresh validation.
+- Refs: FM-D9 (fifth amendment), PR #4, `docs/plans/2026-11-18-paper-binding.md`.
+
+### 2026-11-17 — [progress] Plan of one common setting for the TYK2 and A2A examples; a GPU fault under MPS ends every client of the daemon
+- What: owner request: the setting of the two examples that is accurate in the shortest run, one for both. Plan: a screen of bias factor and hill height with 8 walkers that share a bias, then 4 independent replicas of 8 walkers on both systems; the selection rule (half-width of the 95% interval and distance from experiment at most 8.4 kJ/mol on both, least simulated time) is written before a round 2 run is read; the package defaults do not change. Blocker at the first start: 32 walker processes with the cuPotential back end under one MPS daemon ended in the same second after 4.5 minutes (`CUDA_ERROR_LAUNCH_FAILED`). The server log has one fatal GPU error and then the end of every client on all 8 GPUs: container clients all have process number 0 for it. The faulting kernel is not identified (the first error is of an A2A walker; the kernel log of the host is not readable from this account). Worked around: one daemon per GPU pair and run, and a run that ends with a CUDA error is started again and continues from its checkpoints; the faults are counted. Verified: `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 212 passed (documents only). Not known: the rate of the fault and whether the plugin causes it.
+- Why: a blocker is recorded when it appears; a run of full length with the plugin was listed as not verified, and this is the first thing it showed.
+- Refs: `docs/plans/2026-11-17-example-settings.md`; `scripts/mps.sh`, `scripts/in_docker.sh` (`FMETA_MPS_NAME`, `FMETA_MPS_DIR`); FM-D13, FM-D18.
 
 ### 2026-11-17 — [progress] GPU gates of the final code with the review fixes pass with both back ends (80d7dc7)
 - What: third finding of the review of PR #3, fixed in 80d7dc7 (it has no entry of its own): the build process of a benchmark ligand (`fmeta benchmark build`) reads a `config.yaml` from before the key `run.backend` as the set does, as `openmm` (`saved_config`); it read the default `auto` and wrote it back, and the set then refused its own work directory. Its test runs the real build and failed on the code before the fix. Then `scripts/gpu_gates.py` on clean 80d7dc7 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded), once as it is (`auto`, which gave cuPotential on both test systems) and once with `--backend openmm`: all 20 passed each (`gpu-tests`: 15 passed, with the 13 constraint cases held to the plugin). Nonbonded energy, force against double-precision PME at 1e-6: in the record of cuPotential OpenMM 1.9e-5, 6.8e-4 and cuPotential 1.7e-6, 4.0e-4 (soluble), 6.4e-6, 7.2e-4 and 1.2e-6, 3.0e-4 (membrane), the funnel groups identical; in the record of OpenMM 1.1e-5, 7.5e-4 and 1.1e-5, 6.5e-4. Periodic images: 1.3e-6 nm, 1.2e-3 kJ/mol (cuPotential); 5.6e-7 nm, 2.6e-4 kJ/mol (OpenMM). Toy values as on 1c09775. CI green on 80d7dc7 (run 44063964423). `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 212 passed. Not run again on 80d7dc7: the two examples (they ran on 1c09775), `pytest -m slow`; no walker was added on the GPU.
@@ -124,28 +157,3 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
 - What: correction of the entry below: a review of PR #3 on 1c09775 with three findings was there and was read only after "the plan is complete" was written. First finding fixed here. The plugin's `LangevinMiddleIntegrator` solves rigid three-site water and one atom with one to three partners of one length and one mass (the bonds to hydrogen, but for an atom with four hydrogens), and refuses every other constraint when the Context is made; under `auto` a System with constraints on all bonds got the plugin and the run ended there. `unmet` now counts those constraints (`unsolved_constraints`) where the plugin provides the integrator: `auto` gives OpenMM with the count as the reason, `cupotential` by name is an error before a file is touched, a run with the plugin's force alone goes on. Verified: the decision test failed on the code before the fix; on the GPU the plugin's integrator takes or refuses 13 small systems exactly as counted, with the same number (`pytest -m gpu tests/test_backend.py`: 13 passed); the A2A example has no such constraint (221152 atoms, 193402 constraints; the count takes 1.2 s); `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 211 passed. Not run on this code: the GPU gates (they follow on the final code, with both back ends), `pytest -m slow`. Open: the two other findings (the back end of a new walker; the build process of a benchmark set from before the key).
 - Why: the default must run every system that OpenMM runs, and say why it did not take the plugin; a condition that only the plugin's own error names is found when the run has already been started. The rule is read from the plugin's source (0.3.5), so a test asks the plugin itself: a later version with another rule fails that test instead of a run.
 - Refs: FM-D18, amendment of 2026-11-17 (`docs/design/engine.md`); `src/fmeta/engine/backend.py`, `tests/test_backend.py`, `docs/configuration.md`, `README.md`; PR #3, review comment 4597472181.
-
-### 2026-11-17 — [progress] The A2A example runs with the default back end; the plan of the cuPotential back end is complete (M0 to M4)
-- What: `examples/a2a_theophylline` by the steps of its README on 1c09775 with the default `run.backend: auto` (differences: the host GPUs, `--length-ns 1`, no `--detach`): fetch, split, prepare (221152 atoms), funnel, equilibrate (stock OpenMM, as designed), run (5 replicas of 1 ns on 4 GPUs, four side by side and the fifth after them), status, analyze. Every `rep*/device.json` names cuPotential with force and integrator (the membrane barostat is OpenMM's), `backend_reason` none; `schedule.jsonl` has return code 0 for each replica and `finish` with all five done; 1003 lines in every HILLS; every other step ended with 0. The exit status of the `fmeta run` call itself was not kept, as for TYK2 (the driver script overwrote its log). The value of 1 ns means nothing (no rebinding event in any replica). CI is green on 6b9b5e0, the commit of the gate records (run 44056319585, three jobs). With this the completion conditions of M4 hold: gates of both back ends on the final code, CI green, both examples with the default. Not done: a run of full length with the plugin; the slow tests other than `tests/test_system.py` and `tests/test_membrane.py` on the final code.
-- Why: the plan closes M4, and with it the owner's request of 2026-11-17, when both examples run by their READMEs with the default and their records name cuPotential.
-- Refs: plan `docs/plans/2026-11-17-cupotential-backend.md` (M4); FM-D18 (`docs/design/engine.md`); `README.md`, `docs/roadmap.md` (R11); PR #3.
-
-### 2026-11-17 — [progress] GPU gates of the final code pass with both back ends (1c09775); the TYK2 example runs with the default
-- What: `scripts/gpu_gates.py` on clean 1c09775 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded), once as it is (`auto`, which gave cuPotential) and once with `--backend openmm`: all 20 passed each time (`gpu-tests` and the 19 items). Record of cuPotential (no speed, no duration): nonbonded energy and force against PME at 1e-6 in double precision 2.6e-6 and 4.1e-4 on the soluble system, 5.8e-7 and 3.1e-4 on the membrane system (OpenMM at the same coordinates 1.9e-5, 7.2e-4 and 1.1e-6, 7.3e-4; criteria 1e-4, 2e-3); CVs, walls and bias equal in the two back ends; `periodic_images` CV 4.0e-07 nm, wall energy 3.8e-05 kJ/mol; toy with the plugin's integrator −4.36 (samples) and −3.78 (bias) against −4.95 kJ/mol; every test run had the back end asked for, and the continued ones came from their binary checkpoints. Record of OpenMM: toy −4.76, −4.34; `periodic_images` 6.1e-07 nm, 1.1e-03 kJ/mol; speed (a diagnostic) 1348 ns/day plain, 1372 with the bias, membrane 804. `pytest -m slow` of `tests/test_system.py` and `tests/test_membrane.py`: 3 passed. CI green on 1c09775 (run 44052500256, three jobs). The TYK2 example by its README with the default (88476 atoms, 5 replicas of 1 ns on 5 GPUs): every `device.json` names cuPotential (force, integrator, barostat), `schedule.jsonl` has return code 0 for each replica, `fmeta status` and `fmeta analyze` ended with 0; the exit status of the `fmeta run` call itself was not kept (the driver script overwrote its log). Not done at this commit: the A2A example with the default (running); the other slow tests.
-- Why: the change gate asks for one record per back end on the code that is merged, and the plan closes M4 with them, a green CI and the two examples running with the default.
-- Refs: FM-D18 (`docs/design/engine.md`); `bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`, `bench/results/2026-11-17-1c0977590-gpu-gates.json`, `bench/results/index.json`; `README.md`, `docs/roadmap.md` (R11); plan `docs/plans/2026-11-17-cupotential-backend.md` (M4).
-
-### 2026-11-17 — [amendment] FM-D4, FM-D5, FM-D13 (fourth) and FM-D14 follow FM-D18: one gate record per back end, and the back end is a condition of a run
-- What: FM-D13: the evidence of a commit is one gate record per back end (`scripts/gpu_gates.py` as it is and with `--backend openmm`; `<date>-<commit>-cupotential-gpu-gates.json` and `<date>-<commit>-gpu-gates.json`; `backend` in the record and its index entry; "the newest record" of a rule is the newest of each back end); the record of cuPotential holds neither a speed nor a duration (`PLUGIN_WITHHELD`, checked in CI). FM-D5: `run.yaml` names the back end and its parts, a run that continues keeps them, another back end by name is refused before a file is touched, and `device.json` says what the last segment began from (`restored_from`). FM-D14: the scheduler passes the back end to every replica and walker process, a new replica under `auto` follows the replicas of its work directory, and `device.json` and `fmeta status` show it. FM-D4: the bias, the CVs and the walls are OpenMM's own forces under every back end; the force that reads the CVs is taken out of the integration before the Context exists; its measurements are of OpenMM 8.6.1 (with 8.4.0: the bias at 95% of plain MD, record of 565b359). The rule files (`numerics-invariants.md`, `docker-execution.md`, `progress-log.md`), `CLAUDE.md` and the runbook give the two gate commands. Not measured: whether a continued run under the plugin repeats an uninterrupted one byte for byte (the restart test is on Reference with OpenMM's integrator).
-- Why: `run.backend: openmm` is the path that stays when the plugin is not there (early-access software under a licence that can end), so both paths are verified on the code that is merged and a record says which one it verified; the hills and samples of one run must come from one set of forces.
-- Refs: FM-D4, FM-D5, FM-D13, FM-D14, amendments of 2026-11-17 (`docs/design/engine.md`); `.claude/rules/numerics-invariants.md`, `.claude/rules/docker-execution.md`, `.claude/rules/progress-log.md`, `CLAUDE.md`, `docs/gpu-runbook.md`.
-
-### 2026-11-17 — [design] FM-D18: `run.backend` is `auto` by default (M4); a benchmark report names the back end of every replica
-- What: the default of `run.backend` is `auto` (before: `openmm`) in the code, the two presets and `docs/configuration.md`; `fmeta check` and the GPU gates without `--backend` follow it. A run that continues and a new replica in a work directory with runs keep the back end that is there (`settle`, unchanged). Benchmark sets: a set that names no back end now asks for `auto`, another configuration than the reported sets (made with OpenMM); a work directory prepared for OpenMM is refused by it with the way to go on (`run: {backend: openmm}` in the `config` of `set.yaml`), and a `config.yaml` from before the key is read as `openmm`. A report gives `backend` for every replica (from `run.yaml`) and one header line; replicas of more than one back end are named there as a diagnostic and all count. Verified: `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 197 passed in the image without a GPU (`auto` gives OpenMM there, with the reason); the two new tests failed on the code before the change. Not run on this code: anything on a GPU (the gates of both back ends follow on the final code), `pytest -m slow`. CI is green on 984ca0e (M3).
-- Why: owner request of 2026-11-17: cuPotential is the default. M2 chose its parts and M3 gave it check items that pass, the conditions of the plan for the switch. A report of a set must say what made its numbers once two back ends exist, and a set in progress must not change its forces because a default changed.
-- Refs: FM-D18 (`docs/design/engine.md`), plan `docs/plans/2026-11-17-cupotential-backend.md` (M4); `src/fmeta/config.py`, `src/fmeta/presets/*.yaml`, `docs/configuration.md`, `src/fmeta/benchmark.py`, `src/fmeta/engine/backend.py`, `tests/test_benchmark.py`.
-
-### 2026-11-17 — [design] FM-D18: the check items of the back end and their criteria (M3); a continued test run must come from its binary checkpoint
-- What: `fmeta check` has 19 items. New `backend` (soluble test system) and `membrane_backend`: `auto` gives cuPotential where the plugin can take part; nonbonded energy ≤ 1e-4 and force ≤ 2e-3 (relative), with OpenMM's PME and with the back end of the runs, against PME at an Ewald tolerance of 1e-6 in double precision, also with whole molecules moved by lattice vectors; CVs, walls and bias with cuPotential against OpenMM's within the numbers of `forces`; the plugin's barostat holds the pressure and temperature of the configuration. `platform` makes 100 plugin steps of a PME system. The toy items run with the integrator of the back end (criteria unchanged). `device.json` gets `restored_from`; `toy_restart` and `production` now require `checkpoint` (stricter: a run that fell to the State XML passed before). Every test run is verified to have the back end asked for. Verified on GPUs, item by item with `--backend openmm`, `cupotential` and `auto`: the 12 items the change touches passed (OpenMM within 3.1e-5 / 8.0e-4, cuPotential 2.8e-6 / 4.5e-4; toy with the plugin's integrator −4.36 / −3.78 against −4.95 kJ/mol); the checks of the back end and of the checkpoint reject a run made otherwise (checked once); `ruff`, `pytest` 196 passed. NPT, 8 × 1 ns per set (not a gate item): density within 0.6 and potential energy within 2.0 standard errors of stock; the kinetic temperature of the soluble system is 0.13 K higher with the plugin's integrator (2.8 and 4.4 standard errors), origin not known. Not run: `forces`, `pdb_sdf_*`, `replicas_*`, `analysis`, `benchmark` on this code, `pytest -m slow`, the GPU gates (M4).
-- Why: M3 of the plan: a default needs items that fail when the forces of the plugin are those of another model and when `auto` falls to OpenMM without notice. The criteria are the numbers of `forces`, the upper bound of the plan: the largest measured force component moves from frame to frame (OpenMM 5.9e-4 to 7.6e-4), so a criterion near the measured values would decide by the frame and not by the code.
-- Refs: FM-D18 (`docs/design/engine.md`); `src/fmeta/check.py`, `src/fmeta/engine/backend.py`, `src/fmeta/engine/runner.py`, `src/fmeta/workflow.py`, `src/fmeta/testing/toy.py`, `tests/test_engine.py`, `tests/test_backend.py`, `.claude/rules/numerics-invariants.md`, `docs/gpu-runbook.md`, `README.md`.

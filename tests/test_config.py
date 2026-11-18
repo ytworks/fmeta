@@ -1,6 +1,7 @@
 """The presets, a configuration on top of a preset, and the documentation of the keys."""
 
 import dataclasses
+import json
 import re
 from pathlib import Path
 
@@ -75,6 +76,15 @@ def test_configuration_on_a_preset(tmp_path):
                          ids=lambda path: path.parent.name)
 def test_example_loads(path):
     Config.load(path)
+
+
+def test_binding_examples_share_sampling_and_region_rules():
+    roots = [ROOT / "examples" / name for name in ("tyk2_ejm46", "a2a_theophylline")]
+    a, b = (Config.load(root / "fmeta.yaml") for root in roots)
+    assert a.run == b.run and a.metad == b.metad
+    regions = [json.loads((d / "paper-regions.json").read_text()) for d in roots]
+    common = ("rule", "contact_nm", "core_radius", "initial_sample_count", "initial_sample_time_ps")
+    assert all(regions[0][k] == regions[1][k] for k in common)
 
 
 def test_documentation_has_every_key():

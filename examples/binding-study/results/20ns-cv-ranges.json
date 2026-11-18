@@ -1,0 +1,153 @@
+{
+  "cut_ns": 20,
+  "discard_ns": 2,
+  "matched_interval_ps": 2,
+  "first_sample_ps": 2002,
+  "last_sample_ps": 20000,
+  "records_per_walker": 9000,
+  "physical_walkers_per_arm": 32,
+  "coordinates_nm": {
+    "s": "Funnel-axis projection (COLVAR proj).",
+    "rho": "Recorded perpendicular extension (COLVAR ext), including the funnel regularization."
+  },
+  "rule": "Select COLVAR records at 2002, 2004, ..., 20000 ps from each physical trajectory. Each arm uses all 32 trajectories with equal length, yielding 288000 equally weighted physical records. Quantiles are linear interpolation of the pooled, unweighted observations.",
+  "systems": {
+    "tyk2": {
+      "a": {
+        "independent_bias_histories": 4,
+        "walkers_per_history": 8,
+        "native_colvar_interval_ps": 1.0,
+        "native_post_discard_records": 576000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.57795888,
+          "p01": 0.7107244972,
+          "p99": 4.597613189,
+          "max": 4.77168274
+        },
+        "rho_nm": {
+          "min": 0.00100117,
+          "p01": 0.0129537682,
+          "p99": 0.737779973,
+          "max": 0.81683379
+        }
+      },
+      "b": {
+        "independent_bias_histories": 8,
+        "walkers_per_history": 4,
+        "native_colvar_interval_ps": 1.0,
+        "native_post_discard_records": 576000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.59179664,
+          "p01": 0.7564353296,
+          "p99": 4.6041242417,
+          "max": 4.77414703
+        },
+        "rho_nm": {
+          "min": 0.00104016,
+          "p01": 0.0133746872,
+          "p99": 0.733196023,
+          "max": 0.8125118
+        }
+      },
+      "c": {
+        "independent_bias_histories": 8,
+        "walkers_per_history": 4,
+        "native_colvar_interval_ps": 2.0,
+        "native_post_discard_records": 288000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.59556508,
+          "p01": 0.7249276942,
+          "p99": 4.5628926355,
+          "max": 4.73778439
+        },
+        "rho_nm": {
+          "min": 0.00103191,
+          "p01": 0.0092320094,
+          "p99": 0.7029802566,
+          "max": 0.80352795
+        }
+      },
+      "d": {
+        "independent_bias_histories": 32,
+        "walkers_per_history": 1,
+        "native_colvar_interval_ps": 2.0,
+        "native_post_discard_records": 288000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.62016422,
+          "p01": 0.9195894752,
+          "p99": 4.558020422,
+          "max": 4.7280755
+        },
+        "rho_nm": {
+          "min": 0.00101691,
+          "p01": 0.009216385,
+          "p99": 0.6413449404,
+          "max": 0.75329357
+        }
+      },
+      "e": {
+        "independent_bias_histories": 1,
+        "walkers_per_history": 32,
+        "native_colvar_interval_ps": 2.0,
+        "native_post_discard_records": 288000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.58027577,
+          "p01": 0.6842449987,
+          "p99": 4.5455651491,
+          "max": 4.75877285
+        },
+        "rho_nm": {
+          "min": 0.00100262,
+          "p01": 0.0076912892,
+          "p99": 0.7192723313,
+          "max": 0.81885523
+        }
+      }
+    },
+    "a2a": {
+      "a": {
+        "independent_bias_histories": 4,
+        "walkers_per_history": 8,
+        "native_colvar_interval_ps": 1.0,
+        "native_post_discard_records": 576000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.57544351,
+          "p01": 0.7218201152,
+          "p99": 4.9541875188,
+          "max": 5.12465906
+        },
+        "rho_nm": {
+          "min": 0.00102065,
+          "p01": 0.0160573222,
+          "p99": 0.7594880263,
+          "max": 0.81687081
+        }
+      },
+      "b": {
+        "independent_bias_histories": 8,
+        "walkers_per_history": 4,
+        "native_colvar_interval_ps": 1.0,
+        "native_post_discard_records": 576000,
+        "matched_records": 288000,
+        "s_nm": {
+          "min": 0.59798074,
+          "p01": 0.7505103465,
+          "p99": 4.9644605406,
+          "max": 5.11706591
+        },
+        "rho_nm": {
+          "min": 0.00110001,
+          "p01": 0.0190217097,
+          "p99": 0.7512052165,
+          "max": 0.82075793
+        }
+      }
+    }
+  }
+}

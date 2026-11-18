@@ -1,0 +1,2847 @@
+{
+  "arm": "a",
+  "energy_unit": "kJ/mol",
+  "length_unit": "ns/walker",
+  "reweighting_bias_interpolation": "production_natural_bicubic",
+  "production_source": {
+    "tracked_source_base_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+    "tracked_src_fmeta_tree": "db75005c9dabba6877fbcd462d26b8aee1100d33",
+    "wrapper_segments": {
+      "tyk2": [
+        {
+          "end_ns": 10,
+          "wrapper_commit": "8cb986bcaa44617c2a3f5edf6e15b409b7996bb4",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 20,
+          "wrapper_commit": "0609085f38d84ecb6b8ca89cc7dea45260683f47",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 30,
+          "wrapper_commit": "6e4b114f8a1a58c20307ee28ba717ca25c3f9d03",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 40,
+          "wrapper_commit": "671ca5b5b85bc91d2b1de3b75d9b461b68aa2dff",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 50,
+          "wrapper_commit": "1f6f7acde607b60454237886ce48c28ad0a4f2a1",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 60,
+          "wrapper_commit": "5fa7a1b684d61f6c674854dd0d9a242f047a357b",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 70,
+          "wrapper_commit": "a476e01519b9e155e13de7f9d1efbe3849ae467a",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 80,
+          "wrapper_commit": "63dc702dac5771fc08d8c69af21b4de7e21e57e6",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 90,
+          "wrapper_commit": "5b31d779062f85708f90576daa353bf8e5f5521c",
+          "wrapper_dirty": true
+        }
+      ],
+      "a2a": [
+        {
+          "end_ns": 10,
+          "wrapper_commit": "3bc8b2f05ee52d692d891aa4a5c5f88347cdb62e",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 20,
+          "wrapper_commit": "804e4c0adf1ccb1511e36a6640735f74ab537ea9",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 30,
+          "wrapper_commit": "fed8e4a64ac07a89f7d23c5985021d36bbcea298",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 40,
+          "wrapper_commit": "1f6f7acde607b60454237886ce48c28ad0a4f2a1",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 50,
+          "wrapper_commit": "5fa7a1b684d61f6c674854dd0d9a242f047a357b",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 60,
+          "wrapper_commit": "a476e01519b9e155e13de7f9d1efbe3849ae467a",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 70,
+          "wrapper_commit": "63dc702dac5771fc08d8c69af21b4de7e21e57e6",
+          "wrapper_dirty": true
+        },
+        {
+          "end_ns": 80,
+          "wrapper_commit": "5b31d779062f85708f90576daa353bf8e5f5521c",
+          "wrapper_dirty": true
+        }
+      ]
+    },
+    "dirty_state_note": "The wrapper records commit and dirty status. The tracked src/fmeta tree matches the base in all listed commits. Uncommitted historical file contents cannot be recovered from these records."
+  },
+  "analysis_commit": "6c4bc62db3bdcce84f35b88e440d04046af65e90",
+  "frozen_inputs": {
+    "tyk2": {
+      "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+      "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+      "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+      "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+      "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+    },
+    "a2a": {
+      "system_sha256": "d70b60d0d41efc55ccbf5d460bcccbef5bfcb259a3ba24355fa3ed88dad5c93b",
+      "positions_sha256": "e5ed1f3a67aae9950a104fc72728800ca43252dea083adb5e042da580c63d7d5",
+      "topology_sha256": "4719610b985e71fa0e4095679620481cc406165c3ed3435ec81c2d5f06448826",
+      "funnel_sha256": "bcb380c57aada231d3f09f9827e04ca657918e0cf96bba2c81f3592fffb9091c",
+      "equil_state_sha256": "45f3f578d5c8aeb2476c66c20f96bd39e8b7fd56c2d79046c95864bd9bb9f89f"
+    }
+  },
+  "endpoints": [
+    {
+      "length_ns": 20,
+      "purpose": "screening",
+      "passes": false,
+      "precision_passes": false,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -16.25885388628531,
+            "signed_error_predicted_minus_reference": -4.8395933436546255,
+            "independent_replica_sd": 3.8035188356112504,
+            "ci95_independent_replicas": [
+              -22.311101119019312,
+              -10.2066066535513
+            ],
+            "ci95_halfwidth": 6.052247232734007,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -16.230523078256237,
+            "accumulated_wt_mean": -14.48774427099853
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -16.25885388628531,
+              "sd": 3.8035188356112504,
+              "sem": 1.9017594178056252,
+              "ci95": [
+                -22.311101119019312,
+                -10.2066066535513
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -16.230523078256237,
+              "sd": 3.8267367214408843,
+              "sem": 1.9133683607204421,
+              "ci95": [
+                -22.31971514847775,
+                -10.141331008034719
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -14.48774427099853,
+              "sd": 2.4599425041137875,
+              "sem": 1.2299712520568937,
+              "ci95": [
+                -18.402061737712167,
+                -10.573426804284892
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -13.263361833548219,
+              "sd": 2.1606110669781056,
+              "sem": 1.0803055334890528,
+              "ci95": [
+                -16.701376187178,
+                -9.825347479918436
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -68.02704466021773,
+          "ci95": [
+            -93.34964708197681,
+            -42.70444223845864
+          ],
+          "dG_core": -67.90850855942409,
+          "ci95_core": [
+            -93.38568818123092,
+            -42.431328937617266
+          ],
+          "dG_bias": -60.61672202985785,
+          "ci95_bias": [
+            -76.9942263105877,
+            -44.23921774912799
+          ],
+          "affinity_fold_error": 3354.058441945707,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "departures": 16,
+            "counts": {
+              "site_frames": 4019,
+              "site_contact_frames": 4019,
+              "bulk_frames": 272,
+              "bulk_clear_frames": 268,
+              "bulk_core_frames": 123,
+              "bulk_core_clear_frames": 122,
+              "site_contact_wall_above_kT_frames": 352,
+              "bound_contact_wall_above_kT_frames": 115
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -89.20882030922593,
+              "dG_core": -89.2871742754412,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -75.40302103286564,
+              "bulk_pmf_sd": 1.528261388288109,
+              "wt_bias_trace_kcal_mol": [
+                -30.10209371113761,
+                -24.231749593237094,
+                -26.453060856027925,
+                -25.50096295823693,
+                -24.079478955302694,
+                -21.55586133316334,
+                -22.52819529806986,
+                -22.241626707697964,
+                -21.908322322457895,
+                -20.743108535911077,
+                -20.42516946541251,
+                -19.82713003189503,
+                -19.983225901520704,
+                -19.788531776062424,
+                -18.900556484388122,
+                -17.516450636233717,
+                -16.38522947201714,
+                -15.67488136880794,
+                -15.838943763260762,
+                -15.877426590042253
+              ],
+              "wt_bias_final_kcal_mol": -15.877426590042253,
+              "wt_bias_late_mean_kcal_mol": -18.02175454896406,
+              "wt_bias_final_minus_late_kcal_mol": 2.1443279589218083,
+              "wt_bias_late_time_sd_kcal_mol": 1.859599790030189,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22102,
+                  "ess": 1693.3823656809166
+                },
+                "bulk": {
+                  "count": 1654,
+                  "ess": 541.2896132465042
+                },
+                "core": {
+                  "count": 701,
+                  "ess": 283.4117340325439
+                }
+              },
+              "weighted_site_above_1kT": 1.4081576400468708e-16,
+              "weighted_site_contact_above_1kT": 1.3627034883729557e-16,
+              "weighted_bound_contact_above_1kT": 3.753445108683481e-18
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -57.11513715588088,
+              "dG_core": -57.19406460135604,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -56.93031622943812,
+              "bulk_pmf_sd": 0.33511594488670743,
+              "wt_bias_trace_kcal_mol": [
+                -28.168981694822953,
+                -20.886596134122087,
+                -18.88585903008226,
+                -16.252427147842848,
+                -15.791764727412586,
+                -15.586765960698067,
+                -14.96358104607977,
+                -13.94437560002157,
+                -13.482335477917523,
+                -12.99030855508178,
+                -13.5065707010255,
+                -14.051482760845563,
+                -14.559912149781901,
+                -14.41785184574088,
+                -14.140029652844126,
+                -13.537472549651046,
+                -13.038388768283312,
+                -12.806523642761642,
+                -12.886622992637232,
+                -13.121866326099264
+              ],
+              "wt_bias_final_kcal_mol": -13.121866326099264,
+              "wt_bias_late_mean_kcal_mol": -13.606672138967046,
+              "wt_bias_final_minus_late_kcal_mol": 0.4848058128677817,
+              "wt_bias_late_time_sd_kcal_mol": 0.614858170441011,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 19965,
+                  "ess": 361.2582069800544
+                },
+                "bulk": {
+                  "count": 1768,
+                  "ess": 417.5871288351024
+                },
+                "core": {
+                  "count": 746,
+                  "ess": 213.09200196041508
+                }
+              },
+              "weighted_site_above_1kT": 1.0380124002951208e-12,
+              "weighted_site_contact_above_1kT": 1.7569279215880024e-12,
+              "weighted_bound_contact_above_1kT": 6.640454886264664e-16
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -71.2373600315241,
+              "dG_core": -70.9535474314131,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -58.52888591490182,
+              "bulk_pmf_sd": 1.2737536832527927,
+              "wt_bias_trace_kcal_mol": [
+                -30.06799807259807,
+                -28.23651958617404,
+                -24.673427935714574,
+                -25.445873237714245,
+                -25.56151867278912,
+                -21.986764430964328,
+                -19.89063784504771,
+                -17.924379630089163,
+                -16.16096426991106,
+                -15.183622801021372,
+                -15.14807230503138,
+                -14.88461936800487,
+                -14.80310550483006,
+                -14.457096073106904,
+                -14.008072320679844,
+                -13.257043238298582,
+                -13.48043031646826,
+                -13.189396719077632,
+                -13.20164866255128,
+                -13.457910126037774
+              ],
+              "wt_bias_final_kcal_mol": -13.457910126037774,
+              "wt_bias_late_mean_kcal_mol": -13.988739463408656,
+              "wt_bias_final_minus_late_kcal_mol": 0.5308293373708821,
+              "wt_bias_late_time_sd_kcal_mol": 0.7323643393550227,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22154,
+                  "ess": 1968.0297753887878
+                },
+                "bulk": {
+                  "count": 1366,
+                  "ess": 420.90353169186864
+                },
+                "core": {
+                  "count": 578,
+                  "ess": 228.94366410425076
+                }
+              },
+              "weighted_site_above_1kT": 4.997640292018407e-13,
+              "weighted_site_contact_above_1kT": 6.167967491164961e-13,
+              "weighted_bound_contact_above_1kT": 6.689931994780369e-13
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -54.54686114424,
+              "dG_core": -54.19924792948601,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -51.6046649422258,
+              "bulk_pmf_sd": 0.6810312103744396,
+              "wt_bias_trace_kcal_mol": [
+                -30.566195212298112,
+                -22.512299329751777,
+                -22.700385001957276,
+                -21.191451032963418,
+                -18.635585115561895,
+                -15.29254567114176,
+                -15.86202071577711,
+                -14.78713154234907,
+                -14.532195798769191,
+                -14.496682600377152,
+                -14.662827666378039,
+                -14.433120938420752,
+                -13.44784155602293,
+                -12.520028542282539,
+                -11.965218689799228,
+                -12.04168450086178,
+                -11.64682051209397,
+                -11.262917132073072,
+                -10.761405496597618,
+                -10.596244292013585
+              ],
+              "wt_bias_final_kcal_mol": -10.596244292013585,
+              "wt_bias_late_mean_kcal_mol": -12.33381093265435,
+              "wt_bias_final_minus_late_kcal_mol": 1.7375666406407646,
+              "wt_bias_late_time_sd_kcal_mol": 1.3578927359674942,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22120,
+                  "ess": 841.6197839552486
+                },
+                "bulk": {
+                  "count": 1732,
+                  "ess": 440.9516942655997
+                },
+                "core": {
+                  "count": 732,
+                  "ess": 242.7716918555979
+                }
+              },
+              "weighted_site_above_1kT": 1.5561128582547113e-12,
+              "weighted_site_contact_above_1kT": 1.5263026282347463e-12,
+              "weighted_bound_contact_above_1kT": 3.504417694640475e-12
+            }
+          ]
+        },
+        "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -6.408694609647778,
+            "signed_error_predicted_minus_reference": 1.5326590542856975,
+            "independent_replica_sd": 3.556173385544239,
+            "ci95_independent_replicas": [
+              -12.067360035534536,
+              -0.7500291837610193
+            ],
+            "ci95_halfwidth": 5.658665425886758,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -6.323863978487478,
+            "accumulated_wt_mean": -6.007030974058895
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -6.408694609647778,
+              "sd": 3.556173385544239,
+              "sem": 1.7780866927721195,
+              "ci95": [
+                -12.067360035534536,
+                -0.7500291837610193
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -6.323863978487478,
+              "sd": 3.5642228734145185,
+              "sem": 1.7821114367072592,
+              "ci95": [
+                -11.995337935840336,
+                -0.6523900211346205
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -6.007030974058895,
+              "sd": 3.1088131550467377,
+              "sem": 1.5544065775233689,
+              "ci95": [
+                -10.953846443606833,
+                -1.0602155045109563
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -5.265991179697096,
+              "sd": 3.106088250282567,
+              "sem": 1.5530441251412834,
+              "ci95": [
+                -10.208470717695542,
+                -0.32351164169864993
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -26.813978246766304,
+          "ci95": [
+            -50.4898343886765,
+            -3.138122104856105
+          ],
+          "dG_core": -26.459046885991608,
+          "ci95_core": [
+            -50.18849392355597,
+            -2.7295998484272523
+          ],
+          "dG_bias": -25.13341759546242,
+          "ci95_bias": [
+            -45.83089352005099,
+            -4.4359416708738415
+          ],
+          "affinity_fold_error": 13.07732638057664,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              1,
+              0,
+              0,
+              1
+            ],
+            "departures": 17,
+            "counts": {
+              "site_frames": 2725,
+              "site_contact_frames": 2719,
+              "bulk_frames": 301,
+              "bulk_clear_frames": 301,
+              "bulk_core_frames": 131,
+              "bulk_core_clear_frames": 131,
+              "site_contact_wall_above_kT_frames": 176,
+              "bound_contact_wall_above_kT_frames": 45
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -36.123076820174745,
+              "dG_core": -35.816810950926126,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -33.62406959270964,
+              "bulk_pmf_sd": 0.2999876645982029,
+              "wt_bias_trace_kcal_mol": [
+                -16.051095400031326,
+                -19.06855308863786,
+                -12.416379644691094,
+                -10.716640216944834,
+                -9.03102104185127,
+                -8.772631183612102,
+                -8.223601962872575,
+                -8.632097266503607,
+                -8.536594528189957,
+                -8.847946635201417,
+                -9.069366483488034,
+                -8.921099340325664,
+                -8.673353574582398,
+                -8.243257775354937,
+                -7.737939350922423,
+                -7.549553013902267,
+                -7.604245290297724,
+                -7.622855730390278,
+                -7.607916209161521,
+                -7.333868281071975
+              ],
+              "wt_bias_final_kcal_mol": -7.333868281071975,
+              "wt_bias_late_mean_kcal_mol": -8.036345504949722,
+              "wt_bias_final_minus_late_kcal_mol": 0.7024772238777466,
+              "wt_bias_late_time_sd_kcal_mol": 0.6049162853287812,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 14788,
+                  "ess": 880.9031828152099
+                },
+                "bulk": {
+                  "count": 1803,
+                  "ess": 539.0984531831045
+                },
+                "core": {
+                  "count": 803,
+                  "ess": 323.24537847583196
+                }
+              },
+              "weighted_site_above_1kT": 2.2221177630899574e-10,
+              "weighted_site_contact_above_1kT": 6.360030601264139e-10,
+              "weighted_bound_contact_above_1kT": 1.502822796559589e-24
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -18.530890856403463,
+              "dG_core": -18.095649042389525,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -19.73470063138329,
+              "bulk_pmf_sd": 0.20645552125768396,
+              "wt_bias_trace_kcal_mol": [
+                -15.881283947171825,
+                -13.0913199417868,
+                -9.272467733746506,
+                -9.348209429363445,
+                -5.21582435296527,
+                -3.34461582933299,
+                -3.8042065433035526,
+                -2.738058539923599,
+                -3.466760609381786,
+                -4.877956069993048,
+                -5.579023641938982,
+                -5.249666723838008,
+                -4.503814391969414,
+                -4.799376156495298,
+                -5.14011709204543,
+                -4.7416297921582125,
+                -4.255861597374938,
+                -4.058761492827861,
+                -4.270093845848152,
+                -4.568721784106215
+              ],
+              "wt_bias_final_kcal_mol": -4.568721784106215,
+              "wt_bias_late_mean_kcal_mol": -4.7167066518602505,
+              "wt_bias_final_minus_late_kcal_mol": 0.14798486775403585,
+              "wt_bias_late_time_sd_kcal_mol": 0.4611208595276339,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 13593,
+                  "ess": 1052.3217672651306
+                },
+                "bulk": {
+                  "count": 1844,
+                  "ess": 535.4648854065398
+                },
+                "core": {
+                  "count": 801,
+                  "ess": 346.2694732566003
+                }
+              },
+              "weighted_site_above_1kT": 7.366707137868199e-05,
+              "weighted_site_contact_above_1kT": 0.00010835064294378165,
+              "weighted_bound_contact_above_1kT": 9.65158951772686e-13
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -42.244017365183545,
+              "dG_core": -41.91739683995907,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -37.75696316504839,
+              "bulk_pmf_sd": 0.6058862289165564,
+              "wt_bias_trace_kcal_mol": [
+                -21.9247961908886,
+                -16.988651190366753,
+                -13.810912233174,
+                -10.913815805633737,
+                -11.946067719231262,
+                -10.987565856604247,
+                -10.447624445502557,
+                -10.2088998603765,
+                -10.7810026948553,
+                -10.369180444762561,
+                -10.789168533756039,
+                -9.945772671868998,
+                -9.857014596556578,
+                -8.985053867957019,
+                -9.232916438878055,
+                -8.97389028129085,
+                -8.429792276419748,
+                -7.958124228881756,
+                -8.079945644989376,
+                -7.989629215253386
+              ],
+              "wt_bias_final_kcal_mol": -7.989629215253386,
+              "wt_bias_late_mean_kcal_mol": -9.02413077558518,
+              "wt_bias_final_minus_late_kcal_mol": 1.034501560331794,
+              "wt_bias_late_time_sd_kcal_mol": 0.9031836660134875,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 17064,
+                  "ess": 2162.4105823854597
+                },
+                "bulk": {
+                  "count": 1687,
+                  "ess": 587.8223610005579
+                },
+                "core": {
+                  "count": 722,
+                  "ess": 353.63074928742884
+                }
+              },
+              "weighted_site_above_1kT": 1.5392332199097862e-09,
+              "weighted_site_contact_above_1kT": 1.326298743654463e-09,
+              "weighted_bound_contact_above_1kT": 3.411365281126905e-12
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -10.35792794530346,
+              "dG_core": -10.006330710691708,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -9.417936992708348,
+              "bulk_pmf_sd": 1.8339398248527807,
+              "wt_bias_trace_kcal_mol": [
+                -22.53001581963854,
+                -20.92155310523225,
+                -13.966216323832677,
+                -12.089029919911328,
+                -10.159196675821846,
+                -8.572708019223613,
+                -7.028804204264027,
+                -6.806035798553595,
+                -5.275846018093176,
+                -4.309031232078773,
+                -4.201299975234858,
+                -3.879595648141982,
+                -3.13346307328484,
+                -2.3041855011267742,
+                -2.2811619174253637,
+                -1.6012455371170764,
+                -1.540912393245758,
+                -1.3049571529186563,
+                -1.0908430015521569,
+                -1.1717454383568078
+              ],
+              "wt_bias_final_kcal_mol": -1.1717454383568078,
+              "wt_bias_late_mean_kcal_mol": -2.2509409638404274,
+              "wt_bias_final_minus_late_kcal_mol": 1.0791955254836196,
+              "wt_bias_late_time_sd_kcal_mol": 1.075668641724336,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 36000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 11266,
+                  "ess": 698.7393029164924
+                },
+                "bulk": {
+                  "count": 2250,
+                  "ess": 562.6199715551976
+                },
+                "core": {
+                  "count": 998,
+                  "ess": 390.23035970176227
+                }
+              },
+              "weighted_site_above_1kT": 0.0001337412215308171,
+              "weighted_site_contact_above_1kT": 0.0001867769913009425,
+              "weighted_bound_contact_above_1kT": 1.735593075520172e-07
+            }
+          ]
+        }
+      }
+    },
+    {
+      "length_ns": 40,
+      "purpose": "screening",
+      "passes": false,
+      "precision_passes": false,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -13.78605165131891,
+            "signed_error_predicted_minus_reference": -2.3667911086882274,
+            "independent_replica_sd": 3.3542885609603044,
+            "ci95_independent_replicas": [
+              -19.123473270160673,
+              -8.448630032477148
+            ],
+            "ci95_halfwidth": 5.337421618841763,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -13.76632585396113,
+            "accumulated_wt_mean": -12.636129575323437
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -13.78605165131891,
+              "sd": 3.3542885609603044,
+              "sem": 1.6771442804801522,
+              "ci95": [
+                -19.123473270160673,
+                -8.448630032477148
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -13.76632585396113,
+              "sd": 3.344922686209,
+              "sem": 1.6724613431045,
+              "ci95": [
+                -19.088844276053873,
+                -8.443807431868384
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -12.636129575323437,
+              "sd": 2.718291189767413,
+              "sem": 1.3591455948837066,
+              "ci95": [
+                -16.961537452103716,
+                -8.310721698543157
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -11.710624958461626,
+              "sd": 3.240585450897712,
+              "sem": 1.620292725448856,
+              "ci95": [
+                -16.867119556044408,
+                -6.554130360878845
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            2.0,
+            4.0,
+            6.0,
+            8.0,
+            10.0,
+            12.0,
+            14.0,
+            16.0,
+            18.0,
+            20.0,
+            22.0,
+            24.0,
+            26.0,
+            28.0,
+            30.0,
+            32.0,
+            34.0,
+            36.0,
+            38.0,
+            40.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -57.68084010911832,
+          "ci95": [
+            -80.01261216235226,
+            -35.34906805588439
+          ],
+          "dG_core": -57.598307372973366,
+          "ci95_core": [
+            -79.86772445100941,
+            -35.328890294937324
+          ],
+          "dG_bias": -52.869566143153264,
+          "ci95_bias": [
+            -70.96707269960196,
+            -34.77205958670457
+          ],
+          "affinity_fold_error": 52.98727201291802,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              1,
+              0,
+              0,
+              1
+            ],
+            "departures": 21,
+            "counts": {
+              "site_frames": 7543,
+              "site_contact_frames": 7542,
+              "bulk_frames": 485,
+              "bulk_clear_frames": 478,
+              "bulk_core_frames": 214,
+              "bulk_core_clear_frames": 211,
+              "site_contact_wall_above_kT_frames": 801,
+              "bound_contact_wall_above_kT_frames": 288
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -66.17757885435286,
+              "dG_core": -66.10660198022346,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -58.257248346464166,
+              "bulk_pmf_sd": 1.4190758029469965,
+              "wt_bias_trace_kcal_mol": [
+                -24.231749593237087,
+                -25.500962958236922,
+                -21.555861333163328,
+                -22.24162670769795,
+                -20.74310853591107,
+                -19.827130031895027,
+                -19.788531776062417,
+                -17.516450636233703,
+                -15.674881368807926,
+                -15.877426590042242,
+                -15.59654128536025,
+                -15.554612569818039,
+                -14.993092451783093,
+                -13.856474003089133,
+                -13.856471759967826,
+                -13.79957419928357,
+                -13.185006215106787,
+                -12.797409701994004,
+                -12.798242562955027,
+                -12.800740514657953
+              ],
+              "wt_bias_final_kcal_mol": -12.800740514657953,
+              "wt_bias_late_mean_kcal_mol": -13.923816526401568,
+              "wt_bias_final_minus_late_kcal_mol": 1.1230760117436152,
+              "wt_bias_late_time_sd_kcal_mol": 1.047292262618541,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22992,
+                  "ess": 908.3437933178891
+                },
+                "bulk": {
+                  "count": 1450,
+                  "ess": 423.48425896027163
+                },
+                "core": {
+                  "count": 626,
+                  "ess": 243.23692887644287
+                }
+              },
+              "weighted_site_above_1kT": 7.358499075792548e-13,
+              "weighted_site_contact_above_1kT": 8.034143995404881e-13,
+              "weighted_bound_contact_above_1kT": 8.734708938335196e-14
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -60.72033727407309,
+              "dG_core": -60.835894837763405,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -59.460058878357856,
+              "bulk_pmf_sd": 0.6756849760697885,
+              "wt_bias_trace_kcal_mol": [
+                -20.88659613412209,
+                -16.252427147842848,
+                -15.586765960698063,
+                -13.94437560002156,
+                -12.990308555081768,
+                -14.051482760845555,
+                -14.417851845740868,
+                -13.537472549651042,
+                -12.806523642761631,
+                -13.121866326099255,
+                -13.50902752570056,
+                -13.868362846850705,
+                -14.251961876452114,
+                -14.657769553062009,
+                -14.991631704503938,
+                -14.649471102195763,
+                -14.403288868667845,
+                -14.22223813579026,
+                -13.985659002901306,
+                -13.573540813985119
+              ],
+              "wt_bias_final_kcal_mol": -13.573540813985119,
+              "wt_bias_late_mean_kcal_mol": -14.21129514301096,
+              "wt_bias_final_minus_late_kcal_mol": 0.6377543290258405,
+              "wt_bias_late_time_sd_kcal_mol": 0.4590558201590899,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 20696,
+                  "ess": 834.0142366543911
+                },
+                "bulk": {
+                  "count": 1501,
+                  "ess": 295.45225721283
+                },
+                "core": {
+                  "count": 640,
+                  "ess": 159.5923696882193
+                }
+              },
+              "weighted_site_above_1kT": 5.19199090272611e-13,
+              "weighted_site_contact_above_1kT": 5.055867390911714e-13,
+              "weighted_bound_contact_above_1kT": 1.3810568238994223e-15
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -66.79413500810726,
+              "dG_core": -66.48574057748542,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -57.92262243055389,
+              "bulk_pmf_sd": 1.1393727392572512,
+              "wt_bias_trace_kcal_mol": [
+                -28.23651958617404,
+                -25.44587323771425,
+                -21.98676443096433,
+                -17.924379630089163,
+                -15.183622801021372,
+                -14.884619368004874,
+                -14.457096073106907,
+                -13.257043238298584,
+                -13.189396719077637,
+                -13.457910126037786,
+                -12.733247721862616,
+                -13.08323638935758,
+                -13.09026911232332,
+                -13.544806508903365,
+                -14.025178674607691,
+                -14.476942491841275,
+                -14.88976085989053,
+                -15.005326313898607,
+                -14.002515823011997,
+                -13.587106234689958
+              ],
+              "wt_bias_final_kcal_mol": -13.587106234689958,
+              "wt_bias_late_mean_kcal_mol": -13.843839013038693,
+              "wt_bias_final_minus_late_kcal_mol": 0.2567327783487343,
+              "wt_bias_late_time_sd_kcal_mol": 0.7373612952951232,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22893,
+                  "ess": 1623.9081598343819
+                },
+                "bulk": {
+                  "count": 1361,
+                  "ess": 372.1204419953425
+                },
+                "core": {
+                  "count": 577,
+                  "ess": 220.12686343046101
+                }
+              },
+              "weighted_site_above_1kT": 2.2091833191417338e-13,
+              "weighted_site_contact_above_1kT": 2.1917879355220015e-13,
+              "weighted_bound_contact_above_1kT": 1.7145666734947014e-13
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -37.03130929994006,
+              "dG_core": -36.96499209642117,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -35.83833491723715,
+              "bulk_pmf_sd": 0.5446337375400375,
+              "wt_bias_trace_kcal_mol": [
+                -22.512299329751777,
+                -21.191451032963414,
+                -15.292545671141763,
+                -14.787131542349078,
+                -14.496682600377154,
+                -14.433120938420753,
+                -12.520028542282546,
+                -12.04168450086179,
+                -11.262917132073083,
+                -10.596244292013589,
+                -10.483599948527806,
+                -10.347211352049374,
+                -10.025060069672115,
+                -9.602981944074585,
+                -9.165070750294356,
+                -8.252571967096651,
+                -7.152224072227722,
+                -6.871594570184666,
+                -6.874249243784555,
+                -6.881112270513471
+              ],
+              "wt_bias_final_kcal_mol": -6.881112270513471,
+              "wt_bias_late_mean_kcal_mol": -8.56556761884253,
+              "wt_bias_final_minus_late_kcal_mol": 1.6844553483290596,
+              "wt_bias_late_time_sd_kcal_mol": 1.4519590808735217,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 20830,
+                  "ess": 485.4330488085503
+                },
+                "bulk": {
+                  "count": 1637,
+                  "ess": 351.5614292849242
+                },
+                "core": {
+                  "count": 709,
+                  "ess": 192.7101046797093
+                }
+              },
+              "weighted_site_above_1kT": 5.240368907093076e-09,
+              "weighted_site_contact_above_1kT": 6.0564366164221135e-09,
+              "weighted_bound_contact_above_1kT": 4.285649571481036e-08
+            }
+          ]
+        },
+        "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -4.856893726498998,
+            "signed_error_predicted_minus_reference": 3.0844599374344774,
+            "independent_replica_sd": 2.0677662561248185,
+            "ci95_independent_replicas": [
+              -8.147171267496375,
+              -1.5666161855016214
+            ],
+            "ci95_halfwidth": 3.2902775409973772,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -4.817283011304246,
+            "accumulated_wt_mean": -4.738492091538382
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.856893726498998,
+              "sd": 2.0677662561248185,
+              "sem": 1.0338831280624092,
+              "ci95": [
+                -8.147171267496375,
+                -1.5666161855016214
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.817283011304246,
+              "sd": 2.0841354529631544,
+              "sem": 1.0420677264815772,
+              "ci95": [
+                -8.133607597300935,
+                -1.5009584253075579
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.738492091538382,
+              "sd": 1.4215871876359105,
+              "sem": 0.7107935938179553,
+              "ci95": [
+                -7.000554538003662,
+                -2.4764296450731025
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.008728342094658,
+              "sd": 0.6788664019861909,
+              "sem": 0.33943320099309543,
+              "ci95": [
+                -5.088956278485757,
+                -2.928500405703559
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            2.0,
+            4.0,
+            6.0,
+            8.0,
+            10.0,
+            12.0,
+            14.0,
+            16.0,
+            18.0,
+            20.0,
+            22.0,
+            24.0,
+            26.0,
+            28.0,
+            30.0,
+            32.0,
+            34.0,
+            36.0,
+            38.0,
+            40.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -20.32124335167181,
+          "ci95": [
+            -34.08776458320484,
+            -6.554722120138784
+          ],
+          "dG_core": -20.15551211929697,
+          "ci95_core": [
+            -34.03101418710712,
+            -6.280010051486823
+          ],
+          "dG_bias": -19.825850910996593,
+          "ci95_bias": [
+            -29.290320187007325,
+            -10.361381634985861
+          ],
+          "affinity_fold_error": 176.59664919356464,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              1,
+              0,
+              0,
+              2
+            ],
+            "departures": 22,
+            "counts": {
+              "site_frames": 5155,
+              "site_contact_frames": 5147,
+              "bulk_frames": 613,
+              "bulk_clear_frames": 612,
+              "bulk_core_frames": 278,
+              "bulk_core_clear_frames": 278,
+              "site_contact_wall_above_kT_frames": 371,
+              "bound_contact_wall_above_kT_frames": 105
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -23.955631223267247,
+              "dG_core": -23.81858470281888,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -23.12036347166138,
+              "bulk_pmf_sd": 0.15588070123977063,
+              "wt_bias_trace_kcal_mol": [
+                -19.068553088637856,
+                -10.716640216944834,
+                -8.772631183612106,
+                -8.632097266503607,
+                -8.847946635201419,
+                -8.92109934032566,
+                -8.243257775354937,
+                -7.549553013902265,
+                -7.6228557303902775,
+                -7.333868281071976,
+                -7.1455237381092385,
+                -6.808533710582278,
+                -6.568621056385773,
+                -5.925449752434572,
+                -5.48646715101298,
+                -4.982201491628173,
+                -4.920608525168948,
+                -4.678896149967253,
+                -4.310952826877959,
+                -4.4317405109814425
+              ],
+              "wt_bias_final_kcal_mol": -4.4317405109814425,
+              "wt_bias_late_mean_kcal_mol": -5.525899491314862,
+              "wt_bias_final_minus_late_kcal_mol": 1.094158980333419,
+              "wt_bias_late_time_sd_kcal_mol": 0.9782369561927328,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 15833,
+                  "ess": 835.1300120988095
+                },
+                "bulk": {
+                  "count": 1736,
+                  "ess": 434.9866604774354
+                },
+                "core": {
+                  "count": 788,
+                  "ess": 297.20747761320234
+                }
+              },
+              "weighted_site_above_1kT": 3.66871525768691e-07,
+              "weighted_site_contact_above_1kT": 4.56361729595332e-07,
+              "weighted_bound_contact_above_1kT": 4.807291615870185e-20
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -18.480252528624227,
+              "dG_core": -18.58427512072743,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -19.234597099085022,
+              "bulk_pmf_sd": 0.19035321287793083,
+              "wt_bias_trace_kcal_mol": [
+                -13.0913199417868,
+                -9.348209429363443,
+                -3.3446158293329877,
+                -2.7380585399235953,
+                -4.8779560699930435,
+                -5.249666723838008,
+                -4.799376156495298,
+                -4.741629792158214,
+                -4.058761492827861,
+                -4.568721784106215,
+                -4.690342564834352,
+                -5.182226573517285,
+                -5.771990585868615,
+                -5.604204563684116,
+                -5.011653599157545,
+                -4.618792719327185,
+                -4.652844821331234,
+                -3.948687710997215,
+                -3.385984333807179,
+                -3.1050629172578352
+              ],
+              "wt_bias_final_kcal_mol": -3.1050629172578352,
+              "wt_bias_late_mean_kcal_mol": -4.597179038978256,
+              "wt_bias_final_minus_late_kcal_mol": 1.4921161217204206,
+              "wt_bias_late_time_sd_kcal_mol": 0.8387217516479605,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 13530,
+                  "ess": 652.0642603924243
+                },
+                "bulk": {
+                  "count": 2055,
+                  "ess": 463.0266267772225
+                },
+                "core": {
+                  "count": 942,
+                  "ess": 347.74521256818065
+                }
+              },
+              "weighted_site_above_1kT": 1.689167570846053e-05,
+              "weighted_site_contact_above_1kT": 2.5713959127526613e-05,
+              "weighted_bound_contact_above_1kT": 8.527922178638229e-13
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -29.58183195467745,
+              "dG_core": -29.35756034432985,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -25.229815043782104,
+              "bulk_pmf_sd": 0.7679528177773421,
+              "wt_bias_trace_kcal_mol": [
+                -16.988651190366753,
+                -10.913815805633737,
+                -10.98756585660425,
+                -10.2088998603765,
+                -10.369180444762561,
+                -9.945772671869001,
+                -8.985053867957024,
+                -8.97389028129085,
+                -7.9581242288817595,
+                -7.989629215253389,
+                -7.39148239947854,
+                -7.7701500444791725,
+                -7.772891616063376,
+                -6.79111731224405,
+                -5.480564746516804,
+                -5.306077087995762,
+                -5.052032810423188,
+                -5.050422405765344,
+                -5.068459268739863,
+                -4.6175074798572515
+              ],
+              "wt_bias_final_kcal_mol": -4.6175074798572515,
+              "wt_bias_late_mean_kcal_mol": -6.030070517156334,
+              "wt_bias_final_minus_late_kcal_mol": 1.4125630372990825,
+              "wt_bias_late_time_sd_kcal_mol": 1.1899730444277836,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 15420,
+                  "ess": 1514.1604535547358
+                },
+                "bulk": {
+                  "count": 1945,
+                  "ess": 468.6478376216537
+                },
+                "core": {
+                  "count": 892,
+                  "ess": 353.93509370380855
+                }
+              },
+              "weighted_site_above_1kT": 2.638401756647726e-07,
+              "weighted_site_contact_above_1kT": 2.975528363015398e-07,
+              "weighted_bound_contact_above_1kT": 3.6135760350604377e-13
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -9.267257700118321,
+              "dG_core": -8.861628309311714,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -11.718628029457879,
+              "bulk_pmf_sd": 0.5724000601386562,
+              "wt_bias_trace_kcal_mol": [
+                -20.921553105232245,
+                -12.089029919911326,
+                -8.572708019223612,
+                -6.8060357985535935,
+                -4.309031232078771,
+                -3.8795956481419784,
+                -2.3041855011267742,
+                -1.6012455371170744,
+                -1.3049571529186577,
+                -1.1717454383568084,
+                -0.9086824079192213,
+                -0.5649425071259805,
+                -1.535673018865096,
+                -2.681456180872026,
+                -3.7580779127150237,
+                -3.293800926772393,
+                -3.6950727551993348,
+                -3.912202232613268,
+                -3.7776827846763754,
+                -3.8806024602821014
+              ],
+              "wt_bias_final_kcal_mol": -3.8806024602821014,
+              "wt_bias_late_mean_kcal_mol": -2.800819318704082,
+              "wt_bias_final_minus_late_kcal_mol": -1.0797831415780195,
+              "wt_bias_late_time_sd_kcal_mol": 1.245335290597608,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 38000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 13914,
+                  "ess": 1220.0075429055842
+                },
+                "bulk": {
+                  "count": 2019,
+                  "ess": 516.7878299989908
+                },
+                "core": {
+                  "count": 963,
+                  "ess": 373.0934929965236
+                }
+              },
+              "weighted_site_above_1kT": 6.868574330596696e-05,
+              "weighted_site_contact_above_1kT": 7.30134552430285e-05,
+              "weighted_bound_contact_above_1kT": 6.725113215600499e-09
+            }
+          ]
+        }
+      }
+    },
+    {
+      "length_ns": 80,
+      "purpose": "screening",
+      "passes": false,
+      "precision_passes": false,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -10.5622662111013,
+            "signed_error_predicted_minus_reference": 0.8569943315293838,
+            "independent_replica_sd": 4.088831766076052,
+            "ci95_independent_replicas": [
+              -17.068509984538995,
+              -4.0560224376636045
+            ],
+            "ci95_halfwidth": 6.506243773437696,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -10.556186027436244,
+            "accumulated_wt_mean": -9.844455290556855
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -10.5622662111013,
+              "sd": 4.088831766076052,
+              "sem": 2.044415883038026,
+              "ci95": [
+                -17.068509984538995,
+                -4.0560224376636045
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -10.556186027436244,
+              "sd": 4.050884260309895,
+              "sem": 2.0254421301549477,
+              "ci95": [
+                -17.00204685111382,
+                -4.110325203758666
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -9.844455290556855,
+              "sd": 2.8132288259973826,
+              "sem": 1.4066144129986913,
+              "ci95": [
+                -14.320930132163351,
+                -5.367980448950358
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -9.0036954434867,
+              "sd": 2.451519600551494,
+              "sem": 1.225759800275747,
+              "ci95": [
+                -12.904610191039547,
+                -5.102780695933854
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            4.0,
+            8.0,
+            12.0,
+            16.0,
+            20.0,
+            24.0,
+            28.0,
+            32.0,
+            36.0,
+            40.0,
+            44.0,
+            48.0,
+            52.0,
+            56.0,
+            60.0,
+            64.0,
+            68.0,
+            72.0,
+            76.0,
+            80.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -44.19252182724784,
+          "ci95": [
+            -71.41464577531116,
+            -16.97039787918452
+          ],
+          "dG_core": -44.16708233879324,
+          "ci95_core": [
+            -71.13656402506022,
+            -17.197600652526262
+          ],
+          "dG_bias": -41.18920093568988,
+          "ci95_bias": [
+            -59.91877167297147,
+            -22.4596301984083
+          ],
+          "affinity_fold_error": 4.2102455112958825,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              2,
+              0,
+              1,
+              1
+            ],
+            "departures": 22,
+            "counts": {
+              "site_frames": 14248,
+              "site_contact_frames": 14247,
+              "bulk_frames": 1064,
+              "bulk_clear_frames": 1043,
+              "bulk_core_frames": 501,
+              "bulk_core_clear_frames": 491,
+              "site_contact_wall_above_kT_frames": 1625,
+              "bound_contact_wall_above_kT_frames": 536
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -46.452970223075056,
+              "dG_core": -46.48784270966357,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -43.308285440733684,
+              "bulk_pmf_sd": 1.1560658735253238,
+              "wt_bias_trace_kcal_mol": [
+                -25.50096295823693,
+                -22.24162670769796,
+                -19.827130031895027,
+                -17.516450636233717,
+                -15.877426590042246,
+                -15.554612569818042,
+                -13.856474003089133,
+                -13.799574199283574,
+                -12.797409701994008,
+                -12.800740514657956,
+                -12.757505935999221,
+                -12.60161755487588,
+                -11.40571885308599,
+                -11.014614015689926,
+                -10.53236331457307,
+                -10.033251509687892,
+                -9.49807192956312,
+                -9.120884166455804,
+                -8.3650746841946,
+                -8.180184462102222
+              ],
+              "wt_bias_final_kcal_mol": -8.180184462102222,
+              "wt_bias_late_mean_kcal_mol": -10.350928642622772,
+              "wt_bias_final_minus_late_kcal_mol": 2.1707441805205505,
+              "wt_bias_late_time_sd_kcal_mol": 1.5310203473517392,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 21716,
+                  "ess": 493.5337168547575
+                },
+                "bulk": {
+                  "count": 1625,
+                  "ess": 309.5707486933285
+                },
+                "core": {
+                  "count": 724,
+                  "ess": 191.0310510997764
+                }
+              },
+              "weighted_site_above_1kT": 1.5847934592080618e-09,
+              "weighted_site_contact_above_1kT": 1.6328146551542477e-09,
+              "weighted_bound_contact_above_1kT": 3.5055712153508883e-10
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -51.502619352148685,
+              "dG_core": -51.34310269449749,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -46.9601489519482,
+              "bulk_pmf_sd": 0.6929139052257216,
+              "wt_bias_trace_kcal_mol": [
+                -16.252427147842848,
+                -13.94437560002156,
+                -14.051482760845554,
+                -13.537472549651039,
+                -13.121866326099255,
+                -13.868362846850703,
+                -14.657769553062005,
+                -14.649471102195761,
+                -14.22223813579026,
+                -13.573540813985119,
+                -12.88776985296353,
+                -12.15253968340474,
+                -11.943102570376965,
+                -11.865336063650854,
+                -11.391303036740862,
+                -10.892222888043282,
+                -10.800852381220151,
+                -10.674856238818963,
+                -9.907944420666661,
+                -9.721522558062853
+              ],
+              "wt_bias_final_kcal_mol": -9.721522558062853,
+              "wt_bias_late_mean_kcal_mol": -11.223744969394884,
+              "wt_bias_final_minus_late_kcal_mol": 1.5022224113320313,
+              "wt_bias_late_time_sd_kcal_mol": 0.9574369826475297,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 19326,
+                  "ess": 774.1862994307724
+                },
+                "bulk": {
+                  "count": 1898,
+                  "ess": 351.5270715490277
+                },
+                "core": {
+                  "count": 920,
+                  "ess": 224.090522644127
+                }
+              },
+              "weighted_site_above_1kT": 5.8635440318688595e-12,
+              "weighted_site_contact_above_1kT": 7.297738654729e-12,
+              "weighted_bound_contact_above_1kT": 5.761249655915497e-14
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -59.0754021560203,
+              "dG_core": -58.90997193326234,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -50.41074902108464,
+              "bulk_pmf_sd": 0.5298098248227233,
+              "wt_bias_trace_kcal_mol": [
+                -25.44587323771425,
+                -17.924379630089163,
+                -14.884619368004874,
+                -13.257043238298582,
+                -13.457910126037783,
+                -13.083236389357577,
+                -13.544806508903365,
+                -14.476942491841278,
+                -15.005326313898607,
+                -13.587106234689957,
+                -12.914292195685185,
+                -12.723769951445284,
+                -11.828961085486556,
+                -12.175208420263484,
+                -11.87600839032883,
+                -11.677257281064882,
+                -11.595459305633733,
+                -11.746541565996454,
+                -11.989614090386784,
+                -11.957469504064054
+              ],
+              "wt_bias_final_kcal_mol": -11.957469504064054,
+              "wt_bias_late_mean_kcal_mol": -12.048458179035526,
+              "wt_bias_final_minus_late_kcal_mol": 0.0909886749714719,
+              "wt_bias_late_time_sd_kcal_mol": 0.417802747073798,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 21813,
+                  "ess": 1006.90832422889
+                },
+                "bulk": {
+                  "count": 1641,
+                  "ess": 377.7253512068456
+                },
+                "core": {
+                  "count": 762,
+                  "ess": 227.8965082583555
+                }
+              },
+              "weighted_site_above_1kT": 1.4518011433599375e-12,
+              "weighted_site_contact_above_1kT": 1.5870181647036934e-12,
+              "weighted_bound_contact_above_1kT": 1.0226490680103804e-13
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -19.7390955777473,
+              "dG_core": -19.927412017749564,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -24.077620328993028,
+              "bulk_pmf_sd": 0.4478303767514664,
+              "wt_bias_trace_kcal_mol": [
+                -21.191451032963414,
+                -14.787131542349078,
+                -14.433120938420755,
+                -12.04168450086179,
+                -10.596244292013594,
+                -10.347211352049374,
+                -9.602981944074585,
+                -8.25257196709665,
+                -6.871594570184667,
+                -6.881112270513473,
+                -6.92206452889998,
+                -5.826292509037269,
+                -5.745387438677217,
+                -5.042679338924362,
+                -5.2245478132528245,
+                -5.390864514852957,
+                -5.495688577851908,
+                -5.6690183952454785,
+                -6.074745345282754,
+                -6.155605249717674
+              ],
+              "wt_bias_final_kcal_mol": -6.155605249717674,
+              "wt_bias_late_mean_kcal_mol": -5.7546893711742415,
+              "wt_bias_final_minus_late_kcal_mol": -0.40091587854343214,
+              "wt_bias_late_time_sd_kcal_mol": 0.5124397987082203,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22756,
+                  "ess": 272.4592216267662
+                },
+                "bulk": {
+                  "count": 1468,
+                  "ess": 278.8875606348637
+                },
+                "core": {
+                  "count": 657,
+                  "ess": 162.1860061369988
+                }
+              },
+              "weighted_site_above_1kT": 6.324340762948705e-05,
+              "weighted_site_contact_above_1kT": 7.692086764070279e-05,
+              "weighted_bound_contact_above_1kT": 0.00041772106620282205
+            }
+          ]
+        },
+        "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -4.662117264624062,
+            "signed_error_predicted_minus_reference": 3.279236399309414,
+            "independent_replica_sd": 1.3791400570726653,
+            "ci95_independent_replicas": [
+              -6.856636854173895,
+              -2.467597675074229
+            ],
+            "ci95_halfwidth": 2.194519589549833,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -4.680597199836471,
+            "accumulated_wt_mean": -4.650121606474463
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.662117264624062,
+              "sd": 1.3791400570726653,
+              "sem": 0.6895700285363326,
+              "ci95": [
+                -6.856636854173895,
+                -2.467597675074229
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.680597199836471,
+              "sd": 1.3285051720075494,
+              "sem": 0.6642525860037747,
+              "ci95": [
+                -6.794545387939332,
+                -2.5666490117336096
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.650121606474463,
+              "sd": 0.5717401985388187,
+              "sem": 0.2858700992694094,
+              "ci95": [
+                -5.5598878476854825,
+                -3.7403553652634445
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -4.581448414503777,
+              "sd": 0.9390022151452172,
+              "sem": 0.4695011075726086,
+              "ci95": [
+                -6.075610479624834,
+                -3.08728634938272
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            4.0,
+            8.0,
+            12.0,
+            16.0,
+            20.0,
+            24.0,
+            28.0,
+            32.0,
+            36.0,
+            40.0,
+            44.0,
+            48.0,
+            52.0,
+            56.0,
+            60.0,
+            64.0,
+            68.0,
+            72.0,
+            76.0,
+            80.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -19.506298635187076,
+          "ci95": [
+            -28.688168597863577,
+            -10.324428672510575
+          ],
+          "dG_core": -19.583618684115795,
+          "ci95_core": [
+            -28.428377903138166,
+            -10.738859465093423
+          ],
+          "dG_bias": -19.456108801489155,
+          "ci95_bias": [
+            -23.26257075471606,
+            -15.649646848262252
+          ],
+          "affinity_fold_error": 244.83537575114255,
+          "passes": false,
+          "precision_passes": false,
+          "structure": {
+            "returns_by_replica": [
+              2,
+              2,
+              0,
+              4
+            ],
+            "departures": 25,
+            "counts": {
+              "site_frames": 11242,
+              "site_contact_frames": 11171,
+              "bulk_frames": 1102,
+              "bulk_clear_frames": 1096,
+              "bulk_core_frames": 517,
+              "bulk_core_clear_frames": 515,
+              "site_contact_wall_above_kT_frames": 845,
+              "bound_contact_wall_above_kT_frames": 238
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -20.74301629838164,
+              "dG_core": -21.183760169706048,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -20.53496207462593,
+              "bulk_pmf_sd": 0.3375454616132415,
+              "wt_bias_trace_kcal_mol": [
+                -10.716640216944834,
+                -8.632097266503603,
+                -8.921099340325659,
+                -7.5495530139022655,
+                -7.333868281071976,
+                -6.808533710582277,
+                -5.92544975243457,
+                -4.982201491628174,
+                -4.678896149967252,
+                -4.4317405109814425,
+                -4.509891203166994,
+                -5.205009118894389,
+                -5.1468774438353595,
+                -5.370240556351297,
+                -5.273896257918391,
+                -5.254086685963504,
+                -5.276732467532627,
+                -4.76077558371596,
+                -4.237076712791506,
+                -4.045151241880468
+              ],
+              "wt_bias_final_kcal_mol": -4.045151241880468,
+              "wt_bias_late_mean_kcal_mol": -4.90797372720505,
+              "wt_bias_final_minus_late_kcal_mol": 0.8628224853245818,
+              "wt_bias_late_time_sd_kcal_mol": 0.46080088464094204,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 17760,
+                  "ess": 810.9493525945007
+                },
+                "bulk": {
+                  "count": 1598,
+                  "ess": 333.63400613544235
+                },
+                "core": {
+                  "count": 770,
+                  "ess": 276.5435626095002
+                }
+              },
+              "weighted_site_above_1kT": 2.472792507744803e-05,
+              "weighted_site_contact_above_1kT": 2.0935442519106643e-05,
+              "weighted_bound_contact_above_1kT": 1.9284801376777787e-16
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -18.442936331485917,
+              "dG_core": -18.493023260450997,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -16.578641497233228,
+              "bulk_pmf_sd": 0.23685081826244153,
+              "wt_bias_trace_kcal_mol": [
+                -9.348209429363445,
+                -2.7380585399235953,
+                -5.249666723838006,
+                -4.741629792158214,
+                -4.568721784106214,
+                -5.182226573517287,
+                -5.604204563684115,
+                -4.618792719327188,
+                -3.948687710997215,
+                -3.1050629172578343,
+                -3.1021638128987914,
+                -3.6480604712572267,
+                -4.102535121747727,
+                -4.511815712954779,
+                -4.549049776398566,
+                -4.596128476205994,
+                -3.9724067755900436,
+                -3.8749711735403887,
+                -3.7067634395460813,
+                -3.5600093919474682
+              ],
+              "wt_bias_final_kcal_mol": -3.5600093919474682,
+              "wt_bias_late_mean_kcal_mol": -3.962390415208706,
+              "wt_bias_final_minus_late_kcal_mol": 0.4023810232612379,
+              "wt_bias_late_time_sd_kcal_mol": 0.46271946613959297,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 14357,
+                  "ess": 767.5965954469788
+                },
+                "bulk": {
+                  "count": 1915,
+                  "ess": 400.8804901719286
+                },
+                "core": {
+                  "count": 927,
+                  "ess": 351.04683802060987
+                }
+              },
+              "weighted_site_above_1kT": 6.515360611774108e-07,
+              "weighted_site_contact_above_1kT": 1.084103318481098e-06,
+              "weighted_bound_contact_above_1kT": 2.335607226633402e-12
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -26.39151495569264,
+              "dG_core": -25.992551493594195,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -22.10270713900914,
+              "bulk_pmf_sd": 0.3155131299091397,
+              "wt_bias_trace_kcal_mol": [
+                -10.913815805633735,
+                -10.2088998603765,
+                -9.945772671869003,
+                -8.97389028129085,
+                -7.989629215253387,
+                -7.770150044479171,
+                -6.791117312244052,
+                -5.306077087995761,
+                -5.050422405765345,
+                -4.617507479857251,
+                -4.527642735113683,
+                -4.484212035350974,
+                -4.698829615422703,
+                -5.285148873759425,
+                -5.526946712404491,
+                -5.600725206623955,
+                -5.768013323143737,
+                -5.681486782686505,
+                -5.668747329925601,
+                -5.584985289510472
+              ],
+              "wt_bias_final_kcal_mol": -5.584985289510472,
+              "wt_bias_late_mean_kcal_mol": -5.282673790394154,
+              "wt_bias_final_minus_late_kcal_mol": -0.3023114991163185,
+              "wt_bias_late_time_sd_kcal_mol": 0.4841869953312093,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 16934,
+                  "ess": 1503.623837495576
+                },
+                "bulk": {
+                  "count": 1746,
+                  "ess": 412.08173186943793
+                },
+                "core": {
+                  "count": 864,
+                  "ess": 348.13478309135894
+                }
+              },
+              "weighted_site_above_1kT": 2.438321294739092e-07,
+              "weighted_site_contact_above_1kT": 3.116579059300802e-07,
+              "weighted_bound_contact_above_1kT": 4.8671141615468856e-15
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -12.447726955188097,
+              "dG_core": -12.665139812711944,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -18.608124495088315,
+              "bulk_pmf_sd": 0.31490196011630905,
+              "wt_bias_trace_kcal_mol": [
+                -12.089029919911326,
+                -6.8060357985535935,
+                -3.879595648141982,
+                -1.601245537117075,
+                -1.171745438356808,
+                -0.56494250712598,
+                -2.681456180872028,
+                -3.293800926772394,
+                -3.9122022326132684,
+                -3.880602460282104,
+                -3.745230997433829,
+                -3.5223842013001683,
+                -3.853329155887665,
+                -4.1131099291708395,
+                -4.359821886140832,
+                -4.6031249749688214,
+                -4.738046813029314,
+                -5.122402011931058,
+                -5.2813872263601835,
+                -5.135647734676699
+              ],
+              "wt_bias_final_kcal_mol": -5.135647734676699,
+              "wt_bias_late_mean_kcal_mol": -4.447448493089941,
+              "wt_bias_final_minus_late_kcal_mol": -0.6881992415867577,
+              "wt_bias_late_time_sd_kcal_mol": 0.5962053882416168,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39000,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 18356,
+                  "ess": 718.7723427096641
+                },
+                "bulk": {
+                  "count": 1760,
+                  "ess": 375.059886432434
+                },
+                "core": {
+                  "count": 854,
+                  "ess": 319.5238190397216
+                }
+              },
+              "weighted_site_above_1kT": 5.7186913421135886e-05,
+              "weighted_site_contact_above_1kT": 7.020227779614335e-05,
+              "weighted_bound_contact_above_1kT": 4.323317112936869e-09
+            }
+          ]
+        }
+      }
+    },
+    {
+      "length_ns": 90.0,
+      "purpose": "drift_only",
+      "passes": null,
+      "precision_passes": null,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -10.026798187783648,
+            "signed_error_predicted_minus_reference": 1.3924623548470354,
+            "independent_replica_sd": 4.237805181843616,
+            "ci95_independent_replicas": [
+              -16.770091909518833,
+              -3.2835044660484636
+            ],
+            "ci95_halfwidth": 6.743293721735185,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -10.04596819089624,
+            "accumulated_wt_mean": -9.451017900889877
+          },
+          "method_statistics_kcal_mol": {
+            "primary_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -10.026798187783648,
+              "sd": 4.237805181843616,
+              "sem": 2.118902590921808,
+              "ci95": [
+                -16.770091909518833,
+                -3.2835044660484636
+              ]
+            },
+            "core_reweighted": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -10.04596819089624,
+              "sd": 4.176715011402641,
+              "sem": 2.0883575057013206,
+              "ci95": [
+                -16.692053819026906,
+                -3.3998825627655713
+              ]
+            },
+            "wt_bias_late": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -9.451017900889877,
+              "sd": 2.7709355522150156,
+              "sem": 1.3854677761075078,
+              "ci95": [
+                -13.860194706052852,
+                -5.0418410957269035
+              ]
+            },
+            "wt_bias_final": {
+              "n_total": 4,
+              "n_finite": 4,
+              "complete": true,
+              "mean": -8.872822345904705,
+              "sd": 2.8551263039549326,
+              "sem": 1.4275631519774663,
+              "ci95": [
+                -13.415965424474555,
+                -4.329679267334853
+              ]
+            }
+          },
+          "n_primary_calculable": 4,
+          "n_sampling_quality_pass": 4,
+          "primary_finite_subset_kcal_mol": null,
+          "wt_bias_times_ns": [
+            4.5,
+            9.0,
+            13.5,
+            18.0,
+            22.5,
+            27.0,
+            31.5,
+            36.0,
+            40.5,
+            45.0,
+            49.5,
+            54.0,
+            58.5,
+            63.0,
+            67.5,
+            72.0,
+            76.5,
+            81.0,
+            85.5,
+            90.0
+          ],
+          "base_seed": 0,
+          "status": "available",
+          "dG": -41.95212361768678,
+          "ci95": [
+            -70.16606454942679,
+            -13.738182685946771
+          ],
+          "dG_core": -42.03233091070987,
+          "ci95_core": [
+            -69.83955317880859,
+            -14.22510864261115
+          ],
+          "dG_bias": -39.54305889732325,
+          "ci95_bias": [
+            -57.991054650125136,
+            -21.095063144521365
+          ],
+          "affinity_fold_error": null,
+          "passes": null,
+          "precision_passes": null,
+          "structure": null,
+          "replicas": [
+            {
+              "replica": 0,
+              "status": "available",
+              "dG": -43.37170896568016,
+              "dG_core": -43.55603315494661,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -40.12018513765695,
+              "bulk_pmf_sd": 1.7599393247246133,
+              "wt_bias_trace_kcal_mol": [
+                -25.945657180124126,
+                -21.908322322457888,
+                -20.091818063618753,
+                -15.674881368807936,
+                -15.592242903268376,
+                -14.203231064011186,
+                -13.832455366133624,
+                -12.797409701994017,
+                -12.801582000929042,
+                -12.597624616227042,
+                -12.326124185749837,
+                -11.196393869227062,
+                -10.762273934145158,
+                -10.236082148710183,
+                -9.656427517731005,
+                -9.120884166455806,
+                -8.323298010890966,
+                -8.118597694429678,
+                -8.044850362110628,
+                -8.104611938601646
+              ],
+              "wt_bias_final_kcal_mol": -8.104611938601646,
+              "wt_bias_late_mean_kcal_mol": -9.588954382805197,
+              "wt_bias_final_minus_late_kcal_mol": 1.4843424442035502,
+              "wt_bias_late_time_sd_kcal_mol": 1.4299097964626677,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39112,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 21826,
+                  "ess": 450.4755545701879
+                },
+                "bulk": {
+                  "count": 1502,
+                  "ess": 213.45521514059365
+                },
+                "core": {
+                  "count": 670,
+                  "ess": 126.41604640027428
+                }
+              },
+              "weighted_site_above_1kT": 4.089441787745892e-09,
+              "weighted_site_contact_above_1kT": null,
+              "weighted_bound_contact_above_1kT": null
+            },
+            {
+              "replica": 1,
+              "status": "available",
+              "dG": -49.20860413142931,
+              "dG_core": -49.23852952900386,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -44.65393046324201,
+              "bulk_pmf_sd": 0.5181094834327382,
+              "wt_bias_trace_kcal_mol": [
+                -16.37947142143479,
+                -13.48233547791751,
+                -14.324771352769561,
+                -12.806523642761631,
+                -13.58896661540901,
+                -14.460027214084887,
+                -14.921235244175017,
+                -14.222238135790253,
+                -13.534718306308502,
+                -12.756802290469928,
+                -12.086172571396865,
+                -11.915407320602734,
+                -11.489959720102991,
+                -10.890647490443463,
+                -10.827054078106292,
+                -10.674856238818963,
+                -9.907927074382235,
+                -9.727108597312379,
+                -9.742290391985543,
+                -9.46403173492217
+              ],
+              "wt_bias_final_kcal_mol": -9.46403173492217,
+              "wt_bias_late_mean_kcal_mol": -10.672545521807365,
+              "wt_bias_final_minus_late_kcal_mol": 1.2085137868851952,
+              "wt_bias_late_time_sd_kcal_mol": 0.8992792718566159,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39112,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 19778,
+                  "ess": 731.5894245155523
+                },
+                "bulk": {
+                  "count": 1745,
+                  "ess": 332.68339810146216
+                },
+                "core": {
+                  "count": 822,
+                  "ess": 208.6851425902601
+                }
+              },
+              "weighted_site_above_1kT": 9.679030612548962e-12,
+              "weighted_site_contact_above_1kT": null,
+              "weighted_bound_contact_above_1kT": null
+            },
+            {
+              "replica": 2,
+              "status": "available",
+              "dG": -58.23997045012619,
+              "dG_core": -57.96281969988629,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -50.12670959319645,
+              "bulk_pmf_sd": 0.5827834334763665,
+              "wt_bias_trace_kcal_mol": [
+                -25.88278059316759,
+                -16.16096426991106,
+                -14.911340432719479,
+                -13.189396719077637,
+                -12.875959089979144,
+                -13.2870676227658,
+                -14.364936624360173,
+                -15.005326313898616,
+                -13.400631414767467,
+                -12.874167793572248,
+                -12.264647854200911,
+                -12.046192823722592,
+                -12.035980176208696,
+                -11.620886951656622,
+                -11.613624878145897,
+                -11.74654156599647,
+                -12.017096653080333,
+                -11.970915054059523,
+                -12.100682578280038,
+                -12.38914272945878
+              ],
+              "wt_bias_final_kcal_mol": -12.38914272945878,
+              "wt_bias_late_mean_kcal_mol": -11.980571126480987,
+              "wt_bias_final_minus_late_kcal_mol": -0.4085716029777924,
+              "wt_bias_late_time_sd_kcal_mol": 0.24282769952799868,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39112,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22728,
+                  "ess": 998.049299443016
+                },
+                "bulk": {
+                  "count": 1561,
+                  "ess": 350.4708623009884
+                },
+                "core": {
+                  "count": 726,
+                  "ess": 224.90231156745318
+                }
+              },
+              "weighted_site_above_1kT": 1.3869189690904677e-12,
+              "weighted_site_contact_above_1kT": null,
+              "weighted_bound_contact_above_1kT": null
+            },
+            {
+              "replica": 3,
+              "status": "available",
+              "dG": -16.988210923511463,
+              "dG_core": -17.371941259002707,
+              "primary_calculable": true,
+              "sampling_quality": {
+                "reweighting_solved": true,
+                "site_sampled": true,
+                "bulk_sampled": true,
+                "core_sampled": true,
+                "all_bulk_bins_sampled": true
+              },
+              "dG_bias": -23.271410395197577,
+              "bulk_pmf_sd": 0.408692724272629,
+              "wt_bias_trace_kcal_mol": [
+                -20.72252266573528,
+                -14.532195798769195,
+                -12.901608943142454,
+                -11.262917132073092,
+                -10.427169691767512,
+                -9.824238494065174,
+                -8.555028893642794,
+                -6.871594570184678,
+                -6.8855777678369865,
+                -6.822929213107823,
+                -5.6810221889519275,
+                -5.003832605358677,
+                -5.184914022578058,
+                -5.370830717513631,
+                -5.473920097226468,
+                -5.6690183952454785,
+                -6.07851884106827,
+                -6.158244225773642,
+                -5.46620165030722,
+                -5.533502980636229
+              ],
+              "wt_bias_final_kcal_mol": -5.533502980636229,
+              "wt_bias_late_mean_kcal_mol": -5.56200057246596,
+              "wt_bias_final_minus_late_kcal_mol": 0.02849759182973166,
+              "wt_bias_late_time_sd_kcal_mol": 0.3399935221282663,
+              "bulk_bins": 10,
+              "sampled_bulk_bins": 10,
+              "mbar_samples": 39112,
+              "mbar_states": 296,
+              "support": {
+                "site": {
+                  "count": 22900,
+                  "ess": 327.7436167465062
+                },
+                "bulk": {
+                  "count": 1628,
+                  "ess": 288.9336289952549
+                },
+                "core": {
+                  "count": 768,
+                  "ess": 195.52215615102716
+                }
+              },
+              "weighted_site_above_1kT": 0.000713024893956746,
+              "weighted_site_contact_above_1kT": null,
+              "weighted_bound_contact_above_1kT": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

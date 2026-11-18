@@ -1,0 +1,132 @@
+{
+  "system": "tyk2_ejm46",
+  "analysis_commit": "c8e15da999ad240168636bf507de1ffe8e5a7ac3",
+  "discard_ns": 2.0,
+  "window": "discard_ns < walker time <= cut_ns",
+  "observation": "COLVAR occupation of zero-origin CV cells. Occupied area uses the cell intersection with the native grid.",
+  "grid_origin_nm": [
+    0.0,
+    0.0
+  ],
+  "cell_size_nm": [
+    0.025,
+    0.03
+  ],
+  "native_grid_domain_nm": [
+    0.4002406500207519,
+    4.950240650020751,
+    0.0,
+    1.012215986365802
+  ],
+  "site_nm": [
+    0.7002406500207519,
+    2.1157086226804243
+  ],
+  "bulk_nm": [
+    4.066907316687418,
+    4.5502406500207515
+  ],
+  "prepared_hashes": {
+    "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+    "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+    "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+    "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+    "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+  },
+  "arms": {
+    "c": {
+      "base_seed": 19311801,
+      "independent_bias_histories": 8,
+      "physical_walkers": 32,
+      "checkpoints": [
+        {
+          "cut_ns": 5,
+          "records": 48000,
+          "union_cells": 1956,
+          "union_area_nm2": 1.467,
+          "median_history_area_nm2": 0.701625000000001,
+          "median_walker_area_nm2": 0.140625,
+          "bulk_walkers": 0,
+          "walkers_both_site_and_bulk": 0
+        },
+        {
+          "cut_ns": 10,
+          "records": 128000,
+          "union_cells": 2744,
+          "union_area_nm2": 2.058,
+          "median_history_area_nm2": 1.6095000000000006,
+          "median_walker_area_nm2": 0.5137500000000003,
+          "bulk_walkers": 9,
+          "walkers_both_site_and_bulk": 9
+        },
+        {
+          "cut_ns": 15,
+          "records": 208000,
+          "union_cells": 2826,
+          "union_area_nm2": 2.1195,
+          "median_history_area_nm2": 1.7816250000000002,
+          "median_walker_area_nm2": 0.9453750000000023,
+          "bulk_walkers": 14,
+          "walkers_both_site_and_bulk": 14
+        },
+        {
+          "cut_ns": 20,
+          "records": 288000,
+          "union_cells": 2891,
+          "union_area_nm2": 2.16825,
+          "median_history_area_nm2": 1.989375,
+          "median_walker_area_nm2": 1.1028750000000014,
+          "bulk_walkers": 19,
+          "walkers_both_site_and_bulk": 19
+        }
+      ]
+    },
+    "d": {
+      "base_seed": 19511801,
+      "independent_bias_histories": 32,
+      "physical_walkers": 32,
+      "checkpoints": [
+        {
+          "cut_ns": 5,
+          "records": 48000,
+          "union_cells": 1407,
+          "union_area_nm2": 1.0552500000000002,
+          "median_history_area_nm2": 0.15899999999999997,
+          "median_walker_area_nm2": 0.15899999999999997,
+          "bulk_walkers": 0,
+          "walkers_both_site_and_bulk": 0
+        },
+        {
+          "cut_ns": 10,
+          "records": 128000,
+          "union_cells": 2476,
+          "union_area_nm2": 1.857,
+          "median_history_area_nm2": 0.6761250000000011,
+          "median_walker_area_nm2": 0.6761250000000011,
+          "bulk_walkers": 7,
+          "walkers_both_site_and_bulk": 7
+        },
+        {
+          "cut_ns": 15,
+          "records": 208000,
+          "union_cells": 2592,
+          "union_area_nm2": 1.9440000000000002,
+          "median_history_area_nm2": 1.1493750000000014,
+          "median_walker_area_nm2": 1.1493750000000014,
+          "bulk_walkers": 20,
+          "walkers_both_site_and_bulk": 20
+        },
+        {
+          "cut_ns": 20,
+          "records": 288000,
+          "union_cells": 2686,
+          "union_area_nm2": 2.0145,
+          "median_history_area_nm2": 1.3323750000000012,
+          "median_walker_area_nm2": 1.3323750000000012,
+          "bulk_walkers": 29,
+          "walkers_both_site_and_bulk": 29
+        }
+      ]
+    }
+  }
+}

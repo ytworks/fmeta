@@ -29,7 +29,8 @@ def projection_profile(grid: BiasGrid, fes_scale: float, kT: float) -> np.ndarra
     return profile - profile.min()
 
 
-def sliced_log_weights(reduced_bias: np.ndarray, counts: np.ndarray) -> np.ndarray:
+def sliced_log_weights(reduced_bias: np.ndarray, counts: np.ndarray, *, fast: bool = False,
+                       evaluation_bias: np.ndarray | None = None) -> np.ndarray:
     """Log-weights that turn samples drawn under several static biases into the unbiased ensemble.
 
     ``reduced_bias[k, i]`` is bias ``k`` at sample ``i`` over kT; ``counts[k]`` is the number of
@@ -41,24 +42,44 @@ def sliced_log_weights(reduced_bias: np.ndarray, counts: np.ndarray) -> np.ndarr
     124105, 2008), here as the minimum of a convex function of ``f``. The weight of sample ``i``
     is then ``1 / sum_l N_l exp(f_l - V_l(x_i)/kT)``. Only the samples enter: the offsets come
     from them and not from a model of how the bias grew. Raises ``ArithmeticError`` when the
-    equations are not solved.
+    equations are not solved. An optional matrix of biases at other coordinates evaluates
+    weights there with the same fitted offsets. Those coordinates do not enter the fit.
     """
     reduced_bias = np.asarray(reduced_bias, dtype=float)
     counts = np.asarray(counts, dtype=float)
     log_counts = np.log(counts)
     fraction = counts / counts.sum()
 
-    def objective(f):
+    def log_objective(f):
         terms = (log_counts + f)[:, None] - reduced_bias
         total = logsumexp(terms, axis=0)
         return total.mean() - fraction @ f, np.exp(terms - total).mean(axis=1) - fraction
+
+    objective = log_objective
+    # A campaign fits hundreds of time slices at many historical cuts. When rescaling every
+    # column keeps *all* kernels representable, the same objective and gradient require only
+    # two matrix-vector products per iteration. Very large bias differences use logsumexp.
+    if fast and np.max(np.ptp(reduced_bias, axis=0)) < 500:
+        floor = reduced_bias.min(axis=0)
+        kernel = np.exp(floor - reduced_bias)
+
+        def kernel_objective(f):
+            shift = f.max()
+            coefficients = counts * np.exp(f - shift)
+            totals = coefficients @ kernel
+            value = np.log(totals).mean() + shift - fraction @ f
+            gradient = coefficients * (kernel @ (1.0 / totals)) / totals.size - fraction
+            return value, gradient
+
+        objective = kernel_objective
 
     found = minimize(objective, np.zeros(counts.size), jac=True, method="L-BFGS-B",
                      options=dict(maxiter=5000, maxfun=20000, gtol=1e-10, ftol=1e-15))
     residual = float(np.abs(objective(found.x)[1]).max())
     if not np.isfinite(residual) or residual > 1e-6:
         raise ArithmeticError(f"the reweighting equations were not solved (residual {residual:.1e})")
-    return -logsumexp((log_counts + found.x)[:, None] - reduced_bias, axis=0)
+    evaluate = reduced_bias if evaluation_bias is None else evaluation_bias
+    return -logsumexp((log_counts + found.x)[:, None] - evaluate, axis=0)
 
 
 def reweighted_profile(s_samples, log_weights, kT: float, s_edges) -> np.ndarray:

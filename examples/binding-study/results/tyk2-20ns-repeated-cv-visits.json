@@ -1,0 +1,201 @@
+{
+  "system": "tyk2",
+  "cut_ns": 20,
+  "discard_ns": 2,
+  "physical_walkers_per_arm": 32,
+  "retained_records_per_walker": 9000,
+  "retained_record_interval_ps": 2,
+  "grid_origin_nm": [
+    0.0,
+    0.0
+  ],
+  "cell_size_nm": [
+    0.025,
+    0.03
+  ],
+  "native_grid_domain_nm": [
+    0.4002406500207519,
+    4.950240650020751,
+    0.0,
+    1.012215986365802
+  ],
+  "site_nm": [
+    0.7002406500207519,
+    2.1157086226804243
+  ],
+  "bulk_nm": [
+    4.066907316687418,
+    4.5502406500207515
+  ],
+  "area_unit": "nm²",
+  "criteria": [
+    "at_least_1_visit",
+    "at_least_5_visits",
+    "at_least_2_physical_walkers"
+  ],
+  "rule": "Records use (2, 20] ns. A visit is one retained COLVAR record. The two-walker criterion requires two distinct physical trajectories in the same cell and region. Site and bulk include their lower axial limit and exclude their upper limit. Each occupied-cell area is clipped to the native rectangle and the exact selected region.",
+  "arms": {
+    "c": {
+      "records": 288000,
+      "records_outside_native_rectangle": 0,
+      "zones": {
+        "all": {
+          "records": 288000,
+          "physical_walkers_any": 32,
+          "at_least_1_visit": {
+            "cells": 2891,
+            "area_nm2": 2.16825
+          },
+          "at_least_5_visits": {
+            "cells": 2800,
+            "area_nm2": 2.1
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 2821,
+            "area_nm2": 2.11575
+          }
+        },
+        "site": {
+          "records": 179700,
+          "physical_walkers_any": 32,
+          "at_least_1_visit": {
+            "cells": 1408,
+            "area_nm2": 1.0499515058
+          },
+          "at_least_5_visits": {
+            "cells": 1381,
+            "area_nm2": 1.0297087253
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 1393,
+            "area_nm2": 1.0387015058
+          }
+        },
+        "bulk": {
+          "records": 10505,
+          "physical_walkers_any": 19,
+          "at_least_1_visit": {
+            "cells": 192,
+            "area_nm2": 0.135956683
+          },
+          "at_least_5_visits": {
+            "cells": 180,
+            "area_nm2": 0.1304350245
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 182,
+            "area_nm2": 0.1319350245
+          }
+        }
+      }
+    },
+    "d": {
+      "records": 288000,
+      "records_outside_native_rectangle": 0,
+      "zones": {
+        "all": {
+          "records": 288000,
+          "physical_walkers_any": 32,
+          "at_least_1_visit": {
+            "cells": 2686,
+            "area_nm2": 2.0145
+          },
+          "at_least_5_visits": {
+            "cells": 2575,
+            "area_nm2": 1.93125
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 2456,
+            "area_nm2": 1.842
+          }
+        },
+        "site": {
+          "records": 147058,
+          "physical_walkers_any": 32,
+          "at_least_1_visit": {
+            "cells": 1312,
+            "area_nm2": 0.9780381398
+          },
+          "at_least_5_visits": {
+            "cells": 1260,
+            "area_nm2": 0.9393313201
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 1142,
+            "area_nm2": 0.8506464323
+          }
+        },
+        "bulk": {
+          "records": 10519,
+          "physical_walkers_any": 29,
+          "at_least_1_visit": {
+            "cells": 182,
+            "area_nm2": 0.1289639025
+          },
+          "at_least_5_visits": {
+            "cells": 168,
+            "area_nm2": 0.121942244
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 177,
+            "area_nm2": 0.127442244
+          }
+        }
+      }
+    },
+    "e": {
+      "records": 288000,
+      "records_outside_native_rectangle": 0,
+      "zones": {
+        "all": {
+          "records": 288000,
+          "physical_walkers_any": 32,
+          "at_least_1_visit": {
+            "cells": 3038,
+            "area_nm2": 2.2785
+          },
+          "at_least_5_visits": {
+            "cells": 2945,
+            "area_nm2": 2.20875
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 2845,
+            "area_nm2": 2.13375
+          }
+        },
+        "site": {
+          "records": 200436,
+          "physical_walkers_any": 31,
+          "at_least_1_visit": {
+            "cells": 1449,
+            "area_nm2": 1.080415545
+          },
+          "at_least_5_visits": {
+            "cells": 1427,
+            "area_nm2": 1.0642015058
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 1373,
+            "area_nm2": 1.0238170178
+          }
+        },
+        "bulk": {
+          "records": 9197,
+          "physical_walkers_any": 10,
+          "at_least_1_visit": {
+            "cells": 212,
+            "area_nm2": 0.149706683
+          },
+          "at_least_5_visits": {
+            "cells": 196,
+            "area_nm2": 0.141927805
+          },
+          "at_least_2_physical_walkers": {
+            "cells": 205,
+            "area_nm2": 0.1464494635
+          }
+        }
+      }
+    }
+  }
+}

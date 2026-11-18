@@ -44,18 +44,8 @@ def _cycles(colvar: dict, own: Hills) -> np.ndarray:
     return np.searchsorted(own.time, colvar["time"], side="left")
 
 
-def _sample_estimate(colvars: list, parts: list, on_grid: list, grid: BiasGrid, funnel: Funnel, kT: float,
-                     start: float, **binding_kwargs) -> Optional[float]:
-    """dG0 from the samples after ``start`` (ps) alone, or None when they cannot give one.
-
-    The time of each walker after ``start`` is cut into slices. Within a slice the bias is taken
-    as constant: the hills on the grid of that walker at the middle of the slice, which are its
-    own hills up to then (``parts``) and of the other walkers what it had read by then
-    (``on_grid``, from :func:`hills_on_grid`). That makes the run a set of ensembles with known
-    biases; :func:`sliced_log_weights` then gives every sample its weight in the unbiased
-    ensemble and the weighted histogram along s gives W(s). The hills before ``start`` enter
-    only as part of the bias the later samples felt: nothing assumes that they had filled
-    anything. A sample whose bias cannot be rebuilt is left out."""
+def _slice_samples(colvars: list, parts: list, on_grid: list, start: float):
+    """Select samples and the SYNC-confirmed bias at the midpoint of each time slice."""
     samples, biases = [], []         # the samples of each walker; (walker, hills on its grid) of each slice
     for walker, (colvar, own, table) in enumerate(zip(colvars, parts, on_grid)):
         time = colvar["time"]
@@ -76,6 +66,17 @@ def _sample_estimate(colvars: list, parts: list, on_grid: list, grid: BiasGrid, 
     thin = -(-s.size // MAX_SAMPLES)
     s, rho, ensemble = s[::thin], rho[::thin], ensemble[::thin]
     counts = np.bincount(ensemble, minlength=len(biases))
+    return s, rho, biases, counts
+
+
+def _sample_estimate(colvars: list, parts: list, on_grid: list, grid: BiasGrid, funnel: Funnel, kT: float,
+                     start: float, **binding_kwargs) -> Optional[float]:
+    """Reweight samples from the bias each walker felt. Hills before the cutoff enter only as
+    part of the subsequent walker-specific biases, reconstructed from their SYNC histories."""
+    selected = _slice_samples(colvars, parts, on_grid, start)
+    if selected is None:
+        return None
+    s, rho, biases, counts = selected
     shared, current, reduced = None, None, []
     for (walker, on), count in zip(biases, counts):
         if walker != current:
@@ -114,12 +115,12 @@ def analyze_run(workdir, n_points: int = 20, plateau_fraction: float = 0.5,
                 unbound: Optional[tuple[float, float]] = None, write: bool = True) -> dict:
     """Analyse one run directory and return (and by default write) the results.
 
-    The headline number ``dG`` is measured as funnel metadynamics is published (Limongelli,
-    Bonomi and Parrinello, PNAS 110, 6358, 2013): the free-energy surface is the accumulated
-    bias times ``-gamma / (gamma - 1)``, its profile along the axis gives dG0(t), the first part
-    of the run is rejected and dG0(t) is averaged over the last ``plateau_fraction``. It is
-    ``dG_plateau``; ``dG_error`` is the standard error of that mean from block averages and
-    ``dG_plateau_std`` the standard deviation of dG0(t) over the same part.
+    The framework headline ``dG`` uses the accumulated WT bias times ``-gamma / (gamma - 1)``
+    to estimate a free-energy profile. Integrating its binding region relative to bulk gives
+    dG0(t). The retained fraction (one half by default) and five-block error are choices of
+    fmeta. Limongelli, Bonomi and Parrinello (PNAS 2013, Fig. S3) used trajectory reweighting
+    and reported a standard deviation. Here ``dG_plateau`` is the mean, ``dG_error`` its block
+    standard error, and ``dG_plateau_std`` the standard deviation over the retained fraction.
 
     Two cross-checks from the samples stand beside it: ``dG_reweighted``, from the reweighted
     histogram of the samples after the first ``discard_ns`` (of a run shorter than twice that:

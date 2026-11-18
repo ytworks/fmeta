@@ -1,0 +1,22 @@
+{
+  "analysis_commit": "55957f26eb7c23165e765da3ab7969fd17311cc8",
+  "trajectory_length_ns": 20,
+  "energy_unit": "kcal/mol",
+  "temperature_K": 300,
+  "cases": {
+    "gaussian_well": {
+      "reference": -1.1823841337627061,
+      "primary_dg": -1.2663766139257642,
+      "signed_difference": -0.08399248016305805,
+      "base_seed": 12,
+      "no_binding": false
+    },
+    "empty": {
+      "reference": -0.166104110051867,
+      "primary_dg": -0.3210708331357057,
+      "signed_difference": -0.15496672308383871,
+      "base_seed": 4,
+      "no_binding": true
+    }
+  }
+}

@@ -1,0 +1,436 @@
+{
+  "energy_unit": "kcal/mol",
+  "cut_unit": "ns/walker",
+  "change_direction": "after minus before",
+  "source_commits": {
+    "before_analysis": "d04d61371f89dc1f33d69ded512c1bb7b116f7fe",
+    "before_results": "35545609b6d971bd5ada8bb119f900fb1593f4cb",
+    "analysis_fix": "6c4bc62db3bdcce84f35b88e440d04046af65e90",
+    "first_corrected_results": "29631c42a3f0af6f1bb4bd168691af4097691b75",
+    "compared_public_revision": "c3b71616c75fba9674e8df019f60a68aa55102b3"
+  },
+  "methods": {
+    "before_primary": "Unbinned MBAR site-to-bulk estimate with bilinear interpolation of the logged bias tables.",
+    "after_primary": "Same unbinned site-to-bulk estimate with the native production natural bicubic interpolation.",
+    "wt_late": "Mean over the latter half of cutoff-specific cumulative WT surface integrals.",
+    "wt_endpoint": "Integral of the cumulative WT surface at the cutoff."
+  },
+  "matched_records": {
+    "checks": [
+      "Funnel, starting coordinates, equilibrated state, topology and prepared system digests",
+      "Wrapper segment commits, dirty flags and tracked src/fmeta tree",
+      "Replicas, cutoff, base seed, finite primary/core replica IDs",
+      "MBAR sample/state counts, region counts, strict statuses and populated bulk bins",
+      "Published structural contacts, departures and returns, where available"
+    ],
+    "input_evidence": "Published identity and support records. The archived R2 wrappers record uncommitted working-tree state.",
+    "unchanged_engine_source_between_analysis_commits": true,
+    "git_blobs": {
+      "a": {
+        "before": "bc44a2ac6a2546c1b968347495aecd9dc69d015f",
+        "after": "27e764aeba510e94a16cbd57109535890b9ada2e"
+      },
+      "b": {
+        "before": "8f9c9f2db882391ddef3c0bd1a56f21ee04bc596",
+        "after": "7574bafd6c0818570cb9a8644e5f04a46d893ce0"
+      },
+      "c": {
+        "before": "47b0a0d85afa19c066a71c0e7d788993d1121339",
+        "after": "17603763d9e100001daad433db37cb7b8f791ee1"
+      },
+      "d": {
+        "before": "adb1914ab770a5585ebbb6faa3c212785aca0d4d",
+        "after": "7c66a4c8f62e8797c6ac21def48b38c8d11dda78"
+      }
+    },
+    "revision_with_new_text_but_bilinear_archives": "165636d9a860687051eacfa2c892b78a92d7bb86"
+  },
+  "summary": {
+    "tyk2": {
+      "arm_system_timepoint_comparisons": 7,
+      "paired_finite_replica_timepoints": 61,
+      "largest_primary_replica_change": {
+        "system": "tyk2",
+        "arm": "b",
+        "cut_ns": 20,
+        "replica": 0,
+        "before": -18.350460723668263,
+        "after": -18.393230113913496,
+        "absolute_change": 0.0427693902452
+      },
+      "max_abs_complete_primary_mean_change": 0.0160441015956,
+      "max_abs_core_replica_change": 0.0713463147694,
+      "max_abs_wt_late_replica_change": 7.1054273576e-15
+    },
+    "tyk2_and_a2a": {
+      "arm_system_timepoint_comparisons": 11,
+      "paired_finite_replica_timepoints": 81,
+      "largest_primary_replica_change": {
+        "system": "a2a",
+        "arm": "a",
+        "cut_ns": 80,
+        "replica": 0,
+        "before": -5.009280682446387,
+        "after": -4.957699880110335,
+        "absolute_change": 0.0515808023361
+      },
+      "max_abs_complete_primary_mean_change": 0.0308107546639,
+      "max_abs_core_replica_change": 0.0713463147694,
+      "max_abs_wt_late_replica_change": 7.1054273576e-15
+    },
+    "tyk2_pilot_rank_by_complete_primary_sample_sd": {
+      "before": [
+        "c",
+        "a",
+        "b"
+      ],
+      "after": [
+        "c",
+        "a",
+        "b"
+      ],
+      "excluded_in_both": [
+        "d"
+      ]
+    }
+  },
+  "endpoints": [
+    {
+      "system": "a2a",
+      "arm": "a",
+      "cut_ns": 20,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -6.4279405220312,
+      "primary_mean_after": -6.408694609647778,
+      "primary_mean_change": 0.0192459123834,
+      "primary_sample_sd_before": 3.5593493344751574,
+      "primary_sample_sd_after": 3.556173385544239,
+      "max_abs_primary_replica_change": {
+        "replica": 2,
+        "before": -10.11969205688328,
+        "after": -10.096562467778094,
+        "absolute_change": 0.0231295891052
+      },
+      "max_abs_core_replica_change": 0.0175694290913,
+      "max_abs_wt_late_replica_change": 1.7763568394e-15
+    },
+    {
+      "system": "tyk2",
+      "arm": "a",
+      "cut_ns": 20,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -16.24659516905688,
+      "primary_mean_after": -16.25885388628531,
+      "primary_mean_change": -0.0122587172284,
+      "primary_sample_sd_before": 3.793848153347258,
+      "primary_sample_sd_after": 3.8035188356112504,
+      "max_abs_primary_replica_change": {
+        "replica": 0,
+        "before": -21.287608323098134,
+        "after": -21.321419767979428,
+        "absolute_change": 0.0338114448813
+      },
+      "max_abs_core_replica_change": 0.0614392465197,
+      "max_abs_wt_late_replica_change": 7.1054273576e-15
+    },
+    {
+      "system": "a2a",
+      "arm": "a",
+      "cut_ns": 40,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -4.885724513852129,
+      "primary_mean_after": -4.856893726498998,
+      "primary_mean_change": 0.0288307873531,
+      "primary_sample_sd_before": 2.067692552880479,
+      "primary_sample_sd_after": 2.0677662561248185,
+      "max_abs_primary_replica_change": {
+        "replica": 0,
+        "before": -5.758758729991776,
+        "after": -5.725533275159475,
+        "absolute_change": 0.0332254548323
+      },
+      "max_abs_core_replica_change": 0.0317721442295,
+      "max_abs_wt_late_replica_change": 1.7763568394e-15
+    },
+    {
+      "system": "tyk2",
+      "arm": "a",
+      "cut_ns": 40,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -13.774189234490109,
+      "primary_mean_after": -13.78605165131891,
+      "primary_mean_change": -0.0118624168288,
+      "primary_sample_sd_before": 3.3394676757700688,
+      "primary_sample_sd_after": 3.3542885609603044,
+      "max_abs_primary_replica_change": {
+        "replica": 1,
+        "before": -14.48770731680357,
+        "after": -14.512508908717276,
+        "absolute_change": 0.0248015919137
+      },
+      "max_abs_core_replica_change": 0.0619395026273,
+      "max_abs_wt_late_replica_change": 5.3290705182e-15
+    },
+    {
+      "system": "a2a",
+      "arm": "a",
+      "cut_ns": 80,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -4.692928019287948,
+      "primary_mean_after": -4.662117264624062,
+      "primary_mean_change": 0.0308107546639,
+      "primary_sample_sd_before": 1.3753658162665698,
+      "primary_sample_sd_after": 1.3791400570726653,
+      "max_abs_primary_replica_change": {
+        "replica": 0,
+        "before": -5.009280682446387,
+        "after": -4.957699880110335,
+        "absolute_change": 0.0515808023361
+      },
+      "max_abs_core_replica_change": 0.0294672942533,
+      "max_abs_wt_late_replica_change": 8.881784197e-16
+    },
+    {
+      "system": "tyk2",
+      "arm": "a",
+      "cut_ns": 80,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -10.547261253776837,
+      "primary_mean_after": -10.5622662111013,
+      "primary_mean_change": -0.0150049573245,
+      "primary_sample_sd_before": 4.064721254785039,
+      "primary_sample_sd_after": 4.088831766076052,
+      "max_abs_primary_replica_change": {
+        "replica": 1,
+        "before": -12.276402754767686,
+        "after": -12.309421451278366,
+        "absolute_change": 0.0330186965107
+      },
+      "max_abs_core_replica_change": 0.0678539192819,
+      "max_abs_wt_late_replica_change": 1.7763568394e-15
+    },
+    {
+      "system": "tyk2",
+      "arm": "a",
+      "cut_ns": 90,
+      "n_planned": 4,
+      "n_finite_primary": 4,
+      "n_finite_core": 4,
+      "n_strict": 4,
+      "primary_mean_before": -10.010754086188033,
+      "primary_mean_after": -10.026798187783648,
+      "primary_mean_change": -0.0160441015956,
+      "primary_sample_sd_before": 4.216695776234315,
+      "primary_sample_sd_after": 4.237805181843616,
+      "max_abs_primary_replica_change": {
+        "replica": 2,
+        "before": -13.882053640668149,
+        "after": -13.9196870100684,
+        "absolute_change": 0.0376333694003
+      },
+      "max_abs_core_replica_change": 0.0713463147694,
+      "max_abs_wt_late_replica_change": 7.1054273576e-15
+    },
+    {
+      "system": "a2a",
+      "arm": "b",
+      "cut_ns": 20,
+      "n_planned": 8,
+      "n_finite_primary": 8,
+      "n_finite_core": 8,
+      "n_strict": 8,
+      "primary_mean_before": -5.218054952665335,
+      "primary_mean_after": -5.199844235075838,
+      "primary_mean_change": 0.0182107175895,
+      "primary_sample_sd_before": 2.5467557249086448,
+      "primary_sample_sd_after": 2.556344439598872,
+      "max_abs_primary_replica_change": {
+        "replica": 3,
+        "before": -1.7666703789406335,
+        "after": -1.7294532902806257,
+        "absolute_change": 0.03721708866
+      },
+      "max_abs_core_replica_change": 0.0403664930082,
+      "max_abs_wt_late_replica_change": 3.5527136788e-15
+    },
+    {
+      "system": "tyk2",
+      "arm": "b",
+      "cut_ns": 20,
+      "n_planned": 8,
+      "n_finite_primary": 8,
+      "n_finite_core": 8,
+      "n_strict": 8,
+      "primary_mean_before": -12.229856896808224,
+      "primary_mean_after": -12.235597364134954,
+      "primary_mean_change": -0.00574046732673,
+      "primary_sample_sd_before": 5.80894587715874,
+      "primary_sample_sd_after": 5.8320430519030495,
+      "max_abs_primary_replica_change": {
+        "replica": 0,
+        "before": -18.350460723668263,
+        "after": -18.393230113913496,
+        "absolute_change": 0.0427693902452
+      },
+      "max_abs_core_replica_change": 0.0537744463517,
+      "max_abs_wt_late_replica_change": 3.5527136788e-15
+    },
+    {
+      "system": "tyk2",
+      "arm": "c",
+      "cut_ns": 20,
+      "n_planned": 8,
+      "n_finite_primary": 8,
+      "n_finite_core": 8,
+      "n_strict": 8,
+      "primary_mean_before": -16.975882100258993,
+      "primary_mean_after": -16.988097538802133,
+      "primary_mean_change": -0.0122154385431,
+      "primary_sample_sd_before": 2.574700785771454,
+      "primary_sample_sd_after": 2.57323512162282,
+      "max_abs_primary_replica_change": {
+        "replica": 6,
+        "before": -14.00488315204056,
+        "after": -14.023564815321896,
+        "absolute_change": 0.0186816632813
+      },
+      "max_abs_core_replica_change": 0.0221700604005,
+      "max_abs_wt_late_replica_change": 0
+    },
+    {
+      "system": "tyk2",
+      "arm": "d",
+      "cut_ns": 20,
+      "n_planned": 32,
+      "n_finite_primary": 29,
+      "n_finite_core": 28,
+      "n_strict": 23,
+      "primary_mean_before": null,
+      "primary_mean_after": null,
+      "primary_mean_change": null,
+      "primary_sample_sd_before": null,
+      "primary_sample_sd_after": null,
+      "max_abs_primary_replica_change": {
+        "replica": 6,
+        "before": -16.676544448927892,
+        "after": -16.70239386994342,
+        "absolute_change": 0.0258494210155
+      },
+      "max_abs_core_replica_change": 0.0258449072684,
+      "max_abs_wt_late_replica_change": 0,
+      "finite_primary_subset": {
+        "n": 29,
+        "mean_before": -13.13660717871948,
+        "mean_after": -13.151210003022083,
+        "sample_sd_before": 5.775163484998866,
+        "sample_sd_after": 5.779024777502849
+      }
+    }
+  ],
+  "d20_coverage": {
+    "strict_available": 23,
+    "finite_primary": 29,
+    "finite_core": 28,
+    "independent_histories": 32,
+    "no_bulk_observed_replica_ids": [
+      16,
+      17,
+      24
+    ],
+    "meaning": "The finite-29 subset is conditional. The independent 32-history primary mean, SD and interval are undefined in both analyses. The 32 WT endpoint integrals are calculable even for runs with no observed bulk frames."
+  },
+  "e_presentation": {
+    "energy_analysis_commit": "29631c42a3f0af6f1bb4bd168691af4097691b75",
+    "sampling": {
+      "independent_bias_histories": 1,
+      "walkers_per_bias": 32,
+      "base_seed": 19711801
+    },
+    "first_report_discussing_wt_endpoint": "91357d79db85fd5814b6eae1168a7f82b2d7ce4f",
+    "first_report_using_reweighted_as_primary": "a91e328436e4e8ac13777a4e00a92b021e42aaad",
+    "final_cumulative_record": {
+      "artifact": "e-tyk2.json",
+      "sha256": "ce3b424dd83c43ea25e74fdad9ce79f0f6fc8db91e00d08efff771b01582b638",
+      "cut_ns": 20,
+      "prior_endpoints_with_identical_scientific_content": [
+        5,
+        10,
+        15
+      ],
+      "comparison": "Each complete earlier endpoint object has the same canonical SHA256 in this cumulative record as at its first public revision."
+    },
+    "history_digest": "SHA256 of each complete public endpoint rendered by jq -cS with its terminating newline.",
+    "points": [
+      {
+        "cut_ns": 5,
+        "experimental_reference": -11.419260542630683,
+        "primary_reweighted": -27.309863197906918,
+        "core_reweighted": -27.29504240102716,
+        "wt_late": -26.25945340238944,
+        "wt_endpoint": -24.845617164922285,
+        "primary_absolute_reference_error": 15.8906026553,
+        "wt_endpoint_absolute_reference_error": 13.4263566223,
+        "wt_endpoint_minus_primary": 2.46424603298,
+        "endpoint_sha256": "8d21f8ca4c444ced57a68feef68506a20b62476901dc7504ee921fa8a6a50227",
+        "equal_public_revisions": [
+          "91357d79db85fd5814b6eae1168a7f82b2d7ce4f",
+          "84dc287ee6546bc393c492ba44ffcaa853da16ef",
+          "c10c9f5c4455bb291c5795db39f9beca7ff1b435",
+          "a91e328436e4e8ac13777a4e00a92b021e42aaad",
+          "c3b71616c75fba9674e8df019f60a68aa55102b3"
+        ]
+      },
+      {
+        "cut_ns": 10,
+        "experimental_reference": -11.419260542630683,
+        "primary_reweighted": -24.66605294771316,
+        "core_reweighted": -24.621093022108028,
+        "wt_late": -21.87321568543054,
+        "wt_endpoint": -20.15131056248549,
+        "primary_absolute_reference_error": 13.2467924051,
+        "wt_endpoint_absolute_reference_error": 8.73205001985,
+        "wt_endpoint_minus_primary": 4.51474238523,
+        "endpoint_sha256": "5d8dab4f710d572b94e08c1ad3329ecbe086df9aff96f0be4b1546a2de6ceb72",
+        "equal_public_revisions": [
+          "84dc287ee6546bc393c492ba44ffcaa853da16ef",
+          "c10c9f5c4455bb291c5795db39f9beca7ff1b435",
+          "a91e328436e4e8ac13777a4e00a92b021e42aaad",
+          "c3b71616c75fba9674e8df019f60a68aa55102b3"
+        ]
+      },
+      {
+        "cut_ns": 15,
+        "experimental_reference": -11.419260542630683,
+        "primary_reweighted": -21.81480797946677,
+        "core_reweighted": -21.802100011399528,
+        "wt_late": -20.126049804965202,
+        "wt_endpoint": -19.13764321018425,
+        "primary_absolute_reference_error": 10.3955474368,
+        "wt_endpoint_absolute_reference_error": 7.71838266755,
+        "wt_endpoint_minus_primary": 2.67716476928,
+        "endpoint_sha256": "ac8deca4015242fce64d79761172c9efbd22bbc013fa352f986cd2b71026d2cb",
+        "equal_public_revisions": [
+          "c3b71616c75fba9674e8df019f60a68aa55102b3"
+        ]
+      }
+    ]
+  }
+}

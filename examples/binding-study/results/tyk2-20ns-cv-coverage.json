@@ -1,0 +1,1048 @@
+{
+  "cut_ns": 20,
+  "discard_ns": 2,
+  "retention": "2002 to 20000 ps inclusively at 2 ps",
+  "native_grid_domain_nm": [
+    0.4002406500207519,
+    4.950240650020751,
+    0,
+    1.012215986365802
+  ],
+  "site_nm": [
+    0.7002406500207519,
+    2.1157086226804243
+  ],
+  "bulk_nm": [
+    4.066907316687418,
+    4.5502406500207515
+  ],
+  "arms": {
+    "c": {
+      "records": 288000,
+      "s_nm_range": [
+        0.59556508,
+        4.73778439
+      ],
+      "rho_nm_range": [
+        0.00103191,
+        0.80352795
+      ],
+      "support": {
+        "site": {
+          "records": 179700,
+          "physical_walkers_any": 32,
+          "independent_histories_any": 8
+        },
+        "transition": {
+          "records": 92692,
+          "physical_walkers_any": 24,
+          "independent_histories_any": 8
+        },
+        "bulk": {
+          "records": 10505,
+          "physical_walkers_any": 19,
+          "independent_histories_any": 8
+        },
+        "bound_side": {
+          "records": 64565,
+          "physical_walkers_any": 26,
+          "independent_histories_any": 8
+        },
+        "walkers_both_site_and_bulk": 19,
+        "coordinate_confirmed_bulk_departures_0_to_20ns": 19,
+        "coordinate_confirmed_pocket_returns_0_to_20ns": 0,
+        "coordinate_confirmed_returning_walkers_0_to_20ns": 0
+      },
+      "inside_native_rectangle": 288000,
+      "outside_native_rectangle": 0
+    },
+    "d": {
+      "records": 288000,
+      "s_nm_range": [
+        0.62016422,
+        4.7280755
+      ],
+      "rho_nm_range": [
+        0.00101691,
+        0.75329357
+      ],
+      "support": {
+        "site": {
+          "records": 147058,
+          "physical_walkers_any": 32,
+          "independent_histories_any": 32
+        },
+        "transition": {
+          "records": 126849,
+          "physical_walkers_any": 32,
+          "independent_histories_any": 32
+        },
+        "bulk": {
+          "records": 10519,
+          "physical_walkers_any": 29,
+          "independent_histories_any": 29
+        },
+        "bound_side": {
+          "records": 29965,
+          "physical_walkers_any": 30,
+          "independent_histories_any": 30
+        },
+        "walkers_both_site_and_bulk": 29,
+        "coordinate_confirmed_bulk_departures_0_to_20ns": 25,
+        "coordinate_confirmed_pocket_returns_0_to_20ns": 1,
+        "coordinate_confirmed_returning_walkers_0_to_20ns": 1
+      },
+      "inside_native_rectangle": 288000,
+      "outside_native_rectangle": 0
+    }
+  },
+  "grid_origin_nm": [
+    0.0,
+    0.0
+  ],
+  "grid_edges": "Lower-inclusive, upper-exclusive with the native upper boundary in the final clipped cell. Each zone uses exact sample-coordinate limits. Area uses intersection with the zone and native rectangle; a cell straddling locked boundaries may count in more than one zone. Counts refer to sampled CV support, not PMF accuracy. Quantiles are [minimum, Q1, median, Q3, maximum].",
+  "grids": {
+    "0.5": {
+      "cell_size_nm": [
+        0.0125,
+        0.015
+      ],
+      "c": {
+        "all": {
+          "at_least_1_visit": [
+            11226,
+            2.104875
+          ],
+          "at_least_5_visits": [
+            10586,
+            1.984875
+          ],
+          "at_least_2_physical_walkers": [
+            10887,
+            2.0413125
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              423.0,
+              2522.75,
+              3716.0,
+              4510.5,
+              4965.0
+            ],
+            "area_quantiles_nm2": [
+              0.07931250000000002,
+              0.4730156249999994,
+              0.6967499999999995,
+              0.845718750000002,
+              0.930937500000004
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              144.0,
+              249.0,
+              338.0,
+              500.25,
+              860.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              7569.0,
+              8521.25,
+              9132.5,
+              9566.75,
+              10139.0
+            ],
+            "area_quantiles_nm2": [
+              1.419187500000012,
+              1.5977343750000204,
+              1.7123437500000176,
+              1.7937656250000205,
+              1.9010625000000207
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              1978.0,
+              2219.75,
+              2401.5,
+              2621.0,
+              2976.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              7569.0,
+              8521.25,
+              9132.5,
+              9566.75,
+              10139.0
+            ],
+            "area_quantiles_nm2": [
+              1.419187500000012,
+              1.5977343750000204,
+              1.7123437500000176,
+              1.7937656250000205,
+              1.9010625000000207
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              1978.0,
+              2219.75,
+              2401.5,
+              2621.0,
+              2976.0
+            ]
+          },
+          "four_group_cells": [
+            8707,
+            7569,
+            9166,
+            7964,
+            9551,
+            9614,
+            10139,
+            9099
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            5531,
+            1.031299966592068
+          ],
+          "at_least_5_visits": [
+            5316,
+            0.9919919392131138
+          ],
+          "at_least_2_physical_walkers": [
+            5439,
+            1.014086064095181
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            4474,
+            0.834716672557142
+          ],
+          "at_least_5_visits": [
+            4283,
+            0.7996325140552745
+          ],
+          "at_least_2_physical_walkers": [
+            4400,
+            0.8210844530565194
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            708,
+            0.1307583537453309
+          ],
+          "at_least_5_visits": [
+            654,
+            0.12163335374533091
+          ],
+          "at_least_2_physical_walkers": [
+            684,
+            0.1271261342447083
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            5057,
+            0.9424966848043406
+          ],
+          "at_least_5_visits": [
+            4659,
+            0.8700747580502941
+          ],
+          "at_least_2_physical_walkers": [
+            4819,
+            0.899585587301228
+          ]
+        }
+      },
+      "d": {
+        "all": {
+          "at_least_1_visit": [
+            10357,
+            1.9419374999999999
+          ],
+          "at_least_5_visits": [
+            9241,
+            1.7326875
+          ],
+          "at_least_2_physical_walkers": [
+            9376,
+            1.758
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              2451.0,
+              4271.75,
+              4551.5,
+              4730.5,
+              5205.0
+            ],
+            "area_quantiles_nm2": [
+              0.4595625000000007,
+              0.8009531250000007,
+              0.8534062500000024,
+              0.8869687500000014,
+              0.9759375000000037
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              111.0,
+              174.0,
+              221.5,
+              291.75,
+              552.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              2451.0,
+              4271.75,
+              4551.5,
+              4730.5,
+              5205.0
+            ],
+            "area_quantiles_nm2": [
+              0.4595625000000007,
+              0.8009531250000007,
+              0.8534062500000024,
+              0.8869687500000014,
+              0.9759375000000037
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              111.0,
+              174.0,
+              221.5,
+              291.75,
+              552.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              7677.0,
+              7972.5,
+              8079.0,
+              8285.25,
+              8886.0
+            ],
+            "area_quantiles_nm2": [
+              1.4394375000000161,
+              1.4948437500000171,
+              1.5148125000000179,
+              1.5534843750000182,
+              1.66612500000002
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              2530.0,
+              2799.75,
+              2899.0,
+              3002.25,
+              3336.0
+            ]
+          },
+          "four_group_cells": [
+            8105,
+            8826,
+            7677,
+            8012,
+            7854,
+            8886,
+            8064,
+            8094
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            5061,
+            0.9434045810096436
+          ],
+          "at_least_5_visits": [
+            4284,
+            0.7979069881737951
+          ],
+          "at_least_2_physical_walkers": [
+            4306,
+            0.8019395442680481
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            4339,
+            0.8094041725571419
+          ],
+          "at_least_5_visits": [
+            4172,
+            0.7787948824859983
+          ],
+          "at_least_2_physical_walkers": [
+            4277,
+            0.7978273018973483
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            669,
+            0.12339418299626473
+          ],
+          "at_least_5_visits": [
+            611,
+            0.11363696349564215
+          ],
+          "at_least_2_physical_walkers": [
+            651,
+            0.12075474399501965
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            4691,
+            0.8747947458030956
+          ],
+          "at_least_5_visits": [
+            4393,
+            0.8201818459816406
+          ],
+          "at_least_2_physical_walkers": [
+            4476,
+            0.835082045892368
+          ]
+        }
+      },
+      "overlap": {
+        "common": 10337,
+        "c_only": 889,
+        "d_only": 20,
+        "joint": 11246
+      }
+    },
+    "1.0": {
+      "cell_size_nm": [
+        0.025,
+        0.03
+      ],
+      "c": {
+        "all": {
+          "at_least_1_visit": [
+            2891,
+            2.16825
+          ],
+          "at_least_5_visits": [
+            2800,
+            2.1
+          ],
+          "at_least_2_physical_walkers": [
+            2821,
+            2.1157500000000002
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              124.0,
+              820.25,
+              1470.5,
+              1727.5,
+              1974.0
+            ],
+            "area_quantiles_nm2": [
+              0.093,
+              0.6151875000000006,
+              1.1028750000000014,
+              1.295625000000001,
+              1.4805000000000001
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              102.0,
+              446.75,
+              675.0,
+              780.5,
+              953.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              2191.0,
+              2400.25,
+              2652.5,
+              2686.5,
+              2785.0
+            ],
+            "area_quantiles_nm2": [
+              1.64325,
+              1.8001874999999998,
+              1.989375,
+              2.014875,
+              2.088750000000001
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              1618.0,
+              2123.75,
+              2237.5,
+              2393.25,
+              2573.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              2191.0,
+              2400.25,
+              2652.5,
+              2686.5,
+              2785.0
+            ],
+            "area_quantiles_nm2": [
+              1.64325,
+              1.8001874999999998,
+              1.989375,
+              2.014875,
+              2.088750000000001
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              1618.0,
+              2123.75,
+              2237.5,
+              2393.25,
+              2573.0
+            ]
+          },
+          "four_group_cells": [
+            2398,
+            2401,
+            2644,
+            2191,
+            2676,
+            2718,
+            2785,
+            2661
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            1408,
+            1.0499515057718583
+          ],
+          "at_least_5_visits": [
+            1381,
+            1.0297087252724808
+          ],
+          "at_least_2_physical_walkers": [
+            1393,
+            1.0387015057718583
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            1161,
+            0.8584257627175582
+          ],
+          "at_least_5_visits": [
+            1128,
+            0.8336757627175582
+          ],
+          "at_least_2_physical_walkers": [
+            1143,
+            0.8449257627175581
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            192,
+            0.13595668299626476
+          ],
+          "at_least_5_visits": [
+            180,
+            0.1304350244943971
+          ],
+          "at_least_2_physical_walkers": [
+            182,
+            0.1319350244943971
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            1333,
+            0.9821613237163132
+          ],
+          "at_least_5_visits": [
+            1269,
+            0.9393607872119554
+          ],
+          "at_least_2_physical_walkers": [
+            1276,
+            0.9446107872119553
+          ]
+        }
+      },
+      "d": {
+        "all": {
+          "at_least_1_visit": [
+            2686,
+            2.0145
+          ],
+          "at_least_5_visits": [
+            2575,
+            1.93125
+          ],
+          "at_least_2_physical_walkers": [
+            2456,
+            1.842
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              825.0,
+              1648.75,
+              1776.5,
+              1842.5,
+              2125.0
+            ],
+            "area_quantiles_nm2": [
+              0.6187500000000006,
+              1.2365625000000005,
+              1.3323750000000012,
+              1.3818750000000006,
+              1.59375
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              382.0,
+              661.75,
+              755.5,
+              837.5,
+              963.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              825.0,
+              1648.75,
+              1776.5,
+              1842.5,
+              2125.0
+            ],
+            "area_quantiles_nm2": [
+              0.6187500000000006,
+              1.2365625000000005,
+              1.3323750000000012,
+              1.3818750000000006,
+              1.59375
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              382.0,
+              661.75,
+              755.5,
+              837.5,
+              963.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              2106.0,
+              2229.25,
+              2263.0,
+              2334.0,
+              2530.0
+            ],
+            "area_quantiles_nm2": [
+              1.5795000000000003,
+              1.6719375,
+              1.69725,
+              1.7505,
+              1.8974999999999995
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              1893.0,
+              1976.5,
+              1995.0,
+              2040.5,
+              2208.0
+            ]
+          },
+          "four_group_cells": [
+            2283,
+            2530,
+            2106,
+            2232,
+            2221,
+            2445,
+            2243,
+            2297
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            1312,
+            0.9780381397793289
+          ],
+          "at_least_5_visits": [
+            1260,
+            0.9393313201001613
+          ],
+          "at_least_2_physical_walkers": [
+            1142,
+            0.8506464322886673
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            1125,
+            0.8316685432169356
+          ],
+          "at_least_5_visits": [
+            1092,
+            0.8073898018973484
+          ],
+          "at_least_2_physical_walkers": [
+            1111,
+            0.8216398018973483
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            182,
+            0.12896390249688727
+          ],
+          "at_least_5_visits": [
+            168,
+            0.12194224399501961
+          ],
+          "at_least_2_physical_walkers": [
+            177,
+            0.12744224399501966
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            1228,
+            0.9073752262132004
+          ],
+          "at_least_5_visits": [
+            1175,
+            0.8695820458923682
+          ],
+          "at_least_2_physical_walkers": [
+            1167,
+            0.8635820458923681
+          ]
+        }
+      },
+      "overlap": {
+        "common": 2681,
+        "c_only": 210,
+        "d_only": 5,
+        "joint": 2896
+      }
+    },
+    "2.0": {
+      "cell_size_nm": [
+        0.05,
+        0.06
+      ],
+      "c": {
+        "all": {
+          "at_least_1_visit": [
+            753,
+            2.2590000000000003
+          ],
+          "at_least_5_visits": [
+            737,
+            2.2110000000000003
+          ],
+          "at_least_2_physical_walkers": [
+            741,
+            2.223
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              36.0,
+              236.75,
+              445.5,
+              488.75,
+              567.0
+            ],
+            "area_quantiles_nm2": [
+              0.10800000000000001,
+              0.71025,
+              1.3365000000000005,
+              1.466250000000001,
+              1.7010000000000012
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              30.0,
+              201.75,
+              347.5,
+              421.5,
+              489.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              585.0,
+              644.5,
+              704.5,
+              712.5,
+              732.0
+            ],
+            "area_quantiles_nm2": [
+              1.7550000000000012,
+              1.9335000000000013,
+              2.1135000000000015,
+              2.1375000000000015,
+              2.1960000000000015
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              556.0,
+              605.75,
+              668.0,
+              674.0,
+              705.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              585.0,
+              644.5,
+              704.5,
+              712.5,
+              732.0
+            ],
+            "area_quantiles_nm2": [
+              1.7550000000000012,
+              1.9335000000000013,
+              2.1135000000000015,
+              2.1375000000000015,
+              2.1960000000000015
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              556.0,
+              605.75,
+              668.0,
+              674.0,
+              705.0
+            ]
+          },
+          "four_group_cells": [
+            637,
+            647,
+            704,
+            585,
+            712,
+            714,
+            732,
+            705
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            366,
+            1.0751655449516484
+          ],
+          "at_least_5_visits": [
+            361,
+            1.0601655449516483
+          ],
+          "at_least_2_physical_walkers": [
+            366,
+            1.0751655449516484
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            305,
+            0.8947045040371455
+          ],
+          "at_least_5_visits": [
+            297,
+            0.8707045040371454
+          ],
+          "at_least_2_physical_walkers": [
+            300,
+            0.8797045040371454
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            54,
+            0.1449855609987549
+          ],
+          "at_least_5_visits": [
+            50,
+            0.14492780499377453
+          ],
+          "at_least_2_physical_walkers": [
+            50,
+            0.14492780499377453
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            358,
+            1.0387045040371456
+          ],
+          "at_least_5_visits": [
+            342,
+            1.00563230903092
+          ],
+          "at_least_2_physical_walkers": [
+            342,
+            1.0026467480321652
+          ]
+        }
+      },
+      "d": {
+        "all": {
+          "at_least_1_visit": [
+            710,
+            2.13
+          ],
+          "at_least_5_visits": [
+            689,
+            2.067
+          ],
+          "at_least_2_physical_walkers": [
+            649,
+            1.947
+          ],
+          "one_physical_walker": {
+            "cell_count_quantiles": [
+              235.0,
+              462.0,
+              503.0,
+              527.75,
+              625.0
+            ],
+            "area_quantiles_nm2": [
+              0.705,
+              1.3860000000000008,
+              1.5090000000000003,
+              1.583250000000001,
+              1.8750000000000013
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              200.0,
+              407.75,
+              426.5,
+              456.25,
+              531.0
+            ]
+          },
+          "one_independent_bias_history": {
+            "cell_count_quantiles": [
+              235.0,
+              462.0,
+              503.0,
+              527.75,
+              625.0
+            ],
+            "area_quantiles_nm2": [
+              0.705,
+              1.3860000000000008,
+              1.5090000000000003,
+              1.583250000000001,
+              1.8750000000000013
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              200.0,
+              407.75,
+              426.5,
+              456.25,
+              531.0
+            ]
+          },
+          "four_consecutive_physical_walkers": {
+            "cell_count_quantiles": [
+              564.0,
+              589.75,
+              600.5,
+              622.25,
+              671.0
+            ],
+            "area_quantiles_nm2": [
+              1.692000000000001,
+              1.769250000000001,
+              1.8015000000000012,
+              1.8667500000000012,
+              2.0130000000000017
+            ],
+            "visit_count_ge5_cell_quantiles": [
+              526.0,
+              554.0,
+              566.0,
+              585.25,
+              639.0
+            ]
+          },
+          "four_group_cells": [
+            605,
+            671,
+            564,
+            590,
+            589,
+            650,
+            596,
+            613
+          ]
+        },
+        "site": {
+          "at_least_1_visit": [
+            348,
+            1.0212521789591191
+          ],
+          "at_least_5_visits": [
+            340,
+            0.9993096615982937
+          ],
+          "at_least_2_physical_walkers": [
+            306,
+            0.89536769096908
+          ]
+        },
+        "between_site_and_bulk": {
+          "at_least_1_visit": [
+            296,
+            0.8677045040371454
+          ],
+          "at_least_5_visits": [
+            289,
+            0.8476470213979709
+          ],
+          "at_least_2_physical_walkers": [
+            293,
+            0.8587045040371454
+          ]
+        },
+        "bulk": {
+          "at_least_1_visit": [
+            53,
+            0.1449711219975098
+          ],
+          "at_least_5_visits": [
+            47,
+            0.13592780499377458
+          ],
+          "at_least_2_physical_walkers": [
+            51,
+            0.1419566829962647
+          ]
+        },
+        "other": {
+          "at_least_1_visit": [
+            330,
+            0.9636611870334102
+          ],
+          "at_least_5_visits": [
+            316,
+            0.9285892653929906
+          ],
+          "at_least_2_physical_walkers": [
+            310,
+            0.9096323090309201
+          ]
+        }
+      },
+      "overlap": {
+        "common": 710,
+        "c_only": 43,
+        "d_only": 0,
+        "joint": 753
+      }
+    }
+  }
+}
