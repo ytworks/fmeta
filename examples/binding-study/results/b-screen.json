@@ -1,0 +1,311 @@
+{
+  "arm": "b",
+  "energy_unit": "kJ/mol",
+  "length_unit": "ns/walker",
+  "production_source": {
+    "tracked_source_base_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+    "tracked_src_fmeta_tree": "db75005c9dabba6877fbcd462d26b8aee1100d33",
+    "wrapper_segments": {
+      "tyk2": [
+        {
+          "end_ns": 20,
+          "wrapper_commit": "c163eb26df6200bdeb8b48d35fac7522af82bc8c",
+          "wrapper_dirty": false
+        }
+      ]
+    }
+  },
+  "analysis_commit": "d04d61371f89dc1f33d69ded512c1bb7b116f7fe",
+  "frozen_inputs": {
+    "tyk2": {
+      "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+      "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+      "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+      "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+      "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079"
+    }
+  },
+  "endpoints": [
+    {
+      "length_ns": 20,
+      "purpose": "screening",
+      "passes": null,
+      "systems": {
+        "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -12.229856896808224,
+            "signed_error_predicted_minus_reference": -0.810596354177541,
+            "ci95_independent_replicas": [
+              -17.086257182727586,
+              -7.373456610888863
+            ],
+            "ci95_halfwidth": 4.856400285919362,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -12.23363308286894,
+            "accumulated_wt_mean": -11.854315789718733
+          },
+          "base_seed": 19111801,
+          "status": "available",
+          "dG": -51.16972125624561,
+          "ci95": [
+            -71.48890005253222,
+            -30.850542459959005
+          ],
+          "dG_core": -51.185520818723646,
+          "ci95_core": [
+            -71.57062022343739,
+            -30.800421414009904
+          ],
+          "dG_bias": -49.59845726418318,
+          "ci95_bias": [
+            -66.6342599766003,
+            -32.56265455176605
+          ],
+          "affinity_fold_error": 3.8949976149469108,
+          "passes": false,
+          "structure": {
+            "returns_by_replica": [
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            "departures": 19,
+            "counts": {
+              "site_frames": 3529,
+              "site_contact_frames": 3529,
+              "bulk_frames": 292,
+              "bulk_clear_frames": 280,
+              "bulk_core_frames": 114,
+              "bulk_core_clear_frames": 111,
+              "site_contact_wall_above_kT_frames": 292,
+              "bound_contact_wall_above_kT_frames": 99
+            },
+            "reference_wall_kj_mol": {
+              "prepared": 0.0,
+              "equil": 0.0
+            }
+          },
+          "replicas": [
+            {
+              "replica": 0,
+              "dG": -76.77832766782802,
+              "dG_core": -77.06267708543608,
+              "dG_bias": -66.06058414399318,
+              "bulk_pmf_sd": 0.40848349047771243,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 19595,
+                  "ess": 1225.2535563380095
+                },
+                "bulk": {
+                  "count": 1694,
+                  "ess": 1398.8381059487824
+                },
+                "core": {
+                  "count": 651,
+                  "ess": 624.8066555739795
+                }
+              },
+              "weighted_site_above_1kT": 7.089650488471863e-14,
+              "weighted_site_contact_above_1kT": 1.1178780538095778e-13,
+              "weighted_bound_contact_above_1kT": 5.873674909449686e-17
+            },
+            {
+              "replica": 1,
+              "dG": -54.400636708658546,
+              "dG_core": -54.61504878522691,
+              "dG_bias": -54.02274807530646,
+              "bulk_pmf_sd": 0.8737665302099675,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 23036,
+                  "ess": 472.22439512765845
+                },
+                "bulk": {
+                  "count": 1350,
+                  "ess": 362.62433800884713
+                },
+                "core": {
+                  "count": 514,
+                  "ess": 161.89524305246704
+                }
+              },
+              "weighted_site_above_1kT": 2.1326887757062143e-12,
+              "weighted_site_contact_above_1kT": 1.839873535021689e-13,
+              "weighted_bound_contact_above_1kT": 1.818448653378799e-15
+            },
+            {
+              "replica": 2,
+              "dG": -71.67626487442067,
+              "dG_core": -71.62555165783323,
+              "dG_bias": -70.77070961843758,
+              "bulk_pmf_sd": 1.0739022101595015,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 19487,
+                  "ess": 2425.310292597113
+                },
+                "bulk": {
+                  "count": 1566,
+                  "ess": 450.16801113306326
+                },
+                "core": {
+                  "count": 587,
+                  "ess": 219.2031917740187
+                }
+              },
+              "weighted_site_above_1kT": 7.368844915111387e-14,
+              "weighted_site_contact_above_1kT": 4.701646937788778e-14,
+              "weighted_bound_contact_above_1kT": 2.7923773566783235e-19
+            },
+            {
+              "replica": 3,
+              "dG": -53.75261612650265,
+              "dG_core": -53.762614651901686,
+              "dG_bias": -52.87694720163364,
+              "bulk_pmf_sd": 0.9932875347258883,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 22046,
+                  "ess": 577.4407316068388
+                },
+                "bulk": {
+                  "count": 1378,
+                  "ess": 349.14506361738427
+                },
+                "core": {
+                  "count": 528,
+                  "ess": 162.8524012062505
+                }
+              },
+              "weighted_site_above_1kT": 1.876663920442269e-12,
+              "weighted_site_contact_above_1kT": 2.517911053601641e-12,
+              "weighted_bound_contact_above_1kT": 4.318031946424177e-14
+            },
+            {
+              "replica": 4,
+              "dG": -5.617976397157905,
+              "dG_core": -5.606837884778333,
+              "dG_bias": -17.386902358104848,
+              "bulk_pmf_sd": 0.757083631584631,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 12935,
+                  "ess": 1016.9860745275133
+                },
+                "bulk": {
+                  "count": 2401,
+                  "ess": 818.5094557574965
+                },
+                "core": {
+                  "count": 968,
+                  "ess": 419.39797484457415
+                }
+              },
+              "weighted_site_above_1kT": 0.00010412070574141794,
+              "weighted_site_contact_above_1kT": 9.250147962815002e-05,
+              "weighted_bound_contact_above_1kT": 1.5528134615402953e-14
+            },
+            {
+              "replica": 5,
+              "dG": -33.82543804890629,
+              "dG_core": -33.50645545355417,
+              "dG_bias": -28.878885849565926,
+              "bulk_pmf_sd": 1.500923172585067,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 17510,
+                  "ess": 2171.240791633473
+                },
+                "bulk": {
+                  "count": 1817,
+                  "ess": 1119.3227198360553
+                },
+                "core": {
+                  "count": 738,
+                  "ess": 534.7194239546478
+                }
+              },
+              "weighted_site_above_1kT": 0.00011731681361913287,
+              "weighted_site_contact_above_1kT": 4.00769354265851e-05,
+              "weighted_bound_contact_above_1kT": 0.0029490428473197164
+            },
+            {
+              "replica": 6,
+              "dG": -74.05515159129685,
+              "dG_core": -74.06387061437695,
+              "dG_bias": -71.5794559523739,
+              "bulk_pmf_sd": 0.41087061698185484,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 21878,
+                  "ess": 1758.8217258518648
+                },
+                "bulk": {
+                  "count": 1527,
+                  "ess": 515.2401444865653
+                },
+                "core": {
+                  "count": 593,
+                  "ess": 245.87522533354962
+                }
+              },
+              "weighted_site_above_1kT": 5.071270756252151e-13,
+              "weighted_site_contact_above_1kT": 2.336680604249804e-13,
+              "weighted_bound_contact_above_1kT": 7.061304405033848e-16
+            },
+            {
+              "replica": 7,
+              "dG": -39.25135863519393,
+              "dG_core": -39.24111041668185,
+              "dG_bias": -35.21142491404992,
+              "bulk_pmf_sd": 0.43450290220843446,
+              "mbar_samples": 36000,
+              "mbar_states": 288,
+              "support": {
+                "site": {
+                  "count": 14266,
+                  "ess": 1351.3966893714698
+                },
+                "bulk": {
+                  "count": 2339,
+                  "ess": 742.1674266161042
+                },
+                "core": {
+                  "count": 974,
+                  "ess": 368.56204409046074
+                }
+              },
+              "weighted_site_above_1kT": 7.910733206042108e-11,
+              "weighted_site_contact_above_1kT": 9.574411446510447e-11,
+              "weighted_bound_contact_above_1kT": 3.411295786557212e-09
+            }
+          ]
+        }
+      },
+      "pending_systems": [
+        "a2a"
+      ]
+    }
+  ]
+}

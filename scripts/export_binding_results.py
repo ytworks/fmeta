@@ -6,7 +6,7 @@ import math
 import re
 from pathlib import Path
 
-from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair
+from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair, score_system
 
 from fmeta.analysis import KCAL
 from fmeta.funnel.geometry import KB
@@ -27,6 +27,8 @@ def production_source(path, endpoints):
     groups = {}
     for name in EXAMPLES:
         cuts = {e["length_ns"] for e in endpoints if name in e["systems"]}
+        if not cuts:
+            continue
         entries = []
         for item in data["wrapper_segments"][name]:
             n, commit, dirty = item["end_ns"], item["wrapper_commit"], item["wrapper_dirty"]
@@ -39,10 +41,12 @@ def production_source(path, endpoints):
         if lengths != sorted(set(lengths)) or not cuts.issubset(lengths):
             raise ValueError(f"missing or duplicate observed production segments for {name}")
         groups[name] = entries
-    return dict(tracked_source_base_commit=base, tracked_src_fmeta_tree=tree, wrapper_segments=groups,
-                dirty_state_note="The wrapper records commit and dirty status. The tracked src/fmeta tree "
-                                 "matches the base in all listed commits. Uncommitted historical file "
-                                 "contents cannot be recovered from these records.")
+    source = dict(tracked_source_base_commit=base, tracked_src_fmeta_tree=tree, wrapper_segments=groups)
+    if any(s["wrapper_dirty"] for segments in groups.values() for s in segments):
+        source["dirty_state_note"] = ("The wrapper records commit and dirty status. The tracked src/fmeta tree "
+                                      "matches the base in all listed commits. Uncommitted historical file "
+                                      "contents cannot be recovered from these records.")
+    return source
 
 
 def comparison_kcal_mol(name, energy):
@@ -101,33 +105,53 @@ def main():
                         help="JSON with tracked_source_base_commit, tracked_src_fmeta_tree and "
                              "per-system wrapper_segments (end_ns, wrapper_commit, wrapper_dirty, src_fmeta_tree)")
     parser.add_argument("--analysis-commit", required=True)
-    parser.add_argument("--paired", action="append", nargs=4, required=True,
+    parser.add_argument("--paired", action="append", nargs=4, default=[],
                         metavar=("TYK2_ENERGY", "TYK2_STRUCTURE", "A2A_ENERGY", "A2A_STRUCTURE"))
+    parser.add_argument("--provisional", nargs=3, metavar=("SYSTEM", "ENERGY", "STRUCTURE"),
+                        help="one completed system at a pending paired endpoint")
     parser.add_argument("--drift", nargs=2, metavar=("SYSTEM", "ENERGY"))
     args = parser.parse_args()
     if not re.fullmatch("[0-9a-f]{40}", args.analysis_commit):
         parser.error("analysis commit requires a full hexadecimal Git object ID")
-    inputs, results = {}, []
+    groups = []
     for filenames in args.paired:
         ty, ty_struct, aa, aa_struct = map(read, filenames)
-        pair = {"tyk2": (ty, ty_struct), "a2a": (aa, aa_struct)}
-        length = int(ty["cut_ns"])
+        groups.append({"tyk2": (ty, ty_struct), "a2a": (aa, aa_struct)})
+    if args.provisional:
+        name, energy_file, structure_file = args.provisional
+        if name not in EXAMPLES:
+            parser.error("unknown provisional system")
+        groups.append({name: (read(energy_file), read(structure_file))})
+    if not groups:
+        parser.error("supply a paired or provisional endpoint")
+    inputs, runs, results = {}, {}, []
+    for group in groups:
+        name, (energy, structure) = next(iter(group.items()))
+        length = int(energy["cut_ns"])
         if any(p["length_ns"] == length for p in results):
-            parser.error("duplicate paired endpoint")
-        score = score_pair(args.arm, length, pair)
-        for name, (energy, _) in pair.items():
+            parser.error("duplicate endpoint")
+        endpoint = dict(length_ns=length, purpose=args.phase, passes=None, systems={})
+        if len(group) == len(EXAMPLES):
+            pair_score = score_pair(args.arm, length, group)
+            scores = pair_score["systems"]
+            endpoint["passes"] = pair_score["passes"]
+        else:
+            scores = {name: score_system(name, args.arm, length, energy, structure)}
+            endpoint["pending_systems"] = sorted(set(EXAMPLES) - group.keys())
+        for name, (energy, _) in group.items():
             hashes = {key: energy["regions"][key] for key in HASH_FIELDS}
+            run = energy["protocol"], energy["base_seed"]
             if inputs.setdefault(name, hashes) != hashes:
                 parser.error(f"inconsistent {name} prepared inputs across endpoints")
-        results.append(dict(length_ns=length, purpose=args.phase, passes=score["passes"],
-                            systems={name: measurements(name, pair[name][0], score["systems"][name])
-                                     for name in EXAMPLES}))
+            runs[name] = run
+            endpoint["systems"][name] = measurements(name, energy, scores[name])
+        results.append(endpoint)
     if args.drift:
         name, filename = args.drift
         if name not in EXAMPLES:
             parser.error("unknown drift diagnostic system")
         energy = read(filename)
-        if (energy["protocol"] != ty["protocol"] or energy["base_seed"] != pair[name][0]["base_seed"]
+        if (runs.get(name) != (energy["protocol"], energy["base_seed"])
                 or {key: energy["regions"][key] for key in HASH_FIELDS} != inputs[name]):
             parser.error("drift diagnostic has different inputs, seed or protocol")
         results.append(dict(length_ns=energy["cut_ns"], purpose="drift_only", passes=None,

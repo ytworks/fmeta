@@ -18,6 +18,11 @@ of +0.87 kcal/mol. The interval half-width of 6.47 kcal/mol exceeds the 0.96 kca
 had 2, 0, 1 and 1 contact-confirmed returns. The frozen region definition for this preparation
 is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
 
+In the new eight-GPU screen, candidate B (eight independent groups of four walkers)
+at 20 ns per walker gave **−12.23 kcal/mol**, with a 95% interval of −17.09 to −7.37.
+The signed error was −0.81 kcal/mol and the interval half-width was 4.86 kcal/mol.
+One walker returned to the pocket after a confirmed bulk visit. [Candidate B measurements](../binding-study/results/b-screen.json)
+
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at
 the two ends only, so the chain has no break. The mutations are kept as they are in the entry.
