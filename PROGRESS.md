@@ -31,8 +31,11 @@ that runs on GPUs, end to end, from two files.
 
 Snapshot date: 2026-11-18. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
 D5, D6, D7 and D9 to D18 amended since, see the Change Log). PR #1 is merged (final code
-d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). PR #3 (branch
-`claude/cupotential-backend`; the owner: everything is developed in that PR): NVIDIA
+d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). In progress on
+`claude/example-settings`: one common setting for the TYK2 and A2A examples, accurate in the
+shortest run. The previous search is in `docs/plans/2026-11-17-example-settings.md`; the
+ongoing search and the reanalysis of its trajectories are in `docs/plans/2026-11-18-paper-binding.md`.
+PR #3 is merged (c163eb2; branch `claude/cupotential-backend`): NVIDIA
 cuPotential as the default back end (owner request 2026-11-17; plan
 `docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4; roadmap R11). Final code 80d7dc7: it
 holds the three fixes from the review of PR #3 (row M4), and the gates and CI are of it. Both
@@ -103,7 +106,10 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
   A2A example 302 alone, 526 / 528 / 524.
-- Blockers: none known. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
+- Blockers: a GPU fault of one client ends every client of its MPS daemon (containers all
+  have process number 0 for the server); seen once, at 4.5 minutes of 32 processes with the
+  cuPotential back end, the faulting kernel not identified. Worked around: one daemon per run,
+  and a run that ends with a CUDA error is started again (plan of the example setting). NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
   CUDA 13.4) with the MPS programs of the image and a daemon started by `scripts/mps.sh`
   (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
 
@@ -113,6 +119,11 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
 - What: opt-in sample estimator with synchronized walker biases, wall-free disk cross-check, fixed structural regions and independent-replica intervals. At 80 ns, R2 gave TYK2 −44.13 [−71.19, −17.07] and A2A −19.64 [−28.79, −10.48] kJ/mol. Official image: 224 CPU tests and four slow analysis/walker tests passed. The new eight-GPU search is active.
 - Why: SI Fig. S3 used a reweighted PMF. The shared protocol must satisfy the same affinity and interval-width criteria on both systems in a fresh validation.
 - Refs: FM-D9 (fifth amendment), PR #4, `docs/plans/2026-11-18-paper-binding.md`.
+
+### 2026-11-17 — [progress] Plan of one common setting for the TYK2 and A2A examples; a GPU fault under MPS ends every client of the daemon
+- What: owner request: the setting of the two examples that is accurate in the shortest run, one for both. Plan: a screen of bias factor and hill height with 8 walkers that share a bias, then 4 independent replicas of 8 walkers on both systems; the selection rule (half-width of the 95% interval and distance from experiment at most 8.4 kJ/mol on both, least simulated time) is written before a round 2 run is read; the package defaults do not change. Blocker at the first start: 32 walker processes with the cuPotential back end under one MPS daemon ended in the same second after 4.5 minutes (`CUDA_ERROR_LAUNCH_FAILED`). The server log has one fatal GPU error and then the end of every client on all 8 GPUs: container clients all have process number 0 for it. The faulting kernel is not identified (the first error is of an A2A walker; the kernel log of the host is not readable from this account). Worked around: one daemon per GPU pair and run, and a run that ends with a CUDA error is started again and continues from its checkpoints; the faults are counted. Verified: `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 212 passed (documents only). Not known: the rate of the fault and whether the plugin causes it.
+- Why: a blocker is recorded when it appears; a run of full length with the plugin was listed as not verified, and this is the first thing it showed.
+- Refs: `docs/plans/2026-11-17-example-settings.md`; `scripts/mps.sh`, `scripts/in_docker.sh` (`FMETA_MPS_NAME`, `FMETA_MPS_DIR`); FM-D13, FM-D18.
 
 ### 2026-11-17 — [progress] GPU gates of the final code with the review fixes pass with both back ends (80d7dc7)
 - What: third finding of the review of PR #3, fixed in 80d7dc7 (it has no entry of its own): the build process of a benchmark ligand (`fmeta benchmark build`) reads a `config.yaml` from before the key `run.backend` as the set does, as `openmm` (`saved_config`); it read the default `auto` and wrote it back, and the set then refused its own work directory. Its test runs the real build and failed on the code before the fix. Then `scripts/gpu_gates.py` on clean 80d7dc7 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded), once as it is (`auto`, which gave cuPotential on both test systems) and once with `--backend openmm`: all 20 passed each (`gpu-tests`: 15 passed, with the 13 constraint cases held to the plugin). Nonbonded energy, force against double-precision PME at 1e-6: in the record of cuPotential OpenMM 1.9e-5, 6.8e-4 and cuPotential 1.7e-6, 4.0e-4 (soluble), 6.4e-6, 7.2e-4 and 1.2e-6, 3.0e-4 (membrane), the funnel groups identical; in the record of OpenMM 1.1e-5, 7.5e-4 and 1.1e-5, 6.5e-4. Periodic images: 1.3e-6 nm, 1.2e-3 kJ/mol (cuPotential); 5.6e-7 nm, 2.6e-4 kJ/mol (OpenMM). Toy values as on 1c09775. CI green on 80d7dc7 (run 44063964423). `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 212 passed. Not run again on 80d7dc7: the two examples (they ran on 1c09775), `pytest -m slow`; no walker was added on the GPU.
