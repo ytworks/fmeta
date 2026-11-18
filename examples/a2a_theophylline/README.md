@@ -1,10 +1,10 @@
 # Adenosine A2A receptor with theophylline
 
 The eight-GPU study uses the same production and analysis protocol for this receptor and
-the TYK2 example. Reweighting PR #4 at 80 ns per walker gave −19.64 kJ/mol
-(95% interval −28.79 to −10.48). The mean is 13.59 kJ/mol above the reference derived from
-the stabilised receptor's SPR affinity of approximately 1.64 µM. The experiment was at 10 °C
-and the simulation at 300 K. The interval half-width is 9.16 kJ/mol. The four groups had
+the TYK2 example. Reweighting PR #4 at 80 ns per walker gave **−4.69 kcal/mol**
+(95% interval −6.88 to −2.50). The 300 K reference is −7.94 kcal/mol, giving a signed error
+of +3.25 kcal/mol. It comes from the stabilised receptor's SPR affinity of approximately
+1.64 µM measured at 10 °C. The interval half-width of 2.19 kcal/mol exceeds the 0.96 kcal/mol target. The four groups had
 2, 2, 0 and 4 contact-confirmed returns. The frozen region definition for this preparation
 is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
 

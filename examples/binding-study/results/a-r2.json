@@ -122,6 +122,19 @@
       "passes": false,
       "systems": {
         "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -16.24659516905688,
+            "signed_error_predicted_minus_reference": -4.8273346264261985,
+            "ci95_independent_replicas": [
+              -22.28345418827058,
+              -10.209736149843183
+            ],
+            "ci95_halfwidth": 6.036859019213698,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -16.19674007153916,
+            "accumulated_wt_mean": -14.487744270998526
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -67.97575418733399,
@@ -272,6 +285,19 @@
           ]
         },
         "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -6.4279405220312,
+            "signed_error_predicted_minus_reference": 1.5134131419022756,
+            "ci95_independent_replicas": [
+              -12.091659591388444,
+              -0.764221452673956
+            ],
+            "ci95_halfwidth": 5.663719069357244,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -6.314093166867256,
+            "accumulated_wt_mean": -6.007030974058895
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -26.894503144178543,
@@ -429,6 +455,19 @@
       "passes": false,
       "systems": {
         "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -13.774189234490109,
+            "signed_error_predicted_minus_reference": -2.354928691859426,
+            "ci95_independent_replicas": [
+              -19.088027517674522,
+              -8.460350951305696
+            ],
+            "ci95_halfwidth": 5.313838283184413,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -13.726551156519275,
+            "accumulated_wt_mean": -12.636129575323439
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -57.631207757106615,
@@ -579,6 +618,19 @@
           ]
         },
         "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -4.885724513852129,
+            "signed_error_predicted_minus_reference": 3.055629150081347,
+            "ci95_independent_replicas": [
+              -8.175884776540688,
+              -1.5955642511635704
+            ],
+            "ci95_halfwidth": 3.2901602626885587,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -4.805940083459689,
+            "accumulated_wt_mean": -4.738492091538384
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -20.441871365957308,
@@ -736,6 +788,19 @@
       "passes": false,
       "systems": {
         "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -10.547261253776837,
+            "signed_error_predicted_minus_reference": 0.8719992888538464,
+            "ci95_independent_replicas": [
+              -17.01513982342624,
+              -4.079382684127436
+            ],
+            "ci95_halfwidth": 6.467878569649401,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -10.50473565254129,
+            "accumulated_wt_mean": -9.844455290556855
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -44.12974108580229,
@@ -886,6 +951,19 @@
           ]
         },
         "a2a": {
+          "comparison_kcal_mol": {
+            "reference": -7.941353663933476,
+            "predicted_mean": -4.692928019287948,
+            "signed_error_predicted_minus_reference": 3.2484256446455273,
+            "ci95_independent_replicas": [
+              -6.881441949483476,
+              -2.504414089092421
+            ],
+            "ci95_halfwidth": 2.1885139301955276,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -4.658854320606994,
+            "accumulated_wt_mean": -4.650121606474462
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -19.63521083270078,
@@ -1043,6 +1121,19 @@
       "passes": null,
       "systems": {
         "tyk2": {
+          "comparison_kcal_mol": {
+            "reference": -11.419260542630683,
+            "predicted_mean": -10.010754086188033,
+            "signed_error_predicted_minus_reference": 1.40850645644265,
+            "ci95_independent_replicas": [
+              -16.720458032979188,
+              -3.3010501393968763
+            ],
+            "ci95_halfwidth": 6.709703946791156,
+            "fivefold_limit": 0.9594845599872418,
+            "core_mean": -9.990249329519035,
+            "accumulated_wt_mean": -9.451017900889875
+          },
           "base_seed": 0,
           "status": "available",
           "dG": -41.88499509661073,

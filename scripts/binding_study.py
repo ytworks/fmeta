@@ -17,6 +17,8 @@ from pathlib import Path
 import yaml
 from score_binding import ARMS, ENDPOINTS, EXAMPLES, score_pair
 
+from fmeta.analysis import KCAL
+
 
 def save_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,8 +106,10 @@ def final_report(output, decision):
     else:
         conclusion = "100 ns/walker までに両系の採用条件を満たした共通設定は得られなかった。"
     table = [f"# {title}", "", conclusion, "",
-             "| 段階 | 候補 | ns/walker | 系 | ΔG° [95% 区間] (kJ/mol) | 親和性の誤差（倍） | 復帰数 | 判定 |",
-             "|---|---|---:|---|---:|---:|---:|---|"]
+             "エネルギーは kcal/mol。実験との差は予測 ΔG° から実験参照を引いた値。"
+             "誤差の絶対値と独立レプリカの95%区間の半幅は、ともに RT ln 5 以下（300 K で約 0.96 kcal/mol）が条件。", "",
+             "| 段階 | 候補 | ns/walker | 系 | 実験参照 | ΔG° [95% 区間] | 実験との差 | 半幅 | 復帰数 | 判定 |",
+             "|---|---|---:|---|---:|---:|---:|---:|---:|---|"]
     for phase in ("", "confirm-"):
         for length in ENDPOINTS:
             for arm in ARMS:
@@ -114,12 +118,17 @@ def final_report(output, decision):
                     continue
                 score = json.loads(path.read_text())
                 for system, r in score["systems"].items():
-                    estimate = (f"{r['dG']:.2f} [{r['ci95'][0]:.2f}, {r['ci95'][1]:.2f}]"
-                                if r["ci95"] is not None else "全群の推定不可")
-                    ratio = f"{r['fold_error']:.2f}" if r["fold_error"] is not None else "—"
+                    reference = r["reference_kj_mol"] / KCAL
+                    estimate, gap, halfwidth = "全群の推定不可", "—", "—"
+                    if r["ci95"] is not None:
+                        dg = r["dG"] / KCAL
+                        lo, hi = (v / KCAL for v in r["ci95"])
+                        estimate = f"{dg:.2f} [{lo:.2f}, {hi:.2f}]"
+                        gap, halfwidth = f"{dg - reference:+.2f}", f"{(hi - lo) / 2:.2f}"
                     checks = "適格" if r["passes"] else ", ".join(k for k, v in r["checks"].items() if not v)
                     table.append(f"| {'独立検証' if phase else '探索'} | {arm.upper()} | {length} | {system} | "
-                                 f"{estimate} | {ratio} | {sum(r['returns_by_replica'])} | {checks} |")
+                                 f"{reference:.2f} | {estimate} | {gap} | {halfwidth} | "
+                                 f"{sum(r['returns_by_replica'])} | {checks} |")
     table.extend(["", "判定には各系の全独立レプリカを使用。探索と独立検証を別々に報告した。",
                   "参照は TYK2 の Ki 4.8 nM と A2A の Kd 約 1.64 µM。A2A の実験は 10 °C、本計算は 300 K。"])
     (output / "report.md").write_text("\n".join(table) + "\n")

@@ -2,10 +2,14 @@
 
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 
-from score_binding import ARMS, EXAMPLES, score_pair
+from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair
+
+from fmeta.analysis import KCAL
+from fmeta.funnel.geometry import KB
 
 HASH_FIELDS = tuple(name + "_sha256" for name in ("system", "positions", "topology", "funnel", "equil_state"))
 
@@ -41,7 +45,20 @@ def production_source(path, endpoints):
                                  "contents cannot be recovered from these records.")
 
 
-def measurements(energy, score=None):
+def comparison_kcal_mol(name, energy):
+    kT = KB * energy["protocol"]["bias"]["temperature"] / KCAL
+    reference = kT * math.log(AFFINITY_M[name])
+    predicted = energy["dG"] / KCAL if energy["dG"] is not None else None
+    ci = [v / KCAL for v in energy["ci95"]] if energy["ci95"] is not None else None
+    return dict(reference=reference, predicted_mean=predicted,
+                signed_error_predicted_minus_reference=predicted - reference if predicted is not None else None,
+                ci95_independent_replicas=ci, ci95_halfwidth=(ci[1] - ci[0]) / 2 if ci is not None else None,
+                fivefold_limit=kT * math.log(5),
+                core_mean=energy["dG_core"] / KCAL if energy["dG_core"] is not None else None,
+                accumulated_wt_mean=energy["dG_bias"] / KCAL if energy["dG_bias"] is not None else None)
+
+
+def measurements(name, energy, score=None):
     rows = []
     for i, replica in enumerate(energy["replicas"]):
         support = replica["support"]
@@ -69,7 +86,8 @@ def measurements(energy, score=None):
                     "site_contact_wall_above_kT_frames", "bound_contact_wall_above_kT_frames")},
             reference_wall_kj_mol={k: score["reference_wall_kj_mol"][k] for k in ("prepared", "equil")},
         )
-    return dict(base_seed=energy["base_seed"], status=energy["status"], dG=energy["dG"], ci95=energy["ci95"],
+    return dict(comparison_kcal_mol=comparison_kcal_mol(name, energy),
+                base_seed=energy["base_seed"], status=energy["status"], dG=energy["dG"], ci95=energy["ci95"],
                 dG_core=energy["dG_core"], ci95_core=energy["ci95_core"], dG_bias=energy["dG_bias"],
                 ci95_bias=energy["ci95_bias"], affinity_fold_error=score["fold_error"] if score else None,
                 passes=score["passes"] if score else None, structure=physical, replicas=rows)
@@ -102,7 +120,7 @@ def main():
             if inputs.setdefault(name, hashes) != hashes:
                 parser.error(f"inconsistent {name} prepared inputs across endpoints")
         results.append(dict(length_ns=length, purpose=args.phase, passes=score["passes"],
-                            systems={name: measurements(pair[name][0], score["systems"][name])
+                            systems={name: measurements(name, pair[name][0], score["systems"][name])
                                      for name in EXAMPLES}))
     if args.drift:
         name, filename = args.drift
@@ -113,7 +131,7 @@ def main():
                 or {key: energy["regions"][key] for key in HASH_FIELDS} != inputs[name]):
             parser.error("drift diagnostic has different inputs, seed or protocol")
         results.append(dict(length_ns=energy["cut_ns"], purpose="drift_only", passes=None,
-                            systems={name: measurements(energy)}))
+                            systems={name: measurements(name, energy)}))
     report = dict(arm=args.arm, energy_unit="kJ/mol", length_unit="ns/walker",
                   production_source=production_source(args.production_source, results),
                   analysis_commit=args.analysis_commit,

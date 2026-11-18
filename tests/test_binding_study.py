@@ -95,3 +95,16 @@ def test_selection_waits_for_both_systems_and_requires_independent_confirmation(
     search = result("c", 40, False, args)
     with pytest.raises(ValueError, match="reused a seed"):
         study.confirm_seeds(search, search.copy())
+
+
+def test_report_converts_prediction_reference_interval_and_signed_error_to_kcal(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    study = importlib.import_module("binding_study")
+    trial = {"systems": {"tyk2": {"dG": -41.84, "ci95": [-46.024, -37.656], "reference_kj_mol": -50.208,
+                                  "passes": False, "checks": {"affinity_within_fivefold": False},
+                                  "returns_by_replica": [1, 2]}}}
+    study.save_json(tmp_path / "b-20.json", trial)
+    study.final_report(tmp_path, {"selection": None})
+    report = (tmp_path / "report.md").read_text()
+    assert "kcal/mol" in report
+    assert "| -12.00 | -10.00 [-11.00, -9.00] | +2.00 | 1.00 | 3 |" in report
