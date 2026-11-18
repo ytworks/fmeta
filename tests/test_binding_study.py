@@ -112,6 +112,18 @@ def test_explicit_d_checkpoint_scores_both_systems(monkeypatch, arm, pace, cut):
         score.score_pair(arm, 27, pairs)
 
 
+def test_even_observations_retain_the_original_records_and_check_skipped_timestamps(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    copy_observations = importlib.import_module("analyze_binding_observations").copy_observations
+    source, selected = tmp_path / "raw", tmp_path / "even"
+    source.write_text("# time s rho\n1 0.5 0.1\n2 0.7 0.2\n3 0.8 0.1\n4 1.0 0.3\n5 1.1 0.2\n")
+    copy_observations(source, selected, native_ps=1, period_ps=2, end_ps=4)
+    assert selected.read_text() == "# time s rho\n2 0.7 0.2\n4 1.0 0.3\n"
+    source.write_text(source.read_text().replace("3 0.8 0.1\n", ""))
+    with pytest.raises(ValueError, match="missing or irregular"):
+        copy_observations(source, selected, native_ps=1, period_ps=2, end_ps=4)
+
+
 def test_single_shared_bias_trial_keeps_all_walkers_in_one_tyk2_history(tmp_path, monkeypatch):
     repo = Path(__file__).parents[1]
     monkeypatch.syspath_prepend(str(repo / "scripts"))
