@@ -1,18 +1,22 @@
 # Adenosine A2A receptor with theophylline
 
 The eight-GPU study uses the same production and analysis protocol for this receptor and
-the TYK2 example. Reweighting PR #4 at 80 ns per walker gave **−4.69 kcal/mol**
-(95% interval −6.88 to −2.50). The 300 K reference is −7.94 kcal/mol, giving a signed error
-of +3.25 kcal/mol. It comes from the stabilised receptor's SPR affinity of approximately
+the TYK2 example. Reweighting PR #4 at 80 ns per walker gave **−4.66 kcal/mol**
+(95% interval −6.86 to −2.47). The 300 K reference is −7.94 kcal/mol, giving a signed error
+of +3.28 kcal/mol. It comes from the stabilised receptor's SPR affinity of approximately
 1.64 µM measured at 10 °C. The interval half-width of 2.19 kcal/mol exceeds the 0.96 kcal/mol target. The four groups had
 2, 2, 0 and 4 contact-confirmed returns. The frozen region definition for this preparation
 is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
 
 In the new eight-GPU screen, candidate B (eight independent groups of four walkers)
-at 20 ns per walker gave **−5.22 kcal/mol**, with a 95% interval of −7.35 to −3.09.
-The signed error was +2.72 kcal/mol and the interval half-width was 2.13 kcal/mol,
+at 20 ns per walker gave **−5.20 kcal/mol**, with a 95% interval of −7.34 to −3.06.
+The signed error was +2.74 kcal/mol and the interval half-width was 2.14 kcal/mol,
 both above the 0.96 kcal/mol limit. Four groups had a contact-confirmed return to the pocket.
 [Candidate B measurements](../binding-study/results/b-screen.json)
+
+The matched 20 ns comparison of four walkers per shared bias (C) and one walker per bias (D)
+is available for TYK2. A2A has no completed 20 ns comparison of those two settings or a run
+with all 32 walkers sharing one bias. [Study results](../../docs/plans/2026-11-18-paper-binding.md)
 
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
 theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the steps below ran

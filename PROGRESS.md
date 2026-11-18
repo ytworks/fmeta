@@ -93,8 +93,9 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
     to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
   - a shared production protocol meeting the affinity and precision criteria on both examples.
-    PR #4 ranks 20 ns TYK2 pilots by independent-replica SD, deepens one candidate at a time and
-    checks experimental agreement in fresh paired validation. Checkpoints are 20/40/80/100 ns.
+    PR #4 holds extensions after comparing the matched 20 ns TYK2 pilots. Four-walker sharing (C)
+    sampled a broader surface. Independent walkers (D) gave a late WT mean closer to experiment
+    (absolute errors 5.27 and 1.78 kcal/mol). A single bias shared by all 32 is untested on both systems.
   - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a

@@ -12,21 +12,27 @@ same ligand is part of the TYK2 benchmark (`examples/benchmarks/tyk2`).
 | fmeta | −3.55 kcal/mol, 95% interval −6.36 to −0.74 | 5 replicas of 40 ns with the defaults; see "Result" below |
 
 The eight-GPU study uses the same production and analysis protocol for this kinase and
-the A2A example. Reweighting PR #4 at 80 ns per walker gave **−10.55 kcal/mol**
-(95% interval −17.02 to −4.08). The 300 K reference is −11.42 kcal/mol, giving a signed error
-of +0.87 kcal/mol. The interval half-width of 6.47 kcal/mol exceeds the 0.96 kcal/mol target. The four groups
+the A2A example. Reweighting PR #4 at 80 ns per walker gave **−10.56 kcal/mol**
+(95% interval −17.07 to −4.06). The 300 K reference is −11.42 kcal/mol, giving a signed error
+of +0.86 kcal/mol. The interval half-width of 6.51 kcal/mol exceeds the 0.96 kcal/mol target. The four groups
 had 2, 0, 1 and 1 contact-confirmed returns. The frozen region definition for this preparation
 is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
 
 In the new eight-GPU screen, candidate B (eight independent groups of four walkers)
-at 20 ns per walker gave **−12.23 kcal/mol**, with a 95% interval of −17.09 to −7.37.
-The signed error was −0.81 kcal/mol and the interval half-width was 4.86 kcal/mol.
+at 20 ns per walker gave **−12.24 kcal/mol**, with a 95% interval of −17.11 to −7.36.
+The signed error was −0.82 kcal/mol and the interval half-width was 4.88 kcal/mol.
 One walker returned to the pocket after a confirmed bulk visit. [Candidate B measurements](../binding-study/results/b-screen.json)
 
 Candidate C used the same eight groups and the Gaussian widths and deposition interval
-from Evans et al. At 20 ns per walker it gave **−16.98 kcal/mol** (95% interval −19.13 to
-−14.82), 5.56 kcal/mol below the experimental reference. The 32 walkers made 19 confirmed
+from Evans et al. At 20 ns per walker it gave **−16.99 kcal/mol** (95% interval −19.14 to
+−14.84), 5.57 kcal/mol below the experimental reference. The 32 walkers made 19 confirmed
 departures. No pocket return was observed in the structures recorded every 100 ps. [Candidate C measurements](../binding-study/results/c-screen.json)
+
+Candidate D gave each of the 32 walkers its own bias. At 20 ns the WT surface integral was
+finite for all 32. Averaging each surface over 11–20 ns gave **−13.20 kcal/mol** for D and
+**−16.69 kcal/mol** for C. Relative to the 300 K reference, their absolute differences were
+1.78 and 5.27 kcal/mol. D had one confirmed pocket return and C had none. One bias shared
+by all 32 walkers has yet to be tested. [Matched energy and coverage comparison](../../docs/plans/2026-11-18-paper-binding.md)
 
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at
