@@ -5,14 +5,18 @@ import json
 import math
 import re
 from pathlib import Path
-from statistics import stdev
+from statistics import mean, pstdev, stdev
 
 from score_binding import AFFINITY_M, ARMS, EXAMPLES, score_pair, score_system
 
 from fmeta.analysis import KCAL
+from fmeta.analysis.paper import method_statistics
 from fmeta.funnel.geometry import KB
 
 HASH_FIELDS = tuple(name + "_sha256" for name in ("system", "positions", "topology", "funnel", "equil_state"))
+ESTIMATORS = dict(primary_reweighted="dG", core_reweighted="dG_core",
+                  wt_bias_late="dG_bias", wt_bias_final="dG_bias_final")
+QUALITY_FLAGS = ("reweighting_solved", "site_sampled", "bulk_sampled", "core_sampled", "all_bulk_bins_sampled")
 
 
 def read(path):
@@ -50,37 +54,67 @@ def production_source(path, endpoints):
     return source
 
 
-def comparison_kcal_mol(name, energy):
+def statistics_kcal_mol(energy):
+    """Independent-replica statistics by estimator, including when another estimator lacks support."""
+    rows = energy["replicas"]
+    expected = energy["protocol"]["replicas"]
+    if expected < len(rows) or len(rows) != energy["n_replicas"]:
+        raise ValueError("replica count differs from the run")
+    result = {}
+    for name, key in ESTIMATORS.items():
+        if "method_statistics" in energy and len(rows) == expected:
+            data = energy["method_statistics"][name]
+        else:
+            data = method_statistics([row.get(key) for row in rows] + [None] * (expected - len(rows)))
+        result[name] = dict(n_total=data["n_total"], n_finite=data["n_finite"], complete=data["complete"],
+                            **{k: data[k] / KCAL if data[k] is not None else None for k in ("mean", "sd", "sem")},
+                            ci95=[v / KCAL for v in data["ci95"]] if data["ci95"] is not None else None)
+    return result
+
+
+def comparison_kcal_mol(name, energy, statistics=None):
+    statistics = statistics if statistics is not None else statistics_kcal_mol(energy)
     kT = KB * energy["protocol"]["bias"]["temperature"] / KCAL
     reference = kT * math.log(AFFINITY_M[name])
-    predicted = energy["dG"] / KCAL if energy["dG"] is not None else None
-    ci = [v / KCAL for v in energy["ci95"]] if energy["ci95"] is not None else None
-    replicas = energy["replicas"]
-    expected = energy["protocol"]["replicas"]
-    complete = (energy["status"] == "available" and predicted is not None and ci is not None
-                and expected >= 2 and expected == energy["n_replicas"] == len(replicas)
-                and all(r["status"] == "available" and r["dG"] is not None and math.isfinite(r["dG"])
-                        for r in replicas))
-    # ddof=1 across independent bias histories. Shared walkers belong to a single history.
-    sd = stdev(r["dG"] for r in replicas) / KCAL if complete else None
+    principal = statistics["primary_reweighted"]
+    predicted, ci = principal["mean"], principal["ci95"]
     return dict(reference=reference, predicted_mean=predicted,
                 signed_error_predicted_minus_reference=predicted - reference if predicted is not None else None,
-                independent_replica_sd=sd, ci95_independent_replicas=ci,
+                independent_replica_sd=principal["sd"], ci95_independent_replicas=ci,
                 ci95_halfwidth=(ci[1] - ci[0]) / 2 if ci is not None else None,
                 fivefold_limit=kT * math.log(5),
-                core_mean=energy["dG_core"] / KCAL if energy["dG_core"] is not None else None,
-                accumulated_wt_mean=energy["dG_bias"] / KCAL if energy["dG_bias"] is not None else None)
+                core_mean=statistics["core_reweighted"]["mean"], accumulated_wt_mean=statistics["wt_bias_late"]["mean"])
 
 
 def measurements(name, energy, score=None):
     rows = []
+    times = energy["replicas"][0].get("bias_times_ns", [])
+    stats = statistics_kcal_mol(energy)
     for i, replica in enumerate(energy["replicas"]):
         support = replica["support"]
         contact = score["replicas"][i]["weighted_contact_wall"] if score else None
         site_wall = replica["weighted_site_wall"]
+        if replica.get("bias_times_ns", []) != times:
+            raise ValueError("bias trajectories have different time grids")
+        trace = [v / KCAL for v in replica.get("bias_dG_kj_mol", [])]
+        if len(trace) != len(times):
+            raise ValueError("bias trajectory and saved times differ in length")
+        # Older analysis records contain the cumulative trace and late mean, but no temporal SD.
+        late_sd = replica.get("bias_late_temporal_sd")
+        late_sd_kcal = late_sd / KCAL if late_sd is not None else None
+        if late_sd_kcal is None and trace:
+            late_sd_kcal = pstdev(trace[-max(2, round(len(trace) / 2)):])
         rows.append(dict(
             replica=i, status=replica["status"], dG=replica["dG"], dG_core=replica["dG_core"],
+            primary_calculable=replica["dG"] is not None and math.isfinite(replica["dG"]),
+            sampling_quality={k: replica["sampling_quality"][k] for k in QUALITY_FLAGS}
+            if "sampling_quality" in replica else None,
             dG_bias=replica["dG_bias"], bulk_pmf_sd=replica["unbound_roughness"],
+            wt_bias_trace_kcal_mol=trace, wt_bias_final_kcal_mol=trace[-1] if trace else None,
+            wt_bias_late_mean_kcal_mol=replica["dG_bias"] / KCAL if replica["dG_bias"] is not None else None,
+            wt_bias_final_minus_late_kcal_mol=trace[-1] - replica["dG_bias"] / KCAL
+            if trace and replica["dG_bias"] is not None else None,
+            wt_bias_late_time_sd_kcal_mol=late_sd_kcal,
             bulk_bins=replica.get("bulk_bins"), sampled_bulk_bins=replica.get("sampled_bulk_bins"),
             mbar_samples=replica.get("n_mbar_samples"), mbar_states=replica.get("n_mbar_states"),
             support={k: {q: support[k][q] for q in ("count", "ess")} for k in ("site", "bulk", "core")}
@@ -101,7 +135,14 @@ def measurements(name, energy, score=None):
                     "site_contact_wall_above_kT_frames", "bound_contact_wall_above_kT_frames")},
             reference_wall_kj_mol={k: score["reference_wall_kj_mol"][k] for k in ("prepared", "equil")},
         )
-    return dict(comparison_kcal_mol=comparison_kcal_mol(name, energy),
+    finite = [r["dG"] / KCAL for r in rows if r["primary_calculable"]]
+    conditional = None
+    if finite and not stats["primary_reweighted"]["complete"]:
+        conditional = dict(n_included=len(finite), n_planned=energy["protocol"]["replicas"],
+                           mean=mean(finite), sample_sd=stdev(finite) if len(finite) > 1 else None)
+    return dict(comparison_kcal_mol=comparison_kcal_mol(name, energy, stats), method_statistics_kcal_mol=stats,
+                n_primary_calculable=len(finite), n_sampling_quality_pass=sum(r["status"] == "available" for r in rows),
+                primary_finite_subset_kcal_mol=conditional, wt_bias_times_ns=times,
                 base_seed=energy["base_seed"], status=energy["status"], dG=energy["dG"], ci95=energy["ci95"],
                 dG_core=energy["dG_core"], ci95_core=energy["ci95_core"], dG_bias=energy["dG_bias"],
                 ci95_bias=energy["ci95_bias"], affinity_fold_error=score["fold_error"] if score else None,
@@ -136,7 +177,7 @@ def main():
         groups.append({name: (read(energy_file), read(structure_file))})
     if not groups:
         parser.error("supply a paired or provisional endpoint")
-    inputs, runs, results = {}, {}, []
+    inputs, runs, results, interpolations = {}, {}, [], set()
     for group in groups:
         name, (energy, structure) = next(iter(group.items()))
         length = int(energy["cut_ns"])
@@ -157,6 +198,7 @@ def main():
             if inputs.setdefault(name, hashes) != hashes:
                 parser.error(f"inconsistent {name} prepared inputs across endpoints")
             runs[name] = run
+            interpolations.add(energy.get("reweighting_bias_interpolation", "legacy_bilinear"))
             endpoint["systems"][name] = measurements(name, energy, scores[name])
         results.append(endpoint)
     if args.drift:
@@ -164,12 +206,16 @@ def main():
         if name not in EXAMPLES:
             parser.error("unknown drift diagnostic system")
         energy = read(filename)
+        interpolations.add(energy.get("reweighting_bias_interpolation", "legacy_bilinear"))
         if (runs.get(name) != (energy["protocol"], energy["base_seed"])
                 or {key: energy["regions"][key] for key in HASH_FIELDS} != inputs[name]):
             parser.error("drift diagnostic has different inputs, seed or protocol")
         results.append(dict(length_ns=energy["cut_ns"], purpose="drift_only", passes=None, precision_passes=None,
                             systems={name: measurements(name, energy)}))
+    if len(interpolations) != 1:
+        parser.error("endpoint reports use different reweighting bias interpolation")
     report = dict(arm=args.arm, energy_unit="kJ/mol", length_unit="ns/walker",
+                  reweighting_bias_interpolation=interpolations.pop(),
                   production_source=production_source(args.production_source, results),
                   analysis_commit=args.analysis_commit,
                   frozen_inputs=inputs, endpoints=sorted(results, key=lambda r: r["length_ns"]))

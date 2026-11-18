@@ -224,5 +224,13 @@ def test_pilot_sd_uses_every_independent_primary_estimate_with_n_minus_one(tmp_p
     result = study.get_system_score("tyk2", "a", 20, args)
     assert result["replica_sd_kj_mol"] == pytest.approx((80 / 3)**.5)
     rows[-1]["status"] = "unavailable"
-    (args.output / "partials/a-tyk2-20.json").unlink()
+    checks["all_replicas_available"] = False
+    cache = args.output / "partials/a-tyk2-20.json"
+    cache.unlink()
+    result = study.get_system_score("tyk2", "a", 20, args)
+    assert result["replica_sd_kj_mol"] == pytest.approx((80 / 3)**.5) and not result["precision_passes"]
+    study.save_json(cache, dict(result, replica_sd_kj_mol=None))
+    assert study.get_system_score("tyk2", "a", 20, args)["replica_sd_kj_mol"] == pytest.approx((80 / 3)**.5)
+    rows[-1]["dG"] = None
+    cache.unlink()
     assert study.get_system_score("tyk2", "a", 20, args)["replica_sd_kj_mol"] is None

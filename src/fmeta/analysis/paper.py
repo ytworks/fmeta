@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 from scipy.special import logsumexp
 
+from ..engine.bias import spline_coefficients
 from ..engine.grid import BiasGrid, BiasSettings
 from ..engine.hills import read_colvar, read_hills
 from ..engine.runner import load_run_metadata
@@ -49,11 +50,36 @@ def profile_binding(s, profile, funnel, kT, site, unbound):
     return float(-kT * (log_integral(site_s, site_log) - log_density - np.log(STANDARD_VOLUME)))
 
 
+def _production_bias_lookup(grid, s, rho):
+    """Precompute the production force's clamped natural-bicubic lookup at fixed sample coordinates."""
+    def axis(coordinates, lower, upper, size):
+        spacing = (upper - lower) / (size - 1)
+        x = np.clip((np.asarray(coordinates) - lower) / spacing, 0, size - 1)
+        i = np.floor(x).astype(int)
+        t = x - i
+        weights = ((1 - t)**3 / 6, (3*t**3 - 6*t**2 + 4) / 6,
+                   (-3*t**3 + 3*t**2 + 3*t + 1) / 6, t**3 / 6)
+        return i, weights
+
+    i, wx = axis(s, grid.s_min, grid.s_max, grid.n_s)
+    j, wy = axis(rho, 0.0, grid.rho_max, grid.n_rho)
+    # The production table pads each axis with three coefficients for the boundary cubic.
+    stride = grid.n_s + 3
+    kernel = [(i + a + (j + b) * stride, wx[a] * wy[b]) for b in range(4) for a in range(4)]
+
+    def evaluate(values):
+        coefficients = spline_coefficients(values).ravel()
+        return sum(weight * coefficients[index] for index, weight in kernel)
+
+    return evaluate
+
+
 def _weights_on_slices(s, rho, biases, counts, parts, grid, kT, n_fit):
     """Build each source's successive prefix sums once, even when eight walkers share hills."""
     occupied = np.flatnonzero(counts)
     prefixes = np.array([biases[i][1] for i in occupied], dtype=int)
     reduced = np.zeros((len(occupied), s.size))
+    interpolate = _production_bias_lookup(grid, s, rho)
     for walker, hills in enumerate(parts):
         seen = prefixes[:, walker]
         order = np.argsort(seen, kind="stable")
@@ -65,7 +91,7 @@ def _weights_on_slices(s, rho, biases, counts, parts, grid, kT, n_fit):
                 new = hills[done:n]
                 work.add_hills(new.s, new.rho, new.height)
                 done = n
-                contribution = work.interpolate(s, rho)
+                contribution = interpolate(work.values)
             if n:
                 reduced[index] += contribution
     reduced /= kT
@@ -293,10 +319,15 @@ def analyze_paper_replica(workdir, *, site, unbound, cut_ns, discard_ns=2.0,
     empty_volume = np.trapezoid(funnel.effective_area(site_s, kT) * np.exp(-axial_wall / kT), site_s)
     result = dict(workdir=str(workdir), cut_ns=float(cut_ns), discard_ns=float(discard_ns),
                   n_walkers=len(parts), temperature=bias.temperature, status="unavailable",
+                  primary_calculable=False, reweighting_bias_interpolation="production_natural_bicubic",
+                  sampling_quality=dict(reweighting_solved=False, site_sampled=None, bulk_sampled=None,
+                                        core_sampled=None, all_bulk_bins_sampled=None),
                   bias=meta[0]["bias"], timestep_ps=meta[0].get("timestep_ps"),
                   backend=meta[0].get("backend"), sync_hills=meta[0]["settings"].get("sync_hills"),
                   diagnostics=[], dG=None, dG_core=None, dG_bias=plateau["mean"], dG_bias_final=bias_dg[-1],
-                  bias_drift=plateau["drift"], bias_times_ns=(cut_times / 1000).tolist(), bias_dG_kj_mol=bias_dg,
+                  bias_drift=plateau["drift"], bias_final_minus_late=bias_dg[-1] - plateau["mean"],
+                  bias_late_temporal_sd=plateau["std"], bias_times_ns=(cut_times / 1000).tolist(),
+                  bias_dG_kj_mol=bias_dg,
                   support=None, profile=None, weighted_site_wall=None, dcd_site_weights=None,
                   unbound_roughness=None, peer_postcut_samples=None,
                   max_peer_time_ns=None, unknown_samples=None, walker_passages=transitions,
@@ -362,7 +393,8 @@ def analyze_paper_replica(workdir, *, site, unbound, cut_ns, discard_ns=2.0,
             at = end
         result["dcd_site_weights"] = dcd
     result.update(sample_binding(s, rho, log_weights, funnel, kT, site, unbound, core_radius, bound_below))
-    if result["dG"] is not None:
+    result["primary_calculable"] = result["dG"] is not None and bool(np.isfinite(result["dG"]))
+    if result["primary_calculable"]:
         result["no_binding"] = bool(result["dG_empty_funnel"] - result["dG"] < MIN_BINDING_EXCESS * kT)
     edges = _bin_edges(grid, site, unbound)
     centres = (edges[1:] + edges[:-1]) / 2
@@ -375,15 +407,42 @@ def analyze_paper_replica(workdir, *, site, unbound, cut_ns, discard_ns=2.0,
                   bulk_bins=int(bulk.sum()), sampled_bulk_bins=int(finite_bulk.sum()))
     site_bins = (centres >= site[0]) & (centres <= site[1])
     result.update(site_bins=int(site_bins.sum()), sampled_site_bins=int(np.isfinite(pmf[site_bins]).sum()))
+    result["sampling_quality"].update(reweighting_solved=True, site_sampled=result["support"]["site"]["count"] > 0,
+                                      bulk_sampled=result["support"]["bulk"]["count"] > 0,
+                                      core_sampled=result["support"]["core"]["count"] > 0,
+                                      all_bulk_bins_sampled=bool(finite_bulk.all()))
     if finite_bulk.all():
         level = pmf[bulk] + kT * np.log(funnel.effective_area(centres[bulk], kT))
         result["unbound_roughness"] = float(np.std(level))
-    if result["dG"] is None or result["dG_core"] is None or not finite_bulk.all():
-        result["diagnostics"].append("weighted samples do not cover the site, bulk bins and bulk core")
-    else:
+    if not result["primary_calculable"]:
+        result["diagnostics"].append("the primary site-to-bulk estimate lacks weighted site or bulk support")
+    if result["dG_core"] is None:
+        result["diagnostics"].append("the bulk-disk cross-check lacks weighted site or disk support")
+    if not finite_bulk.all():
+        result["diagnostics"].append("the bulk-flatness diagnostic lacks samples in some bins")
+    if result["primary_calculable"] and result["dG_core"] is not None and finite_bulk.all():
         result["status"] = "available"
     if postcut:
         result["diagnostics"].append("some post-discard samples felt a peer's hills beyond the nominal cut")
+    return result
+
+
+def method_statistics(values):
+    """Coverage and complete-ensemble statistics for one estimator, in kJ/mol.
+
+    Every finite independent-replica value counts toward coverage, including when
+    another estimator or a quality diagnostic is unavailable. Missing values keep the
+    ensemble mean and spread undefined. A single finite run gives a mean only.
+    """
+    values = list(values)
+    finite = [v for v in values if v is not None and np.isfinite(v)]
+    complete = bool(values) and len(finite) == len(values)
+    result = dict(n_total=len(values), n_finite=len(finite), complete=complete,
+                  mean=None, sd=None, sem=None, ci95=None)
+    if complete:
+        summary = summarize_replicas(finite)
+        result.update(mean=summary.mean, sem=summary.sem, ci95=list(summary.ci95) if summary.ci95 else None,
+                      sd=float(np.std(finite, ddof=1)) if len(finite) > 1 else None)
     return result
 
 
@@ -406,6 +465,11 @@ def analyze_paper_replicas(workdirs, *, site, unbound, cut_ns=None, discard_ns=2
                core_radius=float(core_radius), bound_below=float(site[1] if bound_below is None else bound_below),
                replicas=runs, dG=None, sem=None, ci95=None, dG_kcal=None, ci95_kcal=None, dG_core=None,
                dG_bias=float(np.mean([r["dG_bias"] for r in runs])))
+    methods = dict(primary_reweighted="dG", core_reweighted="dG_core", wt_bias_late="dG_bias",
+                   wt_bias_final="dG_bias_final")
+    out["method_statistics"] = {name: method_statistics(r[key] for r in runs) for name, key in methods.items()}
+    out["reweighting_bias_interpolation"] = "production_natural_bicubic"
+    out["n_strict_available"] = sum(r["status"] == "available" for r in runs)
     if available:
         main = summarize_replicas([r["dG"] for r in runs])
         core = summarize_replicas([r["dG_core"] for r in runs])

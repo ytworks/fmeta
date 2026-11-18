@@ -86,7 +86,12 @@ def get_system_score(name, arm, length, args):
         return None
     cache = args.output / "partials" / f"{arm}-{name}-{length}.json"
     if cache.is_file() and all(p.stat().st_mtime_ns <= cache.stat().st_mtime_ns for p in paths):
-        return json.loads(cache.read_text())
+        result = json.loads(cache.read_text())
+        sd = replica_sd(result["systems"][name])
+        if result["replica_sd_kj_mol"] != sd:
+            result["replica_sd_kj_mol"] = sd
+            save_json(cache, result)
+        return result
     energy, structure = (json.loads(p.read_text()) for p in paths)
     score = score_system(name, arm, length, energy, structure)
     result = dict(arm=arm, length_ns=length, system=name, phase="screening", replica_sd_kj_mol=replica_sd(score),
@@ -97,9 +102,9 @@ def get_system_score(name, arm, length, args):
 
 def replica_sd(score):
     """Sample SD in kJ/mol from every independently measured primary ΔG."""
-    if not score["checks"]["all_replicas_available"] or len(score["replicas"]) < 2:
+    if len(score["replicas"]) < 2:
         return None
-    if any(r["status"] != "available" or r["dG"] is None or not math.isfinite(r["dG"]) for r in score["replicas"]):
+    if any(r["dG"] is None or not math.isfinite(r["dG"]) for r in score["replicas"]):
         return None
     return statistics.stdev(r["dG"] for r in score["replicas"])
 

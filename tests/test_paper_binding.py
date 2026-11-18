@@ -4,13 +4,17 @@ import base64
 import dataclasses
 
 import numpy as np
+import openmm as mm
 import pytest
 import yaml
+from openmm import unit
 
 from fmeta.analysis.fes import sliced_log_weights
 from fmeta.analysis.paper import (
+    _production_bias_lookup,
     _roundtrips,
     analyze_paper_replicas,
+    method_statistics,
     profile_binding,
     sample_binding,
     saved_contact_wall,
@@ -33,6 +37,40 @@ def test_fmap_cylinder_integral_with_fixed_site_and_bulk():
     expected = -kt * np.log(exact_kb / STANDARD_VOLUME)
     assert profile_binding(s, profile, funnel, kt, site, bulk) == pytest.approx(expected)
     assert profile_binding(s, profile + 10000., funnel, kt, site, bulk) == pytest.approx(expected)
+
+
+def test_reweighting_uses_the_production_clamped_natural_cubic():
+    grid = BiasGrid(-1., 2., 12, 1.5, 10, .29, .25)
+    grid.add_hills([-.87, .32, 1.91], [.04, .91, 1.45], [9., 14., 21.])
+    s = np.array([-2., -1., -.95, .37, .84, 1.97, 2., 2.4])
+    rho = np.array([0., 1.5, .037, .87, .44, 1.48, 1.5, 1.8])
+    compute = _production_bias_lookup(grid, s, rho)
+    system = mm.System()
+    system.addParticle(1.)
+    force = mm.CustomCompoundBondForce(1, "v(min(2,max(-1,x1)),min(1.5,max(0,y1)))")
+    force.addTabulatedFunction("v", mm.Continuous2DFunction(grid.n_s, grid.n_rho, grid.values.ravel(),
+                                                           grid.s_min, grid.s_max, 0., grid.rho_max))
+    force.addBond([0], [])
+    system.addForce(force)
+    integrator = mm.VerletIntegrator(.001)
+    context = mm.Context(system, integrator, mm.Platform.getPlatformByName("Reference"))
+    reference = []
+    for x, y in zip(s, rho):
+        context.setPositions([[x, y, 0.]])
+        energy = context.getState(getEnergy=True).getPotentialEnergy()
+        reference.append(energy.value_in_unit(unit.kilojoule_per_mole))
+    assert compute(grid.values) == pytest.approx(reference, abs=1e-10, rel=1e-12)
+    assert np.max(np.abs(grid.interpolate(s, rho) - reference)) > .1  # fixture distinguishes the interpolants
+
+
+def test_method_statistics_retain_independent_run_coverage():
+    assert method_statistics([2.]) == dict(n_total=1, n_finite=1, complete=True, mean=2., sd=None, sem=None, ci95=None)
+    missing = method_statistics([2., None, 4., np.nan])
+    assert missing == dict(n_total=4, n_finite=2, complete=False, mean=None, sd=None, sem=None, ci95=None)
+    both = method_statistics([2., 4.])
+    assert (both["n_total"], both["n_finite"], both["mean"], both["sem"]) == (2, 2, 3., 1.)
+    assert both["sd"] == pytest.approx(np.sqrt(2))
+    assert both["ci95"][0] < 2 < 4 < both["ci95"][1]
 
 
 def test_reweighted_gaussian_well_and_core_against_exact_toy():
@@ -142,9 +180,32 @@ def test_historical_cut_checks_the_peer_hills_actually_felt(tmp_path):
     first = result["replicas"][0]["dcd_site_weights"][0]
     assert first["frames"] == 60 and first["frame_ps"] == pytest.approx(2.)
     assert first["walker"] == "rep0/w0" and first["frame_index"] == list(range(2, 60, 3))
+    rep = result["replicas"][0]
+    assert rep["bias_final_minus_late"] == pytest.approx(rep["dG_bias_final"] - rep["dG_bias"])
+    assert rep["bias_late_temporal_sd"] == pytest.approx(np.std(rep["bias_dG_kj_mol"][-10:]))
+    methods = result["method_statistics"]
+    assert methods["wt_bias_late"]["mean"] == pytest.approx(rep["dG_bias"])
+    assert methods["wt_bias_final"]["mean"] == pytest.approx(rep["dG_bias_final"])
+
+    # A sparse bulk window still provides unbinned density; a disk empty of frames
+    # prevents the independent disk estimate. Neither test alters the main numerical result.
+    for extra, missing_quality in (({"unbound": (2.9, 3.2)}, "all_bulk_bins_sampled"),
+                                   ({"core_radius": .07}, "core_sampled")):
+        sparse = analyze_paper_replicas([dirs[0].parent], **(opts | extra))
+        r = sparse["replicas"][0]
+        assert sparse["status"] == "unavailable" and sparse["n_strict_available"] == 0
+        assert r["primary_calculable"] and r["sampling_quality"]["bulk_sampled"]
+        assert not r["sampling_quality"][missing_quality]
+        assert sparse["method_statistics"]["primary_reweighted"]["mean"] == pytest.approx(r["dG"])
+        assert sparse["method_statistics"]["primary_reweighted"]["ci95"] is None
+    assert sparse["method_statistics"]["core_reweighted"]["n_finite"] == 0
+    assert sparse["method_statistics"]["core_reweighted"]["mean"] is None
 
     (dirs[0] / "SYNC").write_text(f"0 w1:130:{crc + 1}\n")
     broken = analyze_paper_replicas([dirs[0].parent], **opts)
     assert broken["status"] == "unavailable" and broken["dG"] is None
     assert broken["replicas"][0]["unknown_samples"] == 120
     assert broken["dG_bias"] == result["dG_bias"]
+    assert not broken["replicas"][0]["sampling_quality"]["reweighting_solved"]
+    assert broken["method_statistics"]["primary_reweighted"]["n_finite"] == 0
+    assert broken["method_statistics"]["wt_bias_final"]["complete"]

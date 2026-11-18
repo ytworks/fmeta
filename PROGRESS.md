@@ -115,6 +115,11 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
 
 ## Change Log
 
+### 2026-11-18 — [amendment] binding estimates and convergence from one trajectory
+- What: Report numerical coverage and independent-replica statistics for each estimator, including the WT surface at the endpoint and its late mean. Replay the optional paper analysis with the production bias spline.
+- Why: In D at 20 ns, six replicas produced observed-ratio free energies despite incomplete bulk diagnostics. All 32 produced finite bias-surface integrals. The user needs the energy of an individual run and the evidence for its convergence.
+- Refs: FM-D9, PR #4, `src/fmeta/analysis/paper.py`, `docs/plans/2026-11-18-paper-binding.md`.
+
 ### 2026-11-18 — [amendment] prioritize independent-replica scatter in the TYK2 pilot
 - What: Rank complete 20 ns TYK2 pilots by the sample SD of independent replica free energies, then extend the selected candidate and follow it in A2A. Use the experimental reference at final independent validation.
 - Why: The owner prioritizes reproducibility during candidate exploration and wants to reserve the longer A2A calculations for the candidate selected in TYK2.

@@ -374,6 +374,17 @@ cut are identified. Such a prefix can require extra sampling to reproduce.
 The two published examples of wall restraints and the numerical validation are documented
 in the [paired study](../plans/2026-11-18-paper-binding.md).
 
+Sixth amendment (2026-11-18). One trajectory can yield a binding free energy. Between-replica
+scatter requires at least two independent values. With explicit paper regions, the observed
+site/bulk ratio has a finite value when both regions carry sampled weight. Coverage of every
+axial bulk bin and the interior disk are additional sampling checks. Report these checks,
+the single-trajectory estimates and coverage counts independently. Also report the endpoint
+and late mean of the accumulated WT bias integral, with its time series for each bias
+history. The bias integral can be finite in a region the ligand never visited. Record those
+visits so a reader can assess convergence. Independent dispersion of each estimator is
+reported over its own complete set of replica values. Temporal scatter within one trajectory
+has a different interpretation.
+
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
 the bias by reading each other's HILLS files.
