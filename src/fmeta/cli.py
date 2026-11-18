@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -152,6 +153,28 @@ def cmd_status(args) -> None:
 
 def cmd_analyze(args) -> None:
     from .workflow import analyze_stage, format_summary
+    if args.paper_regions:
+        from .workflow import analyze_paper_stage
+        if args.plot:
+            raise ValueError("--plot draws the default analysis; request it in a separate call")
+        result = analyze_paper_stage(args.workdir, args.paper_regions, args.length_ns, args.discard_ns)
+        report = json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2) + "\n"
+        if args.output:
+            output = Path(args.output)
+            with tempfile.NamedTemporaryFile(mode="w", dir=output.parent, delete=False) as temp:
+                temp_path = Path(temp.name)
+                try:
+                    temp.write(report)
+                    temp.close()
+                    temp_path.replace(output)
+                finally:
+                    temp_path.unlink(missing_ok=True)
+            print(f"wrote {output}")
+        else:
+            print(report, end="")
+        return
+    if args.length_ns is not None or args.output:
+        raise ValueError("--length-ns and --output require --paper-regions")
     print(format_summary(analyze_stage(args.workdir, plot=args.plot, discard_ns=args.discard_ns)))
     if args.plot:
         print(f"figures: {Path(args.workdir) / 'summary.png'} and rep*/analysis.png")
@@ -378,6 +401,11 @@ def main(argv=None) -> None:
     sub = commands.add_parser("analyze", help="binding free energy with its interval, diagnostics")
     sub.add_argument("workdir")
     sub.add_argument("--plot", action="store_true", help="also write figures (needs matplotlib)")
+    sub.add_argument("--paper-regions", metavar="JSON",
+                     help="measure the reweighted site population and bulk density in fixed regions")
+    sub.add_argument("--length-ns", type=float, help="common endpoint per walker for the paper analysis")
+    sub.add_argument("--output", metavar="JSON",
+                     help="write the paper analysis to this file (default: print JSON)")
     sub.add_argument("--discard-ns", type=float, default=2.0,
                      help="the cross-check from the samples uses those after this much of every "
                           "replica (default 2)")

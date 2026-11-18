@@ -1,5 +1,13 @@
 # Adenosine A2A receptor with theophylline
 
+The eight-GPU study uses the same production and analysis protocol for this receptor and
+the TYK2 example. Reweighting PR #4 at 80 ns per walker gave −19.64 kJ/mol
+(95% interval −28.79 to −10.48). The mean is 13.59 kJ/mol above the reference derived from
+the stabilised receptor's SPR affinity of approximately 1.64 µM. The experiment was at 10 °C
+and the simulation at 300 K. The interval half-width is 9.16 kJ/mol. The four groups had
+2, 2, 0 and 4 contact-confirmed returns. The frozen region definition for this preparation
+is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
+
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
 theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the steps below ran
 to a binding free energy with the official defaults: dG0 = −18.6 kJ/mol (−4.45 kcal/mol), 95%

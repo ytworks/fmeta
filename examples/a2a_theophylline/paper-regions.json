@@ -1,0 +1,64 @@
+{
+  "system_sha256": "d70b60d0d41efc55ccbf5d460bcccbef5bfcb259a3ba24355fa3ed88dad5c93b",
+  "funnel_sha256": "bcb380c57aada231d3f09f9827e04ca657918e0cf96bba2c81f3592fffb9091c",
+  "positions_sha256": "e5ed1f3a67aae9950a104fc72728800ca43252dea083adb5e042da580c63d7d5",
+  "topology_sha256": "4719610b985e71fa0e4095679620481cc406165c3ed3435ec81c2d5f06448826",
+  "equil_state_sha256": "45f3f578d5c8aeb2476c66c20f96bd39e8b7fd56c2d79046c95864bd9bb9f89f",
+  "site": [
+    0.7001715634940635,
+    1.8653005931482038
+  ],
+  "unbound": [
+    4.400171563494062,
+    4.900171563494062
+  ],
+  "core_radius": 0.15,
+  "bound_below": 1.2806511062040506,
+  "pocket_residues": [
+    84,
+    85,
+    168,
+    169,
+    177,
+    238,
+    241,
+    245,
+    262,
+    266
+  ],
+  "pocket_labels": [
+    "A:VAL84",
+    "A:LEU85",
+    "A:PHE168",
+    "A:GLU169",
+    "A:MET177",
+    "A:TRP246",
+    "A:LEU249",
+    "A:ASN253",
+    "A:MET270",
+    "A:ILE274"
+  ],
+  "cutoff_nm": 1.0,
+  "contact_nm": 0.45,
+  "nominal_unbound": [
+    4.400171563494062,
+    4.900171563494062
+  ],
+  "minimum_static_bulk_gap_nm": 1.0008982806798057,
+  "reference_center_s_nm": [
+    1.2001715634940635,
+    1.2237103852164388
+  ],
+  "initial_s_mean_nm": 1.2580240590625,
+  "initial_s_sd_nm": 0.02262704714155068,
+  "initial_sample_count": 32,
+  "initial_sample_time_ps": 1.0,
+  "sources": [
+    "prepared/positions.npy",
+    "prepared/topology.cif",
+    "prepared/funnel.yaml",
+    "equil/state.xml",
+    "walkers' first COLVAR"
+  ],
+  "rule": "Crystal heavy-atom contact shell projected onto the funnel axis, clipped to lower wall and inflection. Bulk is the nominal bulk interval trimmed at the lower end to one interaction cutoff in prepared and equilibrated coordinates. Bound crossing threshold is mean + sample SD of the first zero-bias COLVAR of baseline walkers launched from the same equilibrated pose. This measures initial coordinate spread, not the equilibrium distribution."
+}

@@ -9,6 +9,7 @@ from fmeta.analysis import analyze_replicas, analyze_run
 from fmeta.analysis.binding import binding_free_energy, empty_funnel_free_energy
 from fmeta.analysis.convergence import count_transitions, plateau_statistics, summarize_replicas
 from fmeta.analysis.fes import projection_profile, reweighted_profile, sliced_log_weights
+from fmeta.analysis.paper import analyze_paper_replicas
 from fmeta.engine import BiasGrid, BiasSettings, FunnelBias, MetadynamicsRun, RunSettings
 from fmeta.funnel.geometry import KB, STANDARD_VOLUME
 from fmeta.testing.toy import make_simulation, make_toy
@@ -161,6 +162,13 @@ def test_toy_binding_free_energy_end_to_end(tmp_path):
     # first 2 ns is its cross-check
     assert result["dG_reweighted"] == pytest.approx(exact, abs=2.0)
     assert (result["dG"], result["discard_ns"]) == (result["dG_plateau"], 2.0)
+    # Opt-in experiment measurement on the same real toy trajectory, with explicit bounds.
+    paper = analyze_paper_replicas([tmp_path], site=(0.5, 2.9), unbound=(2.9, 3.4), bound_below=1.3)
+    finite_site_exact = toy.exact_binding_free_energy(T, 2.9, s_min=0.5)
+    assert paper["status"] == "available" and paper["ci95"] is None
+    assert paper["dG"] == pytest.approx(finite_site_exact, abs=2.0)
+    assert paper["replicas"][0]["peer_postcut_samples"] == 0
+    assert paper["no_binding"] is False and paper["replicas"][0]["no_binding"] is False
     assert (tmp_path / "result.json").exists() and (tmp_path / "fes.npz").exists()
 
 
@@ -212,6 +220,10 @@ def test_run_without_binding_is_flagged(tmp_path):
     assert result["dG"] == pytest.approx(result["dG_empty_funnel"], abs=2.0)
     assert result["binding_excess"] < 1.0 * KT
     assert result["no_binding"] and any("empty funnel" in note for note in result["diagnostics"])
+    paper = analyze_paper_replicas([tmp_path], site=(0.5, 2.9), unbound=(2.9, 3.4), bound_below=1.3)
+    assert paper["no_binding"] is True and paper["replicas"][0]["no_binding"] is True
+    exact = toy.exact_binding_free_energy(T, site_max=2.9, s_min=0.5)
+    assert paper["dG_empty_funnel"] == pytest.approx(exact, abs=0.01)
 
 
 def test_figures_are_written(tmp_path):

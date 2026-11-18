@@ -11,6 +11,13 @@ same ligand is part of the TYK2 benchmark (`examples/benchmarks/tyk2`).
 | Experimental binding free energy | −11.3 kcal/mol | RT ln Ki (−11.35 at 298.15 K; the benchmark tables list −11.31) |
 | fmeta | −3.55 kcal/mol, 95% interval −6.36 to −0.74 | 5 replicas of 40 ns with the defaults; see "Result" below |
 
+The eight-GPU study uses the same production and analysis protocol for this kinase and
+the A2A example. Reweighting PR #4 at 80 ns per walker gave −44.13 kJ/mol
+(95% interval −71.19 to −17.07). Its mean differs from the 300 K reference by 3.65 kJ/mol.
+The interval half-width of 27.06 kJ/mol exceeds the 4.01 kJ/mol target. The four groups
+had 2, 0, 1 and 1 contact-confirmed returns. The frozen region definition for this preparation
+is `paper-regions.json`. [Comparison and reproduction commands](../../docs/plans/2026-11-18-paper-binding.md)
+
 The crystal structure is 2.0 Å, one chain, residues 890 to 1177 of the kinase domain with the
 engineered mutations C936A, Q969A, E971A, K972A, D1023N and C1142A. The missing residues are at
 the two ends only, so the chain has no break. The mutations are kept as they are in the entry.

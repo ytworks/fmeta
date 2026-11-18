@@ -1,0 +1,80 @@
+# TYK2 と A2A の共通設定を決める実験
+
+対象は 4GIH の TYK2–ejm_46 と 5MZJ の A2A–テオフィリン。実測親和性、独立レプリカの精度、両系を完了する実時間を同じ設定で評価する。原論文を照合して推定式と候補を固定した。MD は `c163eb26` の OpenMM＋cuPotential、既存の NPT、4 fs 刻み、力場、ファネル壁、軸射影と軸距離を使う。両系とも PR #4 の平衡化済み入力から開始する。[過去の軌跡と実験結果](https://github.com/ytworks/fmeta/pull/4)
+
+## 原論文と今回の推定式
+
+Limongelli らはトリプシン–ベンズアミジンの Asp189 とリガンドの原子間距離にバイアスを置いた。軌跡を再重み付けして得た軸方向 PMF の 0.3～0.7 nm を積分し、3.2 nm のバルクと半径 0.1 nm の円筒断面で標準状態に換算した。結合姿勢は二つ含まれる。NPT 平衡化後の本計算は NVT。報告値 −8.5 ± 0.7 kcal/mol の誤差は終盤の標準偏差である。[原論文](https://pmc.ncbi.nlm.nih.gov/articles/PMC3631651/)・[補足資料の式と図 S3](https://www.iris.unina.it/retrieve/handle/11588/573398/41589/PNAS-2013-Limongelli-6358-63.pdf#page=9)
+
+今回の主値は `COLVAR`・`HILLS`・`SYNC` から各 walker の受けたバイアスを再構成する。先頭 2 ns を除き、既存の時間区間別 MBAR で同じ正規化の重みを求める。区間幅の目安は 250 ps、1 レプリカあたり最大 300 区間、最大 40,000 サンプル。主積分はビンの端への依存を避けるため、各サンプルの重みを直接足す。PMF は診断用にも出力する。結合領域を B、バルクを U として
+
+\[
+K_b = \frac{\sum_{i\in B} w_i}{\sum_{j\in U}w_j/A_\mathrm{eff}(s_j)} |U|,
+\qquad \Delta G^\circ=-RT\ln(K_b/1.66054\;\mathrm{nm}^3).
+\]
+
+別計算では U 内の半径 0.15 nm の円盤にあるサンプルだけを数え、円盤体積で割った濃度を分母に使う。分子は主値と同じ。累積 WT バイアスから再構成した PMF の後半平均も、同じ積分領域で報告する。円筒極限における単位と符号の照合には著者の Tcl `FFS::dg` を直接実行した。300 K、半径 0.15 nm、同じガウス井戸 PMF を使うと、井戸なしで著者 +9.14881、fmeta +9.14793、深さ 24 kJ/mol で著者 −9.40834、fmeta −9.40922 kJ/mol。解析解を持つトイ系でも検証した。[FMAP](https://doi.org/10.1038/s41596-020-0342-4)・[著者の Tcl](https://github.com/limresgrp/FMAP_v1/blob/master/funnel_gui/ffs.tcl#L1296-L1348)
+
+## 固定した条件
+
+| 300 K、hill 高さ 1.5 kJ/mol、bias factor 10 | 独立レプリカ × 共有 walker | σs / σρ (nm) | hill 間隔 |
+|---|---:|---:|---:|
+| A（過去 PR） | 4 × 8 | 0.050 / 0.100 | 1 ps |
+| B | 8 × 4 | 0.050 / 0.100 | 1 ps |
+| C | 8 × 4 | 0.025 / 0.030 | 2 ps |
+| D（独立バイアスの文献対照） | 32 × 1 | 0.025 / 0.030 | 2 ps |
+
+C と D の hill 条件は Evans らの軸射影・軸距離の 2 変数 fun-metaD に由来する。著者は 2 fs × 1,000 歩、今回の実装では 4 fs × 500 歩で 2 ps になる。著者の通常の fun-metaD は各軌跡が独立にバイアスを積む 500 ns 計算で、sEH 固有の体積・配向補正を使った。[本文](https://pmc.ncbi.nlm.nih.gov/articles/PMC7467642/)・[著者公開の入力](https://www.plumed-nest.org/eggs/20/012/data/fun_metaD/plumed.dat.html)
+
+| 同じ規則で構造から固定した領域 (nm) | 結合領域 | バルク領域 | 復帰の軸閾値 |
+|---|---:|---:|---:|
+| TYK2 | 0.70024～2.11571 | 4.06691～4.55024 | 1.20730 |
+| A2A | 0.70017～1.86530 | 4.40017～4.90017 | 1.28065 |
+
+結晶リガンドと 0.45 nm 以内で接触するタンパク質の重原子を軸に射影し、下端壁とファネル変曲点で区間を切る。バルクは末端の既定窓から、準備後・平衡化後の構造でタンパク質、保持した補因子、脂質と周期像から相互作用カットオフを確保できる連続区間を取る。復帰閾値は共通平衡化座標から発進した 32 walker の初回 1 ps、バイアス投入前の軸座標の平均＋標本標準偏差。初速に由来する初期座標の広がりを測っている。判定には 100 ps おきの DCD で、同一 walker のポケット接触→カットオフ外のバルク→ポケット接触を確認する。フレーム間の往復を見逃す可能性がある。DCD は溶質のみで、脂質の位置は全原子の参照構造と該当時刻のチェックポイントで確認する。
+
+## 判定と実行
+
+1. 各系で 8 GPU 全枚を MPS で使い、1 枚 4 プロセス、計 32 walker を同時に動かす。20、40、80、100 ns/walker を共通の評価点とする。途中点は同じ独立レプリカの累積軌跡である。
+2. `device.json` と実際の `run.yaml` を照合する。全レプリカで結合域・バルク・円筒内側の再重み付けに必要なサンプルがあり、各系で構造的な往復を確認できることを求める。各群の往復数、バルク PMF のばらつき、重みの有効標本数、壁の作用を結果に残す。
+3. 親和性は TYK2 の化合物 46 の阻害定数 4.8 nM と A2A-StaR2 の脂質ディスク中の解離定数 約 1.64 µM と比較する。A2A の SPR 測定は 10 °C、原著表の丸め値は pKd 5.78。300 K の同じ換算で参照 ΔG° はそれぞれ約 −47.78、−33.23 kJ/mol。親和性比が 1/5～5、かつ独立レプリカの Student-t 95% 区間の半幅が RT ln 5（4.01 kJ/mol）以下であることを両系に求める。[TYK2 の原著](https://doi.org/10.1016/j.ejmech.2013.03.070)・[A2A の原著、表 2](https://doi.org/10.1016/j.febslet.2015.04.030)
+4. 適格な候補と共通実行長を、8 GPU で両系を完了する実時間の合計で順位付けする。過去 A の 10 ns ごとの再起動の影響を避けるため、A が適格なら同じ長さを新たに計時する。順位順に設定・領域・長さを固定し、探索とは別の seed で両系を確認する。独立検証で同じ基準を満たした候補を採用する。性能記録は SSH 先の非追跡領域に保存する。
+
+PR #4 で保存した `prepared/` と `equil/` を使う場合の解析例。新たに系を準備した場合は、専用の 32 ウォーカーの 1 ps 事前計算から `paper_regions.py define` で領域を固定し、そのファイルを全候補に共通で使う。
+
+本計算の再現例は候補 C、TYK2 の 20 ns/walker。A2A は同じ `--arm c --length-ns 20` を使い、入力・出力ディレクトリと独立な seed を替える。探索の base seed は B で 19111801 / 19211801、C で 19311801 / 19411801、D で 19511801 / 19611801（TYK2 / A2A）。既存の専用 MPS サーバーを使用する場合は、その名前とパイプを指定する。
+
+```bash
+scripts/in_docker.sh python scripts/prepare_binding_trial.py runs/r2/tyk2 runs/study/c/tyk2 \
+    --arm c --length-ns 20 --seed 19311801
+scripts/mps.sh start all
+scripts/in_docker.sh --mps --gpus all fmeta run runs/study/c/tyk2
+scripts/in_docker.sh --mps --gpus all fmeta run runs/study/c/tyk2 --length-ns 40
+```
+
+保存した A の 80 ns の主値と構造を再計算する例。
+
+```bash
+mkdir -p runs/paper-analysis
+work=runs/r2/tyk2
+regions=examples/tyk2_ejm46/paper-regions.json
+scripts/in_docker.sh fmeta analyze "$work" --paper-regions "$regions" --length-ns 80 \
+    --output runs/paper-analysis/tyk2-energy.json
+scripts/in_docker.sh python scripts/paper_regions.py check "$work" --regions "$regions" \
+    --length-ns 80 --output runs/paper-analysis/tyk2-structure.json
+```
+
+A2A には `runs/r2/a2a` と `examples/a2a_theophylline/paper-regions.json` を指定する。両系の JSON を `scripts/score_binding.py` に渡すと、判定理由と各レプリカの診断が得られる。
+
+## 過去軌跡の再解析
+
+| A、ns/walker | TYK2 主値 [95% 区間] (kJ/mol) | A2A 主値 [95% 区間] (kJ/mol) | DCD の復帰数 TYK2 / A2A |
+|---:|---:|---:|---:|
+| 20 | −67.98 [−93.23, −42.72] | −26.89 [−50.59, −3.20] | 1 / 2 |
+| 40 | −57.63 [−79.86, −35.40] | −20.44 [−34.21, −6.68] | 2 / 3 |
+| 80 | −44.13 [−71.19, −17.07] | −19.64 [−28.79, −10.48] | 4 / 8 |
+| 90（ドリフトの確認） | −41.88 [−69.96, −13.81] | — | — |
+
+80 ns で TYK2 は平均の誤差が約 3.6 kJ/mol、区間の半幅が 27.06 kJ/mol。A2A は誤差が約 13.6 kJ/mol、半幅が 9.16 kJ/mol。円盤内側による照合値は −43.95 / −19.49、同じ積分窓の後半バイアス値は −41.19 / −19.46 kJ/mol。両系とも面積補正を変えたときの差は小さい。TYK2 では独立レプリカのばらつき、A2A では参照値とのずれとばらつきが課題として残った。
+
+80 ns のバルクフレームでタンパク質・補因子から 1 nm 確保できたのは TYK2 1,043/1,064、A2A 1,096/1,102。実際に戻った独立レプリカは両系とも 4 群中 3 群だった。結晶ポーズと平衡化直後の壁エネルギーは両系ともゼロ。軌跡中では結合側の軸閾値とポケット接触を満たすフレームのうち、TYK2 536/4,451、A2A 238/5,437 で壁が 1 kT を超えた。これらはバイアス下のフレーム数。先頭 2 ns を除き DCD の実際の接触フレームで同じ MBAR の分母を評価すると、結合区間内の全接触フレームに占める 1 kT 超の重みは各レプリカで TYK2 最大 0.007%、A2A 最大 0.006%。これはサンプルされた拘束下の結合領域の診断である。

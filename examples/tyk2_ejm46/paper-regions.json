@@ -1,0 +1,84 @@
+{
+  "system_sha256": "05c7f0c5b3cc0119d17d48937b23c643a745b910c12e0da8493a17465b476c54",
+  "funnel_sha256": "06232f54114423b16b648aaddba725a29b3159e62dc276881107ab73c9947dd2",
+  "positions_sha256": "8c10ae4a211b6ee42a25bf35713bf2458cd821129958146229762af24890df67",
+  "topology_sha256": "eaac9827eda4fc6c145bc1962df2ec2327c66cc98c7499ba8f7a4a7af47213ff",
+  "equil_state_sha256": "afe38cb59580fb73e867b69c8e56d13e347124773bf24be6d6d9715b6ce5d079",
+  "site": [
+    0.7002406500207519,
+    2.1157086226804243
+  ],
+  "unbound": [
+    4.066907316687418,
+    4.5502406500207515
+  ],
+  "core_radius": 0.15,
+  "bound_below": 1.2072954301721213,
+  "pocket_residues": [
+    11,
+    13,
+    14,
+    15,
+    16,
+    21,
+    38,
+    70,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    137,
+    138,
+    140,
+    150,
+    151
+  ],
+  "pocket_labels": [
+    "A:ARG901",
+    "A:LEU903",
+    "A:GLY904",
+    "A:GLU905",
+    "A:GLY906",
+    "A:VAL911",
+    "A:ALA928",
+    "A:ILE960",
+    "A:MET978",
+    "A:GLU979",
+    "A:TYR980",
+    "A:VAL981",
+    "A:PRO982",
+    "A:LEU983",
+    "A:GLY984",
+    "A:ARG1027",
+    "A:ASN1028",
+    "A:LEU1030",
+    "A:GLY1040",
+    "A:ASP1041"
+  ],
+  "cutoff_nm": 1.0,
+  "contact_nm": 0.45,
+  "nominal_unbound": [
+    4.0502406500207515,
+    4.5502406500207515
+  ],
+  "minimum_static_bulk_gap_nm": 1.0077360852654387,
+  "reference_center_s_nm": [
+    1.2002406500207519,
+    1.196725492720603
+  ],
+  "initial_s_mean_nm": 1.1912773184375,
+  "initial_s_sd_nm": 0.01601811173462115,
+  "initial_sample_count": 32,
+  "initial_sample_time_ps": 1.0,
+  "sources": [
+    "prepared/positions.npy",
+    "prepared/topology.cif",
+    "prepared/funnel.yaml",
+    "equil/state.xml",
+    "walkers' first COLVAR"
+  ],
+  "rule": "Crystal heavy-atom contact shell projected onto the funnel axis, clipped to lower wall and inflection. Bulk is the nominal bulk interval trimmed at the lower end to one interaction cutoff in prepared and equilibrated coordinates. Bound crossing threshold is mean + sample SD of the first zero-bias COLVAR of baseline walkers launched from the same equilibrated pose. This measures initial coordinate spread, not the equilibrium distribution."
+}

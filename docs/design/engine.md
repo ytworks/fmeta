@@ -359,6 +359,21 @@ with the former rule +0.11 ± 0.47, standard deviation 1.63, largest 2.63.
 Why: the review. The former rule holds only for walkers in lock step, which a set of processes
 on several GPUs is not. No committed result came from a run with walkers.
 
+Fifth amendment (2026-11-18). The attribution in the third amendment was incorrect.
+In SI Fig. S3 Limongelli et al. obtained the axis PMF from reweighted trajectories and
+reported a temporal standard deviation. The default bias-half mean and five-block error
+belong to fmeta. For the paired example study, `fmeta analyze --paper-regions` implements
+the finite binding-basin integral with a bulk number density and the 1 M standard state.
+It estimates the basin and bulk integrals from the same weighted samples. Time slices
+use each walker's actual synchronized hill prefixes. The secondary bulk density uses
+only samples inside a wall-free disk, divided by the disk area and bulk interval length.
+The late-bias cross-check integrates the identical finite regions. The Student-t
+interval uses all independent bias histories. Missing reweighting support is reported
+for the whole ensemble. Historical samples that depend on a peer beyond the nominal
+cut are identified. Such a prefix can require extra sampling to reproduce.
+The two published examples of wall restraints and the numerical validation are documented
+in the [paired study](../plans/2026-11-18-paper-binding.md).
+
 ### FM-D10 — Replicas for the error estimate, walkers for speed
 Independent replicas (default 5) give the confidence interval. Walkers of one replica share
 the bias by reading each other's HILLS files.

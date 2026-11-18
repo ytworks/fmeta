@@ -14,10 +14,9 @@ that runs on GPUs, end to end, from two files.
   `Modeller.addMembrane`, with the funnel pointing into water.
 - Engine: well-tempered metadynamics on the funnel CVs (projection `s`, extent `rho`) with
   OpenMM custom forces; replicas for error bars, shared-bias walkers for speed; exact restart.
-- Result: standard binding free energy by the published procedure: from the accumulated bias
-  over the second half of a run, with a block error. The replicas together are the measurement:
-  mean and 95 % interval, diagnostics per replica, a "no binding" statement, no convergence
-  verdict.
+- Result: standard binding free energy from a bound-to-bulk integral. The default uses the
+  accumulated bias over the second half. The paired example protocol uses reweighted samples.
+  Independent replicas give the mean and 95% interval, with diagnostics and an empty-funnel reference.
 - OpenMM only: no input from other MD programs.
 - Owner request 2026-11-15 (roadmap R7–R10). In: replicas side by side on several GPUs or one
   after another on one GPU (R7); official presets (R9); real inputs (R8); a kinase and a GPCR
@@ -30,7 +29,7 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-17. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
+Snapshot date: 2026-11-18. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
 D5, D6, D7 and D9 to D18 amended since, see the Change Log). PR #1 is merged (final code
 d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). PR #3 (branch
 `claude/cupotential-backend`; the owner: everything is developed in that PR): NVIDIA
@@ -90,17 +89,17 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
     trypsin −66.9 to 10.4 and −80.5 to −7.6 in two runs, and the value depends on the bias
     setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
     to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
-  - a run of full length with the cuPotential back end: the examples ran 1 ns per replica with
-    it (on 1c09775); every 40 ns value and every benchmark report is from OpenMM's own forces;
-  - settings chosen for accuracy (walkers in the defaults, run length, bias): deferred by the
-    owner; reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
+  - a shared production protocol meeting the fivefold affinity and independent-replica precision
+    criteria on both examples. PR #4 has cuPotential trajectories to 90 ns (TYK2) and 80 ns (A2A).
+    The paired follow-up uses 20/40/80/100 ns checkpoints, reviewed primary methods and fresh validation seeds.
+  - reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
   modelled; non-protein components are removed unless listed in `system.keep_hetero`; a
   directory prepared before 2026-11-16 keeps periodic funnel walls and must be prepared again;
   the scatter over seeds of the gate `toy_free_energy` (10 ns, estimate from the samples) is
   not measured: the gate's seed gives 0.19 kJ/mol with OpenMM and 0.59 with cuPotential (FM-D12).
-- GPUs (owner, 2026-11-16: all 8 are for this task): idle, nothing of this task runs on them;
-  the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
+- GPUs: the paired example experiment uses all eight under MPS with 32 processes per system.
+  Historical stock OpenMM measurements, ns/day on one GPU: in the image of
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
   A2A example 302 alone, 526 / 528 / 524.
@@ -109,6 +108,11 @@ examples ran on 1c09775, the code before the fixes, and were not run again.
   (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
 
 ## Change Log
+
+### 2026-11-18 — [amendment] reweighted finite-site binding for the paired examples
+- What: opt-in sample estimator with synchronized walker biases, wall-free disk cross-check, fixed structural regions and independent-replica intervals. At 80 ns, R2 gave TYK2 −44.13 [−71.19, −17.07] and A2A −19.64 [−28.79, −10.48] kJ/mol. Official image: 224 CPU tests and four slow analysis/walker tests passed. The new eight-GPU search is active.
+- Why: SI Fig. S3 used a reweighted PMF. The shared protocol must satisfy the same affinity and interval-width criteria on both systems in a fresh validation.
+- Refs: FM-D9 (fifth amendment), PR #4, `docs/plans/2026-11-18-paper-binding.md`.
 
 ### 2026-11-17 — [progress] GPU gates of the final code with the review fixes pass with both back ends (80d7dc7)
 - What: third finding of the review of PR #3, fixed in 80d7dc7 (it has no entry of its own): the build process of a benchmark ligand (`fmeta benchmark build`) reads a `config.yaml` from before the key `run.backend` as the set does, as `openmm` (`saved_config`); it read the default `auto` and wrote it back, and the set then refused its own work directory. Its test runs the real build and failed on the code before the fix. Then `scripts/gpu_gates.py` on clean 80d7dc7 (2 GPUs, image 648480d3… of lock ee32ef34…, host driver 595.99.02, `libcuda` 615.71.10 loaded), once as it is (`auto`, which gave cuPotential on both test systems) and once with `--backend openmm`: all 20 passed each (`gpu-tests`: 15 passed, with the 13 constraint cases held to the plugin). Nonbonded energy, force against double-precision PME at 1e-6: in the record of cuPotential OpenMM 1.9e-5, 6.8e-4 and cuPotential 1.7e-6, 4.0e-4 (soluble), 6.4e-6, 7.2e-4 and 1.2e-6, 3.0e-4 (membrane), the funnel groups identical; in the record of OpenMM 1.1e-5, 7.5e-4 and 1.1e-5, 6.5e-4. Periodic images: 1.3e-6 nm, 1.2e-3 kJ/mol (cuPotential); 5.6e-7 nm, 2.6e-4 kJ/mol (OpenMM). Toy values as on 1c09775. CI green on 80d7dc7 (run 44063964423). `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` 212 passed. Not run again on 80d7dc7: the two examples (they ran on 1c09775), `pytest -m slow`; no walker was added on the GPU.

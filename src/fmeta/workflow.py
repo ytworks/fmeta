@@ -14,6 +14,7 @@ or re-analysed from any point.
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import re
@@ -414,6 +415,62 @@ def format_status(rows: Sequence[dict]) -> str:
 
 
 # ---- analysis ---------------------------------------------------------------
+
+def analyze_paper_stage(workdir, regions_path, length_ns: Optional[float] = None,
+                        discard_ns: float = 2.0) -> dict:
+    """Measure all configured independent replicas at a common, per-walker endpoint.
+
+    The region definition belongs to the prepared system and funnel. This entry point
+    only reads simulation files, including when used on an archived run.
+    """
+    from .analysis.paper import analyze_paper_replicas
+
+    workdir = Path(workdir)
+    regions = json.loads(Path(regions_path).read_text())
+    required = {"system_sha256", "positions_sha256", "funnel_sha256", "topology_sha256", "equil_state_sha256",
+                "site", "unbound", "bound_below", "core_radius"}
+    if not isinstance(regions, dict) or not required.issubset(regions):
+        raise ValueError(f"a paper region file requires {', '.join(sorted(required))}")
+    for field, filename in (("system_sha256", "prepared/system.xml"), ("positions_sha256", "prepared/positions.npy"),
+                            ("funnel_sha256", "prepared/funnel.yaml"), ("topology_sha256", "prepared/topology.cif"),
+                            ("equil_state_sha256", "equil/state.xml")):
+        digest = hashlib.sha256()
+        with (workdir / filename).open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+        if digest.hexdigest() != regions[field]:
+            raise ValueError(f"the region file belongs to a different {filename}")
+
+    config = Config.load(workdir / "config.yaml")
+    directories = [replica_directory(workdir, i) for i in range(config.run.replicas)]
+    if set(directories) != {d for d in workdir.glob("rep*") if d.is_dir() and d.name[3:].isdigit()}:
+        raise ValueError("the replica directories differ from the independent replicas in config.yaml")
+    backends = set()
+    for directory in directories:
+        check_walker_set(directory, config.run.walkers)
+        walkers = [directory / f"w{i}" for i in range(config.run.walkers)] if config.run.walkers > 1 else []
+        present = {d for d in directory.glob("w*") if d.is_dir() and d.name[1:].isdigit()}
+        if set(walkers) != present:
+            raise ValueError(f"{directory.name}: walker directories differ from config.yaml")
+        for source in walkers or [directory]:
+            for filename in ("run.yaml", "HILLS", "COLVAR"):
+                if not (source / filename).is_file():
+                    raise FileNotFoundError(source / filename)
+            device = source / "device.json"
+            backends.add(json.loads(device.read_text())["backend"] if device.exists() else None)
+    result = analyze_paper_replicas(
+        directories, site=regions["site"], unbound=regions["unbound"],
+        bound_below=regions["bound_below"], core_radius=regions["core_radius"],
+        cut_ns=config.run.length_ns if length_ns is None else length_ns, discard_ns=discard_ns)
+    result["regions"] = regions
+    result["base_seed"] = config.run.seed
+    result["recorded_backends"] = sorted(backends, key=str)
+    result["protocol"] = dict(replicas=config.run.replicas, walkers=config.run.walkers,
+                              timestep_fs=config.run.timestep_fs, pace_ps=config.run.pace_ps,
+                              friction=config.run.friction, sync_hills=config.run.walker_sync_hills,
+                              precision=config.run.precision, bias=config.metad.to_dict())
+    return result
+
 
 def analyze_stage(workdir, plot: bool = False, **kwargs) -> dict:
     """Analyse every replica under ``workdir`` and combine them. With ``plot``,
