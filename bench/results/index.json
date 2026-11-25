@@ -130,6 +130,26 @@
    "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
    "all_passed": true,
    "backend": "openmm"
+  },
+  {
+   "file": "2026-11-25-b3a4a26d1-cupotential-gpu-gates.json",
+   "date": "2026-11-25",
+   "commit": "b3a4a26d1372006968750e637883ee41d2763d4b",
+   "dirty": false,
+   "gpus": 2,
+   "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+   "all_passed": true,
+   "backend": "cupotential"
+  },
+  {
+   "file": "2026-11-25-b3a4a26d1-gpu-gates.json",
+   "date": "2026-11-25",
+   "commit": "b3a4a26d1372006968750e637883ee41d2763d4b",
+   "dirty": false,
+   "gpus": 2,
+   "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+   "all_passed": true,
+   "backend": "openmm"
   }
  ]
 }

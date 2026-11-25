@@ -71,15 +71,16 @@ driver 610); details in the plan.
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets ran with the defaults from 47e84f7 in fresh work directories (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns, 90 replicas, every one to its end, both exit 0); reports by the code of 7386d28: `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol, fmeta / FEP+. TYK2: MUE 3.60 / 0.37, offset removed 1.81 / 0.35, Pearson r 0.15 / 0.96; every ligand above experiment (+1.0 to +6.9); experiment inside the 95% interval for 5 of 10; 47 of 50 replicas with a return to the site. A2A: MUE 4.34 / 0.74, offset removed 3.49 / 0.79, Pearson r 0.57 / 0.79; 6 of 8 below experiment (4d −12.0, 4e D −9.3); experiment inside the interval for 7 of 8; 25 of 40 replicas without a return. Intervals 4.3 to 16.4 (TYK2) and 7.0 to 28.9 kcal/mol (A2A) wide against experimental spans of 4.3 and 3.2. R10 is closed. Reported as measured (set READMEs, `README.md`) |
 
 - GPU gates: **all 20 passed with each back end** (`gpu-tests` and the 19 items of `fmeta check`)
-  on clean 80d7dc7, the final code with the review fixes, image of lock ee32ef34… (OpenMM 8.4.0,
-  CUDA 13.4, mixed precision, 2 GPUs, host driver 595.99.02 with the compatibility `libcuda`
-  615.71.10; dated in UTC): `bench/results/2026-11-17-80d7dc789-cupotential-gpu-gates.json` (the
-  default `auto`, which gave cuPotential; no speed and no duration in it) and
-  `bench/results/2026-11-17-80d7dc789-gpu-gates.json` (`--backend openmm`). `toy_free_energy`
+  on clean b3a4a26, the head of PR #5 (`src/` as 2943769: the default length 100 ns), image
+  d8b9c513… of lock ee32ef34… (OpenMM 8.4.0, CUDA 13.4, mixed precision, 2 GPUs, host driver
+  595.99.02 with the compatibility `libcuda` 615.71.10; dated in UTC):
+  `bench/results/2026-11-25-b3a4a26d1-cupotential-gpu-gates.json` (the default `auto`, which
+  gave cuPotential; no speed and no duration in it) and
+  `bench/results/2026-11-25-b3a4a26d1-gpu-gates.json` (`--backend openmm`). `toy_free_energy`
   (samples, bias; exact −4.95 kJ/mol, criteria 2.0 and 3.0): cuPotential −4.36, −3.78; OpenMM
-  −4.76, −4.34. The speed of OpenMM (1366 ns/day plain, 1306 with the bias, 948 membrane)
-  decides nothing. Before it: 1c09775 (both back ends, before the review fixes), 565b359 (18
-  gates, OpenMM, the same image); on `main` (lock d061e45a…, OpenMM 8.6.1): d4041f9.
+  −4.76, −4.34. The speed of OpenMM (1429 ns/day plain, 1386 with the bias, 931 membrane)
+  decides nothing. Before it: 80d7dc7 and 1c09775 (both back ends), 565b359 (18 gates, OpenMM,
+  the same lock); on `main` (lock d061e45a…, OpenMM 8.6.1): d4041f9.
 - Review of PR #1: three rounds, 9 findings, each fixed in its own commit (FM-D5, FM-D9, FM-D10,
   FM-D11, FM-D15); all 9 threads answered and resolved.
 - Function checks on real systems (783ecff, GPU, short runs): every function of PR #1 that the
@@ -105,8 +106,9 @@ driver 610); details in the plan.
   directory prepared before 2026-11-16 keeps periodic funnel walls and must be prepared again;
   the scatter over seeds of the gate `toy_free_energy` (10 ns, estimate from the samples) is
   not measured: the gate's seed gives 0.19 kJ/mol with OpenMM and 0.59 with cuPotential (FM-D12).
-- GPUs (owner, 2026-11-16: all 8 are for this task): idle, nothing of this task runs on them;
-  the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
+- GPUs (owner, 2026-11-16: all 8 are for this task): the 5 × 100 ns runs of PR #5 (owner
+  2026-11-26: all 8 GPUs, MPS where it helps): TYK2 ended on three GPUs with MPS (2/2/1); A2A
+  runs one replica per GPU on five; the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
   A2A example 302 alone, 526 / 528 / 524.
