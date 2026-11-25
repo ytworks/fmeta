@@ -7,7 +7,7 @@ the S1 pocket of bovine beta-trypsin. No membrane.
 |---|---|---|
 | Experimental binding free energy | −6.4 to −7.3 kcal/mol | the measurements quoted by Limongelli et al. (their references 40 and 41) |
 | Funnel metadynamics, published | −8.5 ± 0.7 kcal/mol | Limongelli, Bonomi, Parrinello, PNAS 110, 6358 (2013), doi:10.1073/pnas.1303186110 |
-| fmeta, official defaults (5 replicas of 40 ns), two runs | −6.8 kcal/mol, 95% interval −16.0 to 2.5; −10.5 kcal/mol, 95% interval −19.2 to −1.8 | see "Result" below |
+| fmeta, official defaults of 2026-11-16 (5 replicas of 40 ns), two runs | −6.8 kcal/mol, 95% interval −16.0 to 2.5; −10.5 kcal/mol, 95% interval −19.2 to −1.8 | see "Result" below |
 
 ## Inputs
 
@@ -62,8 +62,8 @@ before `run.backend` existed.
 
 ## Result
 
-With the defaults the five replicas give a value with a wide interval. A replica of 40 ns does
-not converge on its own: the five together are the measurement, and the interval is what they
+With the defaults of 2026-11-16 (40 ns; the default is 100 ns since 2026-11-25) the five
+replicas give a value with a wide interval. A replica of 40 ns does not converge on its own: the five together are the measurement, and the interval is what they
 say (FM-D9, second amendment, `docs/design/engine.md`). The value of a replica is the mean over
 the second half of the run of dG(t) from the accumulated bias, with a block error (the published
 procedure; FM-D9, third amendment). The numbers are reported as measured; the mean without its

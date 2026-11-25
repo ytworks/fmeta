@@ -1010,7 +1010,8 @@ What the count does not say:
   The rule counts passing replicas and that is what was applied; the scatter is reported here.
 - The defaults do not give a converged binding free energy of trypsin-benzamidine in 40 ns: a
   run with them is expected to end as NOT CONVERGED, which is what the diagnostics are for.
-  Roadmap R2 ("five replicas to convergence") is not met within the length the owner allows.
+  Roadmap R2 ("five replicas to convergence") is not met within the length the owner allows
+  (40 ns then; the limit was removed by the fourth amendment).
 - With the faster settings the ligand leaves early, the bias at the site overfills, and the
   samples after the first 2 ns rarely visit the site: the estimate from the samples is
   shallow (1 to 4 replicas per setting within 1 kT of the empty funnel) while the bias sum is

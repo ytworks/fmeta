@@ -52,7 +52,7 @@ Verified on CPU only (see `PROGRESS.md`).
   alternate locations. Built and equilibrated on the GPU from 3PTB, 4GIH and the prepared TYK2
   protein of the Schrödinger set. Gates passed on 47e84f7 (same record).
 - **R2 — Real-system validation** (2026-11-16, as reworded that day). Trypsin-benzamidine
-  (`examples/trypsin_benzamidine`): five replicas of 40 ns with the official defaults, their
+  (`examples/trypsin_benzamidine`): five replicas of 40 ns with the official defaults of then, their
   value with its interval beside experiment and the published funnel-metadynamics value.
   Reported, not gated. Two runs with the values of the defaults (the value of a replica from
   the bias, FM-D9, third amendment): the scan run −28.3 kJ/mol (95% interval −66.9 to 10.4) and

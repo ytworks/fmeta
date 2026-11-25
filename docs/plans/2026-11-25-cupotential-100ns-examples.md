@@ -126,14 +126,7 @@ All commands from the root of the checkout. `G…` are free host GPUs (`nvidia-s
    for x in runs/tyk2_100 runs/a2a_100/work; do for T in 40 60 80; do for r in "$x"/rep*; do
      mkdir -p "${x}_at${T}/${r##*/}" && cp "$r"/run.yaml "$r"/HILLS "$r"/COLVAR "${x}_at${T}/${r##*/}/"
    done; done; done
-   scripts/in_docker.sh python -c "
-   import glob
-   from fmeta.engine.hills import truncate_data_file
-   for x in ('runs/tyk2_100', 'runs/a2a_100/work'):
-       for t in (40, 60, 80):
-           for d in sorted(glob.glob(f'{x}_at{t}/rep*')):
-               print(d, [truncate_data_file(f'{d}/{f}', max_time=1000.0 * t) for f in ('HILLS', 'COLVAR')])
-   "
+   scripts/in_docker.sh python -c "import glob; from fmeta.engine.hills import truncate_data_file as cut; [print(d, cut(d + '/HILLS', max_time=1000.0 * t), cut(d + '/COLVAR', max_time=1000.0 * t)) for x in ('runs/tyk2_100', 'runs/a2a_100/work') for t in (40, 60, 80) for d in sorted(glob.glob(f'{x}_at{t}/rep*'))]"
    for x in runs/tyk2_100 runs/a2a_100/work; do for T in 40 60 80; do
      scripts/in_docker.sh fmeta analyze "${x}_at${T}"
    done; done
@@ -185,3 +178,13 @@ about 8 h (TYK2) and 23 h (A2A).
   a reason, return code 0, 100000 hills; container exit codes 0; `fmeta analyze` exit 0 at
   100, 40, 60 and 80 ns.
 - Before every commit and the PR text: no speed or duration of the plugin in the diff.
+- Done in the development session, where the CUDA platform of the image does not run (WSL2,
+  host driver 610: the compatibility `libcuda` sees no device, the host's rejects the PTX of
+  CUDA 13.4), on the CPU platform as a smoke test of section B: the TYK2 steps as written with
+  the unmodified example configuration (88473 atoms; `config.yaml` holds `length_ns: 100.0` and
+  `backend: auto`), an equilibration shortened in the work directory, the speed copy by `cp -a`
+  with `--replica 0 --device 0`, 2 replicas to 0.03 and on to 0.06 ns, `fmeta status`,
+  `fmeta analyze`, and the cut copies of step 5 at 0.03 ns: every command ended with 0, `auto`
+  gave OpenMM with the reason that the platform is CPU, `--backend cupotential` was refused
+  with exit 1 before a run file was written, and the summary of the cut copies equals the one
+  written when the run stood at 0.03 ns (apart from the directory names).

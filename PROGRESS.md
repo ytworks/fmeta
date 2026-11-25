@@ -34,16 +34,15 @@ that runs on GPUs, end to end, from two files.
 ## Current Status
 
 Snapshot date: 2026-11-25. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
-D5, D6, D7 and D9 to D18 amended since, see the Change Log). Branch `claude/cupotential-100ns`
-(plan `docs/plans/2026-11-25-cupotential-100ns-examples.md`): default length 100 ns (FM-D16,
-fourth amendment); the 100 ns runs of both examples wait for the 8-GPU session. PR #1 is merged (final code
-d4041f9; plan `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`). PR #3 (branch
-`claude/cupotential-backend`; the owner: everything is developed in that PR): NVIDIA
-cuPotential as the default back end (owner request 2026-11-17; plan
-`docs/plans/2026-11-17-cupotential-backend.md`, M0 to M4; roadmap R11). Final code 80d7dc7: it
-holds the three fixes from the review of PR #3 (row M4), and the gates and CI are of it. Both
-examples ran on 1c09775, the code before the fixes, and were not run again. PR #3 is merged
-(c163eb2; `src/` as 80d7dc7).
+D5, D6, D7 and D9 to D18 amended since, see the Change Log). Merged: PR #1 (d4041f9; plan
+`docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`) and PR #3 (c163eb2, `src/` as
+80d7dc7 with the three review fixes; cuPotential as the default back end, owner request
+2026-11-17, plan `docs/plans/2026-11-17-cupotential-backend.md`, roadmap R11; both examples ran
+with it on 1c09775, before the fixes). PR #5 (branch `claude/cupotential-100ns`, plan
+`docs/plans/2026-11-25-cupotential-100ns-examples.md`): default length 100 ns (FM-D16, fourth
+amendment); the 100 ns runs of both examples wait for the 8-GPU session. Its runbook passed a
+CPU smoke test on TYK2 in the development session, where the image's CUDA does not run (WSL2,
+driver 610); details in the plan.
 
 | Milestone | Status |
 |---|---|
