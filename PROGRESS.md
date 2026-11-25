@@ -110,11 +110,17 @@ driver 610); details in the plan.
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
   A2A example 302 alone, 526 / 528 / 524.
-- Blockers: none known. NVIDIA MPS works on this host (driver 595.99.02, below the R615 of
-  CUDA 13.4) with the MPS programs of the image and a daemon started by `scripts/mps.sh`
-  (protocol 3; FM-D13, amendments of 2026-11-17); the host driver is not raised (owner).
+- Blockers: the WSL2 host (RTX 5090, Windows driver 610.88 = CUDA 13.3) cannot run the CUDA of
+  the image until its Windows driver is R615 or newer (owner action; FM-D13, fifth amendment).
+  The 8-GPU host: none; MPS works there with driver 595.99.02 and the MPS programs of the image
+  (protocol 3; FM-D13, amendments of 2026-11-17); its driver is not raised (owner).
 
 ## Change Log
+
+### 2026-11-25 — [amendment] FM-D13, fifth: under WSL2 the image loads the driver library of Windows
+- What: owner request to run on the Windows machine with an RTX 5090 as well, in Docker. There (WSL2, NVIDIA Container Toolkit 1.17.8, `cuda-compat-mode = "ldconfig"`, Windows driver 610.88 = CUDA 13.3) the toolkit put the image's compatibility `libcuda` 615.71.10 first, and CUDA found no device. `docker/entrypoint.sh` now puts the driver library of Windows first when `/dev/dxg` exists (alone in a directory of its own; no MPS under WSL2); other hosts are unchanged. Verified on that host: the image rebuilt; CUDA now reaches the driver and stops at the next condition, OpenMM's PTX of NVRTC 13.4 on a CUDA 13.3 driver (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). So the host needs a Windows driver of the R615 branch (owner action). `fmeta doctor` there selects CPU without saying why (unchanged). Not run on this code: the GPU gates (the 8-GPU session, on the head of PR #5).
+- Why: the compatibility libraries are a Linux mechanism; under WSL2 the only driver is that of Windows, and a container that loads another library fails with an error that names no cause.
+- Refs: FM-D13, fifth amendment (`docs/design/engine.md`); `docker/entrypoint.sh`, `.claude/rules/docker-execution.md`, `docs/gpu-runbook.md`; PR #5.
 
 ### 2026-11-25 — [design] FM-D16, fourth amendment: no limit of 40 ns; `run.length_ns` is 100 by default
 - What: owner request of 2026-11-25. The rule that nothing runs longer than 40 ns (owner 2026-11-16; "Nothing runs longer" of the scan) is removed, and `run.length_ns` is 100.0 in `src/fmeta/config.py`, both presets and `docs/configuration.md`. The bias `sig2` from the scan stays; the scan and its tables stay as the record. Values measured at 40 ns stay as measured; a benchmark work directory keeps the length its ligands were prepared with, a new one gets 100 ns, `--length-ns 40` repeats the reported plan. Texts that stated the limit or the old default follow (example READMEs and `fmeta.yaml` comments, set READMEs, `README.md`, `docs/gpu-runbook.md`). The plan of 2026-11-25 holds the runbook of the 100 ns runs of both examples with cuPotential for the 8-GPU session. Verified: `tests/test_config.py` failed with the code default alone (presets and reference) and passes with the three; `ruff`, `check_progress_size.py`, `verify_bench_results.py`, `pytest` in the image (no GPU here). Not run: the GPU gates on this code (the 8-GPU session).

@@ -36,7 +36,8 @@ the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amen
 review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
 of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
 with these amendments passed with both back ends (80d7dc7, one record each); FM-D16 amended a
-fourth time (2026-11-25, owner: the limit of 40 ns is removed and `run.length_ns` is 100).
+fourth time (2026-11-25, owner: the limit of 40 ns is removed and `run.length_ns` is 100); FM-D13
+amended a fifth time (2026-11-25: under WSL2 the entry of the image loads the driver of Windows).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -622,6 +623,20 @@ directory of the test runs, which Git does not track. The image and the lock are
 Why: `run.backend: openmm` is the path that stays when the plugin is not there (it is
 early-access software under a licence that can end), and `auto` falls to it by name. Both paths
 are therefore verified on the code that is merged, and a record says which one it verified.
+Amendment (2026-11-25, fifth: WSL2, owner request to run on a Windows machine with an RTX 5090
+as well): under WSL2 the GPU is `/dev/dxg` and the driver library is that of Windows, which the
+container runtime mounts as `/usr/lib/x86_64-linux-gnu/libcuda.so.1`. The compatibility
+libraries of the image cannot drive a GPU there: with the Windows driver 610.88 (CUDA 13.3) the
+runtime put them first and CUDA found no device (`CUDA_ERROR_NO_DEVICE`). The entry of the
+image (`docker/entrypoint.sh`) therefore puts the driver library of Windows first when
+`/dev/dxg` exists, alone in a directory of its own; there is no MPS under WSL2. With it the same
+host gets to the driver and stops at the next condition: the kernels that OpenMM compiles with
+NVRTC 13.4 are PTX, and a driver of CUDA 13.3 does not load them
+(`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). A WSL2 host therefore needs a Windows driver that
+supports the CUDA runtime of the image (the R615 branch for CUDA 13.4, the same condition as on
+Linux without the compatibility libraries). Other hosts are unchanged (no `/dev/dxg`).
+Why: the compatibility libraries are a Linux mechanism; under WSL2 the only driver is the one of
+Windows, and a container that loads another library fails with an error that names no cause.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by
