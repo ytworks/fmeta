@@ -35,7 +35,8 @@ of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended 
 the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
 review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
 of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
-with these amendments passed with both back ends (80d7dc7, one record each).
+with these amendments passed with both back ends (80d7dc7, one record each); FM-D16 amended a
+fourth time (2026-11-25, owner: the limit of 40 ns is removed and `run.length_ns` is 100).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1056,6 +1057,24 @@ defaults were chosen; the analysis no longer reports such a count.
   is what the interval shows.
 - Roadmap R2 is reworded: the result of a real system is its value with the interval over the
   replicas, not "five replicas to convergence".
+
+Fourth amendment (2026-11-25, owner): the limit of 40 ns is removed, and `run.length_ns` is 100
+by default.
+- "Nothing runs longer" (the rule of the scan, second amendment) and the owner's limit of 40 ns
+  of 2026-11-16 no longer hold: a run is as long as its configuration says.
+- `run.length_ns` is 100.0 in the code, both presets and `docs/configuration.md`. The default
+  bias (`sig2`) stays. The scan, its rule and its tables stay as the record of how that bias
+  was chosen; they were measured up to 40 ns and say nothing about 100 ns.
+- Values measured at 40 ns (the trypsin scan, the examples, the benchmark reports) stay as they
+  were measured. A benchmark work directory keeps the length its ligands were prepared with
+  (`benchmark.prepare_set`), a new one gets 100 ns, and `--length-ns 40` repeats the plan of
+  the reports.
+- Five replicas stay and no criterion changes.
+Why: the owner's decision. A replica of 40 ns does not converge on its own, and the set of five
+gave wide intervals (95% intervals 23.5 and 29.3 kJ/mol wide on the TYK2 and A2A examples, 18
+to 121 kJ/mol on the ligands of the benchmark sets). The two examples are measured at 100 ns
+with the default back end (plan `docs/plans/2026-11-25-cupotential-100ns-examples.md`). A run
+with the defaults takes 2.5 times the GPU time of one of 40 ns.
 
 ### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
 Status: **Accepted** (2026-11-16).

@@ -178,7 +178,9 @@ All 25 replicas ran to 40 ns and were analysed as they stood at 10, 15, 20, 30 a
 The rule, written before a scan run started (FM-D16, second amendment,
 `docs/design/engine.md`). It counts replicas that passed the convergence check the analysis had
 at that time. The analysis has no such verdict any more (see "How the result is read" below);
-the rule and its counts stay here as the record of how the defaults were chosen:
+the rule and its counts stay here as the record of how the defaults were chosen. The default
+bias still comes from it; the length of 40 ns and "Nothing runs longer" were replaced on
+2026-11-25 by the owner's 100 ns (FM-D16, fourth amendment):
 
 - The lengths are taken in the order 10, 15, 20, 30, 40 ns. The first length at which a setting
   has all five replicas without a convergence problem becomes `run.length_ns`, and that setting
@@ -211,9 +213,9 @@ What the count does not say:
 - `sig2` has the widest scatter between replicas of all settings, and one of its replicas left
   the site only once, at 27.5 ns, and did not come back (corrected on 2026-11-16: this line said
   that it never left). The rule counts replicas that pass and was applied as written.
-- A run can be extended exactly (`fmeta run runs/tb --length-ns 80`); how long this system
-  needs for a narrow interval was not measured, because nothing runs longer than 40 ns by the
-  owner's decision.
+- A run can be extended exactly (`fmeta run runs/tb --length-ns 100`); how long this system
+  needs for a narrow interval was not measured. The limit of 40 ns that held then is removed
+  and the default is 100 ns (owner, 2026-11-25; FM-D16, fourth amendment).
 - The faster settings (`bf20_h3`, `bf20_h3_sig2`) push the ligand out early. Their samples then
   rarely visit the site and the estimate is shallow: at 40 ns 3 and 4 of their five replicas are
   within 1 kT of the empty funnel (2, 2 and 1 for `bf20`, `h3` and `sig2`).

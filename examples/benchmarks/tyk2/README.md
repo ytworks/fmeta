@@ -13,6 +13,11 @@ scripts/in_docker.sh fmeta benchmark report examples/benchmarks/tyk2 -o runs/ben
 `prepare` takes the three pilot ligands (`ejm_44`, `ejm_31`, `ejm_46`: the weakest, a middle
 and a strong binder); `--ligands all` adds the other seven to the same work directory.
 
+With the defaults a new work directory runs 5 replicas of 100 ns per ligand (FM-D16, fourth
+amendment, 2026-11-25). The result below was made with 40 ns, the default of then:
+`fmeta benchmark prepare ... --length-ns 40` repeats that plan. A work directory keeps the
+length its ligands were prepared with.
+
 ## Source and licence
 
 Structures and reference values come from the Schrödinger

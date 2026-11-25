@@ -105,5 +105,6 @@ What the diagnostics of `fmeta analyze` say:
   between the site and the unbound region moves with it: from −84 kJ/mol at 2 ns to −14 kJ/mol
   at 40 ns in the mean of the five (`runs/tyk2/summary.png`).
 
-The run can be extended exactly (`fmeta run runs/tyk2 --length-ns 80`); that was not done,
-because nothing runs longer than 40 ns by the owner's decision of 2026-11-16.
+A run is extended exactly by a larger length (`fmeta run runs/tyk2 --length-ns 100`). The limit of
+40 ns that held when this run was made is removed and the default is 100 ns (owner,
+2026-11-25; FM-D16, fourth amendment).
