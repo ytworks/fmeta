@@ -35,7 +35,11 @@ of every replica), with FM-D4, FM-D5, FM-D13 (a fourth time) and FM-D14 amended 
 the GPU gates passed with both back ends (1c09775, one record each); FM-D18 amended from the
 review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves are a condition
 of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
-with these amendments passed with both back ends (80d7dc7, one record each).
+with these amendments passed with both back ends (80d7dc7, one record each); FM-D16 amended a
+fourth time (2026-11-25, owner: the limit of 40 ns is removed and `run.length_ns` is 100); FM-D13
+amended a fifth time (2026-11-25: under WSL2 the entry of the image loads the driver of Windows);
+FM-D18: the GPU gates of b3a4a26 passed with both back ends and the two examples ran 5 × 100 ns
+with the default back end (2026-11-25, PR #5).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -621,6 +625,20 @@ directory of the test runs, which Git does not track. The image and the lock are
 Why: `run.backend: openmm` is the path that stays when the plugin is not there (it is
 early-access software under a licence that can end), and `auto` falls to it by name. Both paths
 are therefore verified on the code that is merged, and a record says which one it verified.
+Amendment (2026-11-25, fifth: WSL2, owner request to run on a Windows machine with an RTX 5090
+as well): under WSL2 the GPU is `/dev/dxg` and the driver library is that of Windows, which the
+container runtime mounts as `/usr/lib/x86_64-linux-gnu/libcuda.so.1`. The compatibility
+libraries of the image cannot drive a GPU there: with the Windows driver 610.88 (CUDA 13.3) the
+runtime put them first and CUDA found no device (`CUDA_ERROR_NO_DEVICE`). The entry of the
+image (`docker/entrypoint.sh`) therefore puts the driver library of Windows first when
+`/dev/dxg` exists, alone in a directory of its own; there is no MPS under WSL2. With it the same
+host gets to the driver and stops at the next condition: the kernels that OpenMM compiles with
+NVRTC 13.4 are PTX, and a driver of CUDA 13.3 does not load them
+(`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). A WSL2 host therefore needs a Windows driver that
+supports the CUDA runtime of the image (the R615 branch for CUDA 13.4, the same condition as on
+Linux without the compatibility libraries). Other hosts are unchanged (no `/dev/dxg`).
+Why: the compatibility libraries are a Linux mechanism; under WSL2 the only driver is the one of
+Windows, and a container that loads another library fails with an error that names no cause.
 
 ### FM-D14 — Run modes, and one scheduler for the child processes of a run
 `run.mode` (`--mode` for one call) says how the replicas use the devices. `parallel`: side by
@@ -1009,7 +1027,8 @@ What the count does not say:
   The rule counts passing replicas and that is what was applied; the scatter is reported here.
 - The defaults do not give a converged binding free energy of trypsin-benzamidine in 40 ns: a
   run with them is expected to end as NOT CONVERGED, which is what the diagnostics are for.
-  Roadmap R2 ("five replicas to convergence") is not met within the length the owner allows.
+  Roadmap R2 ("five replicas to convergence") is not met within the length the owner allows
+  (40 ns then; the limit was removed by the fourth amendment).
 - With the faster settings the ligand leaves early, the bias at the site overfills, and the
   samples after the first 2 ns rarely visit the site: the estimate from the samples is
   shallow (1 to 4 replicas per setting within 1 kT of the empty funnel) while the bias sum is
@@ -1056,6 +1075,24 @@ defaults were chosen; the analysis no longer reports such a count.
   is what the interval shows.
 - Roadmap R2 is reworded: the result of a real system is its value with the interval over the
   replicas, not "five replicas to convergence".
+
+Fourth amendment (2026-11-25, owner): the limit of 40 ns is removed, and `run.length_ns` is 100
+by default.
+- "Nothing runs longer" (the rule of the scan, second amendment) and the owner's limit of 40 ns
+  of 2026-11-16 no longer hold: a run is as long as its configuration says.
+- `run.length_ns` is 100.0 in the code, both presets and `docs/configuration.md`. The default
+  bias (`sig2`) stays. The scan, its rule and its tables stay as the record of how that bias
+  was chosen; they were measured up to 40 ns and say nothing about 100 ns.
+- Values measured at 40 ns (the trypsin scan, the examples, the benchmark reports) stay as they
+  were measured. A benchmark work directory keeps the length its ligands were prepared with
+  (`benchmark.prepare_set`), a new one gets 100 ns, and `--length-ns 40` repeats the plan of
+  the reports.
+- Five replicas stay and no criterion changes.
+Why: the owner's decision. A replica of 40 ns does not converge on its own, and the set of five
+gave wide intervals (95% intervals 23.5 and 29.3 kJ/mol wide on the TYK2 and A2A examples, 18
+to 121 kJ/mol on the ligands of the benchmark sets). The two examples are measured at 100 ns
+with the default back end (plan `docs/plans/2026-11-25-cupotential-100ns-examples.md`). A run
+with the defaults takes 2.5 times the GPU time of one of 40 ns.
 
 ### FM-D17 — Benchmark sets: the ordinary stages for every ligand, one scheduler call, a report without a verdict
 Status: **Accepted** (2026-11-16).
@@ -1146,7 +1183,14 @@ The GPU gates of the final code 80d7dc7 (2026-11-17) passed with both back ends,
 (`--backend openmm`). That commit holds the amendments from the review of PR #3 (2026-11-17, at
 the end of this decision); the records of 1c09775, the code before them, passed in the same way
 (`bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`,
-`bench/results/2026-11-17-1c0977590-gpu-gates.json`).
+`bench/results/2026-11-17-1c0977590-gpu-gates.json`). On b3a4a26 (PR #5, the default length
+100 ns; 2026-11-25) the gates passed again with both back ends
+(`bench/results/2026-11-25-b3a4a26d1-cupotential-gpu-gates.json`,
+`bench/results/2026-11-25-b3a4a26d1-gpu-gates.json`), and both examples ran 5 × 100 ns with the
+defaults, every replica with cuPotential to its end: dG0 of TYK2 with ejm_46 −25.63 kJ/mol (95%
+interval −47.12 to −4.13; experiment −47.3), of A2A with theophylline −17.99 kJ/mol (−38.91 to
+2.92; measurements −33.0 to −27.0). That is a measurement of real systems at full length, not
+a gate: no criterion depends on it (the READMEs of the examples).
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`

@@ -41,6 +41,8 @@ Owner rule (2026-11-15): everything except CI is executed and tested in Docker. 
   the compatibility libraries of the image are used, and with them the MPS programs of the
   image: an MPS daemon and the CUDA driver library of its clients must be of one driver version.
   A client of that daemon has no OpenCL platform (FM-D13, amendments of 2026-11-17).
+  Under WSL2 the compatibility libraries do not work: the driver of Windows must itself be
+  R615 or newer, and there is no MPS (FM-D13, fifth amendment).
 
 ## Usage
 

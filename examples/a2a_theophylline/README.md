@@ -1,10 +1,12 @@
 # Adenosine A2A receptor with theophylline
 
 A membrane target with a weak ligand: the human adenosine A2A receptor in POPC with
-theophylline, from the crystal structure 5MZJ. **State of 2026-11-16:** the steps below ran
-to a binding free energy with the official defaults: dG0 = −18.6 kJ/mol (−4.45 kcal/mol), 95%
-interval −33.3 to −4.0 kJ/mol, from five replicas of 40 ns. The measurement on the simulated
-construct is −33.0 kJ/mol (−7.89 kcal/mol) ("Result" below).
+theophylline, from the crystal structure 5MZJ. **State of 2026-11-25:** the steps below ran
+to a binding free energy with the official defaults and the default back end (cuPotential):
+dG0 = −18.0 kJ/mol (−4.30 kcal/mol), 95% interval −38.9 to 2.9 kJ/mol, from five replicas of
+100 ns ("Result at 100 ns" below). With OpenMM's own forces and the defaults of 2026-11-16
+(five replicas of 40 ns): −18.6 kJ/mol (−4.45 kcal/mol), 95% interval −33.3 to −4.0 kJ/mol
+("Result"). The measurement on the simulated construct is −33.0 kJ/mol (−7.89 kcal/mol).
 
 Numbers in this file come from four places, and are marked: **[entry]** the header of the
 RCSB entry 5MZJ, **[file]** the OPM file and fmeta runs on it (both read or run on 2026-11-16),
@@ -142,8 +144,8 @@ value of a replica is the mean over the second half of the run of dG(t) from the
 bias, with a block error.
 
 The run was made with OpenMM's own forces and integrator: commit 47e84f7 is from before
-`run.backend` existed, and today that is `run.backend: openmm`. A run of the full length with
-the cuPotential back end has not been made.
+`run.backend` existed, and today that is `run.backend: openmm`. The run of the full length with
+the cuPotential back end is in "Result at 100 ns" below.
 
 | Quantity | fmeta | Experiment |
 |---|---|---|
@@ -175,8 +177,53 @@ What the diagnostics of `fmeta analyze` say:
   the difference between the site and the unbound region moves with it
   (`runs/a2a_theophylline/work/summary.png`).
 
-The run can be extended exactly (`fmeta run runs/a2a_theophylline/work --length-ns 80`); that
-was not done, because nothing runs longer than 40 ns by the owner's decision of 2026-11-16.
+A run is extended exactly by a larger length (`fmeta run runs/a2a_theophylline/work --length-ns
+100`). The limit of 40 ns that held when this run was made is removed and the default is 100 ns
+(owner, 2026-11-25; FM-D16, fourth amendment).
+
+## Result at 100 ns with the default back end
+
+Measured on 2026-11-25 (UTC): the steps above with the official defaults (5 replicas of 100 ns,
+`run.backend: auto`) on commit b3a4a26 in the official image (image d8b9c513… of lock
+ee32ef34…, OpenMM 8.4.0), 221122 atoms. Every replica ran with the cuPotential plugin for the
+nonbonded force and the integrator, with OpenMM's membrane barostat (`device.json`, no fallback
+reason), from its start to 100 000 hills without a stop, return code 0 (`schedule.jsonl`; the
+container of `fmeta run` ended with 0). One difference from the `fmeta run` line above: five
+GPUs, one replica each (`scripts/in_docker.sh --gpus 0,1,2,3,4 ... fmeta run
+runs/a2a_100/work --gpus 0,1,2,3,4`), while the TYK2 example ran on the other three (owner,
+2026-11-26: the eight GPUs of the machine for both examples). The values at 40, 60 and 80 ns
+are from copies of the same runs cut at those times (`truncate_data_file`, the rollback of a
+restart) and analysed by `fmeta analyze` as runs of that length. Speeds measured with the
+plugin are not published (NVIDIA's licence).
+
+| Length | dG0 (kJ/mol) | 95% interval (width) | Each replica, with its block error | From the samples after 2 ns | Rebinding events |
+|---|---|---|---|---|---|
+| 100 ns | −17.99 (−4.30 kcal/mol), standard error 7.53 | −38.91 to 2.92 (41.8) | 1.68 ± 0.55, −26.60 ± 3.26, −41.95 ± 4.13, −14.46 ± 3.53, −8.65 ± 3.91 | 2.38, −5.07, −28.69, −8.01, −3.48 | 23, 3, 1, 3, 21 |
+| 80 ns | −18.57, standard error 7.38 | −39.05 to 1.92 (41.0) | 0.58, −21.96, −44.11, −11.38, −15.96 | 2.01, −5.17, −31.95, −1.23, −6.31 | 17, 2, 1, 2, 6 |
+| 60 ns | −15.89, standard error 5.93 | −32.35 to 0.57 (32.9) | −0.38, −6.34, −34.31, −16.98, −21.43 | 2.65, −0.89, −20.51, −0.43, −9.46 | 13, 2, 1, 2, 1 |
+| 40 ns | −9.72, standard error 2.65 | −17.06 to −2.37 (14.7) | −11.24, 0.03, −15.93, −11.74, −9.70 | −0.80, −0.52, −8.97, −3.77, −4.57 | 1, 2, 1, 2, 1 |
+
+The rebinding events of a length are counted against the bound region of the surface at that
+length (its minimum plus 0.3 nm), so the counts of two lengths are not cumulative.
+
+- Experiment: −33.0 kJ/mol on the simulated construct, all measurements −33.0 to −27.0 kJ/mol.
+  The value at 100 ns is 15.0 kJ/mol (3.6 kcal/mol) above the first; all measurements lie
+  inside the interval. The replicas reach from −41.95 to 1.68 kJ/mol.
+- Against the run with OpenMM's own forces above, at the same length of 40 ns: −9.72 (standard
+  error 2.65) against −18.64 (5.28), a difference of +8.92 kJ/mol with a standard error of 5.91
+  (Welch, 5.9 degrees of freedom: 95% interval −5.61 to +23.45). The two runs differ in more
+  than the back end: the image (OpenMM 8.6.1 then, 8.4.0 now), the build and the equilibration
+  (221101 and 221122 atoms), and the random numbers.
+- From 40 to 100 ns the interval of the five went from 14.7 to 41.8 kJ/mol wide. The surface is
+  still being filled: in three replicas dG(t) from the bias changed by 20.8 to 23.7 kJ/mol over
+  the last half of the run, up and down.
+- Diagnostics of `fmeta analyze` at 100 ns: replica 0 (1.68 kJ/mol) is within 1 kT of what an
+  empty funnel gives (−2.18 kJ/mol) and is reported as no binding; the value of the five
+  together is not. One replica has fewer than 3 rebinding events. In four replicas an estimate
+  from the samples differs from the value by 5.2 to 21.5 kJ/mol.
+
+It is reported as measured: nothing was tuned on this system, and the five replicas together
+are the measurement (FM-D9, second amendment).
 
 ## State (2026-11-16)
 

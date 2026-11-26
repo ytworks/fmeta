@@ -14,6 +14,11 @@ PROGRESS.md budget, evidence index, CPU tests, the image build). Criteria:
   1.19.1, `cuda-compat-mode = "ldconfig"`), and NVIDIA MPS runs with the MPS programs of the
   image (FM-D13; "Several replicas on one GPU" below). A gate record names the driver and the
   `libcuda` that was loaded.
+- WSL2 (Windows, Docker in WSL with the NVIDIA Container Toolkit): the compatibility libraries
+  cannot drive the GPU there, so the entry of the image loads the driver library of Windows,
+  and that driver must itself support CUDA 13.4 (R615 branch; with 610.88, CUDA 13.3, OpenMM's
+  kernels do not load: `CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). No MPS: one replica per GPU
+  (FM-D13, fifth amendment).
 - The image. `scripts/in_docker.sh` builds it from `conda-linux-64.lock` on first use (about
   7.4 GB: the CUDA build of OpenMM, NVIDIA's cuPotential plugin, CUDA compatibility libraries
   and MPS programs, the ligand-parameter generators `openmmforcefields`, `openff-toolkit` and
@@ -113,7 +118,7 @@ periodic images, which the item `periodic_images` exists to exclude.
 
 ## Production runs (reported, not gated)
 
-Binding free energies of real systems (`examples/<name>/`) are long runs (40 ns per
+Binding free energies of real systems (`examples/<name>/`) are long runs (100 ns per
 replica by default) and are not analytic: they are reported, not gated. Run them on a clean commit, the
 long stage as a detached container:
 

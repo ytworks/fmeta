@@ -209,7 +209,7 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 
 | Key | Unit | Default | What it does; where the value comes from |
 |---|---|---|---|
-| `run.length_ns` | ns | `40.0` | Production length of each replica (of each walker, with `walkers` above 1). Measured, with the owner's limit of 40 ns: the longest the scan of FM-D16 on trypsin-benzamidine ran. A replica of this length does not converge on its own: the result is the mean of the replicas with its interval (FM-D9, second amendment), and on trypsin that interval is wide with the defaults (−68.7 to 14.0 kJ/mol around −27.4). A run is extended exactly by running `fmeta run` again with a larger `--length-ns` (design: FM-D5). [E20] ran 500 ns per simulation; BioSimSpace recommends "of the order of 500 - 2000 ns" [L23]. |
+| `run.length_ns` | ns | `100.0` | Production length of each replica (of each walker, with `walkers` above 1). The owner's decision of 2026-11-25, which removed the limit of 40 ns (FM-D16, fourth amendment); before it the default was 40 ns, the longest the scan of FM-D16 on trypsin-benzamidine ran. A replica of 40 ns does not converge on its own: the result is the mean of the replicas with its interval (FM-D9, second amendment), and on trypsin that interval was wide at 40 ns (−68.7 to 14.0 kJ/mol around −27.4). A run is extended exactly by running `fmeta run` again with a larger `--length-ns` (design: FM-D5). [E20] ran 500 ns per simulation; BioSimSpace recommends "of the order of 500 - 2000 ns" [L23]. |
 | `run.replicas` | - | `5` | Independent runs, each with its own bias; their spread is the error estimate (design: FM-D10). Five repeats in [L23] and [BSS-T]. |
 | `run.walkers` | - | `1` | Walkers that share one bias within a replica, for wall time on several GPUs (design: FM-D10). A replica that has run continues with the same number or more: a run that would leave out a walker with hills is refused. |
 | `run.walker_sync_hills` | - | `1` | A walker reads the hills of the others after every N of its own. |
@@ -229,16 +229,17 @@ is below 0.1 kT. The schedule has no source: convention, and M4 looks at it.
 
 ## Where the defaults differ from the literature that was read
 
-Two of these were set by measurement: the hill widths and the run length, by the scan of the
-bias on trypsin-benzamidine (FM-D16 in `docs/design/engine.md` has the settings, the rule that
-was written before the runs, and the result). The others stand as they were chosen for this
+The hill widths were set by measurement, by the scan of the bias on trypsin-benzamidine (FM-D16
+in `docs/design/engine.md` has the settings, the rule that was written before the runs, and the
+result); the run length is the owner's decision. The others stand as they were chosen for this
 file. None was tuned against experimental values.
 
 - **Hill widths.** 0.05 nm along the axis and 0.1 nm in rho, from the scan. The BioSimSpace
   defaults are 0.025 and 0.05 nm [BSS-F]; [E20] used 0.03 nm for its second variable.
-- **Length.** 40 ns per replica, the longest the scan ran. [E20] ran 500 ns per simulation and
-  [L23] recommends 500 to 2000 ns. On trypsin-benzamidine five replicas of 40 ns with the
-  defaults give −28.3 kJ/mol with a 95% interval of −66.9 to 10.4.
+- **Length.** 100 ns per replica, by the owner's decision of 2026-11-25 (before it 40 ns, the
+  longest the scan ran). [E20] ran 500 ns per simulation and [L23] recommends 500 to 2000 ns. On
+  trypsin-benzamidine five replicas of 40 ns with the defaults of then give −28.3 kJ/mol with a
+  95% interval of −66.9 to 10.4.
 - **Deposition rate.** Hills of 1.5 kJ/mol every 1 ps; [E20] and the BioSimSpace protocol
   default [BSS-P] deposit every 2 ps (1000 steps of 2 fs). At the same height the bias starts
   to grow twice as fast. Hills of 3.0 kJ/mol and a bias factor of 20 were in the scan and

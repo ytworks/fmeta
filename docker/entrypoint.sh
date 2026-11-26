@@ -24,7 +24,22 @@ source /usr/local/bin/_activate_current_env.sh
 # OpenCL library of the host: OpenMM initialises OpenCL when it is imported, and the older
 # library then waits for the newer MPS server and never returns (FM-D13). Such a client has the
 # CUDA platform and no OpenCL platform.
-if /sbin/ldconfig -p 2> /dev/null | grep -m 1 -F 'libcuda.so.1 ' | grep -q -F ' /usr/local/cuda/compat/'; then
+#
+# WSL2 (the GPU is /dev/dxg): the driver library is that of Windows, mounted by the container
+# runtime as /usr/lib/x86_64-linux-gnu/libcuda.so.1. The compatibility libraries cannot drive a
+# GPU there (CUDA_ERROR_NO_DEVICE), and the runtime may still put them first when the driver of
+# Windows reports an older version. So under WSL2 the driver library of Windows is put first,
+# alone in a directory of its own, and there is no MPS. The CUDA runtime of the image then needs
+# a driver of Windows that supports it (R615 or newer for CUDA 13.4).
+compat_first() {
+    /sbin/ldconfig -p 2> /dev/null | grep -m 1 -F 'libcuda.so.1 ' | grep -q -F ' /usr/local/cuda/compat/'
+}
+if [[ -e /dev/dxg && -e /usr/lib/x86_64-linux-gnu/libcuda.so.1 ]] && compat_first; then
+    WSL_DRIVER_DIR="/tmp/fmeta-wsl-driver-$(id -u)"
+    mkdir -p "$WSL_DRIVER_DIR"
+    ln -sfn /usr/lib/x86_64-linux-gnu/libcuda.so.1 "$WSL_DRIVER_DIR/libcuda.so.1"
+    export LD_LIBRARY_PATH="$WSL_DRIVER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+elif compat_first; then
     export PATH="/opt/fmeta/mps/bin:$PATH"
     if [[ -S "${CUDA_MPS_PIPE_DIRECTORY:-/tmp/nvidia-mps}/control" ]]; then
         export OCL_ICD_VENDORS=/opt/fmeta/mps/opencl-vendors

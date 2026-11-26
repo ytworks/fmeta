@@ -1,6 +1,6 @@
 # cuPotential as the default back end
 
-Status: In progress
+Status: Done (PR #3)
 Refs: FM-D18 (to be written in M3); amendments of FM-D4, FM-D5, FM-D13, FM-D14
 
 ## Context

@@ -1,6 +1,6 @@
 # GPU validation, run modes, official image, presets, examples, benchmarks
 
-Status: In progress (PR #1)
+Status: Done (PR #1)
 Refs: roadmap R1–R4; FM-D13..FM-D17 (to be written as each milestone lands)
 
 ## Context

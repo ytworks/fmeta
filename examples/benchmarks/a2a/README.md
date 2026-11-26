@@ -13,6 +13,11 @@ scripts/in_docker.sh fmeta benchmark report examples/benchmarks/a2a -o runs/benc
 `prepare` takes the three pilot ligands (`4q`, `4d`, `4e D`: the weakest, a middle and the
 strongest binder); `--ligands all` adds the other five to the same work directory.
 
+With the defaults a new work directory runs 5 replicas of 100 ns per ligand (FM-D16, fourth
+amendment, 2026-11-25). The result below was made with 40 ns, the default of then:
+`fmeta benchmark prepare ... --length-ns 40` repeats that plan. A work directory keeps the
+length its ligands were prepared with.
+
 ## Source and licence
 
 Structures and reference values come from the Schrödinger
