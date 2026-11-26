@@ -1,6 +1,7 @@
 # 100 ns by default; the TYK2 and A2A examples at full length with cuPotential
 
-Status: In progress
+Status: Complete (2026-11-26): the gates of b3a4a26 with both back ends and 5 × 100 ns of both
+examples with the default back end, the documents of section C (PR #5)
 Refs: roadmap R11, R3, R10; FM-D16 (amendment of 2026-11-25), FM-D18, FM-D9
 
 ## Context
@@ -25,6 +26,20 @@ Owner decisions of 2026-11-25:
 3. All development (code, documents, the procedure of the analysis, the PR) is done in a
    session without the GPUs; the 8-GPU machine only runs, in a separate session on the branch
    of the PR (the runbook below).
+
+Owner decisions of 2026-11-26, in the session on the 8-GPU machine (they change decision 3 and
+steps 2 to 4 of section B):
+
+4. That session also does section C (the documents and the PR).
+5. All eight GPUs are used. Each example goes from its build to its production as soon as it
+   can, without waiting for the other, and the layout is the one that ends first, with MPS where
+   it helps. A replica is fastest with a GPU of its own and A2A is the slower system, so A2A ran
+   one replica per GPU on five GPUs and TYK2 on the other three with MPS, two, two and one. The
+   speed comparison follows that layout: cuPotential from the production runs themselves,
+   OpenMM from 2 ns copies in the same layout (TYK2 alone and two per GPU, A2A alone), not the
+   five per GPU of step 3. The GPU gates ran on the GPUs that TYK2 left free, on the same
+   clean commit.
+6. The WSL2 host is not part of this PR.
 
 The rule on speeds stays (owner 2026-11-17, clause 2.12 of NVIDIA's licence): a speed or a
 duration measured with the plugin goes to no tracked file, commit message, PR text or PR

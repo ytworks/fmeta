@@ -103,8 +103,12 @@ Verified on CPU only (see `PROGRESS.md`).
   `bench/results/2026-11-17-80d7dc789-gpu-gates.json`. The TYK2 example and the A2A example
   ran by the steps of their READMEs with the default on 1c09775, the code before those fixes
   (5 replicas of 1 ns each; every `device.json` names cuPotential, and every replica ended with
-  return code 0); they were not run again on the final code. Not done: a run of full length
-  with the plugin. Speeds measured with the plugin are in no tracked file
+  return code 0); they were not run again on the final code. On b3a4a26 (PR #5, the default
+  length 100 ns, 2026-11-25) the gates passed again with each back end and both examples ran
+  5 × 100 ns with the default, every replica with cuPotential, 100 000 hills and return code 0:
+  dG0 of TYK2 with ejm_46 −25.63 kJ/mol (95% interval −47.12 to −4.13; experiment −47.3), of
+  A2A with theophylline −17.99 kJ/mol (−38.91 to 2.92; measurements −33.0 to −27.0), in the
+  READMEs of the examples. Speeds measured with the plugin are in no tracked file
   until NVIDIA permits it (owner, 2026-11-17); the parts were chosen from them by the rule of
   FM-D18. Plan: `docs/plans/2026-11-17-cupotential-backend.md`.
 

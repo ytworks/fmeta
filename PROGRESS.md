@@ -33,16 +33,15 @@ that runs on GPUs, end to end, from two files.
 
 ## Current Status
 
-Snapshot date: 2026-11-25. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
+Snapshot date: 2026-11-26. Decisions: `docs/design/engine.md` (FM-D1..D18 Accepted; FM-D2, D4,
 D5, D6, D7 and D9 to D18 amended since, see the Change Log). Merged: PR #1 (d4041f9; plan
 `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`) and PR #3 (c163eb2, `src/` as
 80d7dc7 with the three review fixes; cuPotential as the default back end, owner request
 2026-11-17, plan `docs/plans/2026-11-17-cupotential-backend.md`, roadmap R11; both examples ran
 with it on 1c09775, before the fixes). PR #5 (branch `claude/cupotential-100ns`, plan
-`docs/plans/2026-11-25-cupotential-100ns-examples.md`): default length 100 ns (FM-D16, fourth
-amendment); the 100 ns runs of both examples wait for the 8-GPU session. Its runbook passed a
-CPU smoke test on TYK2 in the development session, where the image's CUDA does not run (WSL2,
-driver 610); details in the plan.
+`docs/plans/2026-11-25-cupotential-100ns-examples.md`, complete): default length 100 ns (FM-D16,
+fourth amendment); on its code b3a4a26 the GPU gates passed with both back ends and both
+examples ran 5 × 100 ns with the default back end (rows M5 and M6, the example READMEs).
 
 | Milestone | Status |
 |---|---|
@@ -66,8 +65,8 @@ driver 610); details in the plan.
 | GPU plan M2: real inputs (R8, FM-D15) | Merged, both parts. Membrane part: `fmeta split --drop`, kept components are receptor, orientation warning, membrane box 8% above the box rule. Protein part: chain gaps capped (NME / ACE), caps and protonation states of the input kept, kept hetero in their own chain, `info.protein_input` in `prepared/report.json`. `pytest` 128 passed. GPU gates passed on 47e84f7; the real `addMembrane` test (`-m slow`) not rerun. On real files (GPU, 200 ps of free equilibration, zero wall energy): 3PTB, 4GIH, the prepared TYK2 protein of the Schrödinger set; protein model alone on both A2A files |
 | GPU plan M5 infrastructure: `fmeta benchmark` (R10, FM-D17) | Merged: `fmeta benchmark prepare`, `run`, `status`, `report`; sets `examples/benchmarks/tyk2` (10 ligands) and `a2a` (8 ligands) with experimental and FEP+ values; reports to `bench/reports/` without a verdict, checked by `scripts/verify_bench_results.py`. Tested on a synthetic set with a local source. On the merged code both real sets download and build: TYK2 pilot 86–91k atoms (eeb5302), caps and histidine states of the FEP+ input kept; A2A pilot 116–117k atoms (c41c08b; 228 POPC, box 12.74 × 6.69 × 13.9–14.1 nm), superposed at 0.112 nm, HIS 264 / 278 doubly protonated as in the file, gap capped, sodium kept (set READMEs). The pilot runs and the whole sets are under M7. GPU gates passed on 47e84f7 |
 | GPU plan M4: trypsin-benzamidine (R2), the run length and the scan of the bias | Defaults from the scan by its rule (FM-D16): the setting `sig2` (`metad.sigma_s` 0.05 and `sigma_rho` 0.1 nm; bias factor 10 and height 1.5 kJ/mol stay) and `run.length_ns` 40, with 2 of 5 replicas passing the convergence check of that time; the length is 100 ns since 2026-11-25 (owner, no limit of 40 ns; FM-D16, fourth amendment). Read without a verdict, with the headline of the third amendment of FM-D9: dG0 −28.3 kJ/mol, 95% interval −66.9 to 10.4, replicas −78.2 to −4.6 (experiment −26.8 to −30.5, not used). The six settings of the scan give −14.9 to −29.1 kJ/mol at 40 ns with this headline; with the estimate from the samples, the headline when the scan was read, −2.9 to −28.0: the value depends on the bias setting, and two mean-force estimators over the pooled replicas did not reduce that (spread 25.1 kJ/mol against 32.8 and 42.0; FM-D16, third amendment). R2 is reworded: the value with its interval. The example ran again by its README steps with the defaults, one replica after another on one GPU (47e84f7, 5 × 40 ns, exit 0, `docker stop` and the same command twice): dG0 −44.04 kJ/mol, 95% interval −80.51 to −7.57, replicas −85.3 to −10.9; the ten replicas of both runs −36.16 (95% −57.42 to −14.90). R2 is closed as reworded |
-| GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). Run from its README with the defaults (5 × 40 ns, 47e84f7, the five replicas on one GPU with MPS), headline of the third amendment of FM-D9: dG0 −14.85 kJ/mol (−3.55 kcal/mol), 95% interval −26.60 to −3.11, replicas −29.00 to −3.97, rebinding events 5, 0, 1, 1, 1; experiment −47.3 kJ/mol, outside the interval. Reported as measured in the README |
-| GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. Run again from its README with the defaults (5 × 40 ns, 47e84f7, 221101 atoms, the five replicas on one GPU with MPS at 106–107 ns/day each, exit 0, one `docker stop` and the same command): dG0 −18.64 kJ/mol (−4.45 kcal/mol), 95% interval −33.31 to −3.97, replicas −33.60 to −4.60, rebinding events 2, 7, 1, 3, 9; the measurement on the simulated construct is −33.0 kJ/mol, all measurements −33.0 to −27.0, inside the interval at its lower end. The site is closed for a 0.3 nm probe in the crystal structure; theophylline left and came back in every replica. R3 is closed. Reported as measured in the README |
+| GPU plan M5: kinase example (R10) | TYK2 with ejm_46 from PDB entry 4GIH (`examples/tyk2_ejm46`, 88476 atoms). Run from its README with the defaults (5 × 40 ns, 47e84f7, the five replicas on one GPU with MPS), headline of the third amendment of FM-D9: dG0 −14.85 kJ/mol (−3.55 kcal/mol), 95% interval −26.60 to −3.11, replicas −29.00 to −3.97, rebinding events 5, 0, 1, 1, 1; experiment −47.3 kJ/mol, outside the interval. Reported as measured in the README. At 100 ns with the default back end (PR #5, b3a4a26, 88488 atoms, the five replicas on three GPUs with MPS 2/2/1, every replica cuPotential with force, integrator and barostat, 100 000 hills, return code 0): dG0 −25.63 kJ/mol (−6.12 kcal/mol), 95% interval −47.12 to −4.13, replicas −47.51 to −1.09; experiment 0.2 kJ/mol below the interval; the same runs cut at 40 ns −28.52 (−13.67 ± 7.04 from the OpenMM run of 40 ns) |
+| GPU plan M6: GPCR example (R3) | `examples/a2a_theophylline` (OPM file of 5MZJ): builds without a workaround (221110 atoms, gap LEU208–GLU219 capped, sodium ion kept, 4 disulfide bonds, funnel into the extracellular water, no error in the validation); equilibrated with the 2 ns free stage; membrane production works (5 replicas on one GPU with MPS, about 506 ns/day in total). That run (former default bias) was stopped at about 11 ns when the defaults changed. Run again from its README with the defaults (5 × 40 ns, 47e84f7, 221101 atoms, the five replicas on one GPU with MPS at 106–107 ns/day each, exit 0, one `docker stop` and the same command): dG0 −18.64 kJ/mol (−4.45 kcal/mol), 95% interval −33.31 to −3.97, replicas −33.60 to −4.60, rebinding events 2, 7, 1, 3, 9; the measurement on the simulated construct is −33.0 kJ/mol, all measurements −33.0 to −27.0, inside the interval at its lower end. The site is closed for a 0.3 nm probe in the crystal structure; theophylline left and came back in every replica. R3 is closed. Reported as measured in the README. At 100 ns with the default back end (PR #5, b3a4a26, 221122 atoms, one replica per GPU on five GPUs, every replica cuPotential with force and integrator, 100 000 hills, return code 0): dG0 −17.99 kJ/mol (−4.30 kcal/mol), 95% interval −38.91 to 2.92, replicas −41.95 to 1.68; all measurements inside the interval; the same runs cut at 40 ns −9.72 (+8.92 ± 5.91 from the OpenMM run of 40 ns) |
 | GPU plan M7: benchmark runs (R10) | Pilots (3 ligands per set, 5 × 20 ns, former default bias, commits eeb5302 and f2ea653): the TYK2 pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-45055cc99-tyk2`: dG0 −18.96, −11.14 and −23.71 kJ/mol for ejm_44, ejm_31 and ejm_46 against −31.05, −39.92 and −47.32 from experiment; 95% intervals 19 to 62 kJ/mol wide); the A2A pilot is complete (15 runs) and its report is committed as a pilot (`bench/reports/2026-11-16-80bf2209b-a2a`: dG0 −52.81, −65.99 and −90.40 kJ/mol for 4q, 4d and 4e D against −37.18, −43.95 and −50.52 from experiment; 95% intervals 29 to 76 kJ/mol wide; 9 of the 15 replicas left the site once in the 20 ns, 1 of them came back, 6 never left). Both pilot reports hold the headline of the first amendment of FM-D9 (from the samples; `bench/reports/README.md`). The whole sets ran with the defaults from 47e84f7 in fresh work directories (TYK2 10 ligands, A2A 8 ligands, 5 × 40 ns, 90 replicas, every one to its end, both exit 0); reports by the code of 7386d28: `bench/reports/2026-11-16-7386d2881-tyk2` and `-a2a`. Agreement with experiment in kcal/mol, fmeta / FEP+. TYK2: MUE 3.60 / 0.37, offset removed 1.81 / 0.35, Pearson r 0.15 / 0.96; every ligand above experiment (+1.0 to +6.9); experiment inside the 95% interval for 5 of 10; 47 of 50 replicas with a return to the site. A2A: MUE 4.34 / 0.74, offset removed 3.49 / 0.79, Pearson r 0.57 / 0.79; 6 of 8 below experiment (4d −12.0, 4e D −9.3); experiment inside the interval for 7 of 8; 25 of 40 replicas without a return. Intervals 4.3 to 16.4 (TYK2) and 7.0 to 28.9 kcal/mol (A2A) wide against experimental spans of 4.3 and 3.2. R10 is closed. Reported as measured (set READMEs, `README.md`) |
 
 - GPU gates: **all 20 passed with each back end** (`gpu-tests` and the 19 items of `fmeta check`)
@@ -94,11 +93,11 @@ driver 610); details in the plan.
 - Not verified yet:
   - a binding free energy of a real system with a narrow interval (95% intervals in kJ/mol:
     trypsin −66.9 to 10.4 and −80.5 to −7.6 in two runs, and the value depends on the bias
-    setting; TYK2 with ejm_46 −26.6 to −3.1, 32 above experiment; A2A with theophylline −33.3
-    to −4.0; the 18 ligands of the benchmark sets: intervals 18 to 121 wide);
-  - a run of full length with the cuPotential back end: the examples ran 1 ns per replica with
-    it (on 1c09775); every 40 ns value and every benchmark report is from OpenMM's own forces;
-    5 × 100 ns of both examples with the defaults wait for the 8-GPU session (plan of 2026-11-25);
+    setting; TYK2 with ejm_46 −26.6 to −3.1 at 40 ns with OpenMM, −47.1 to −4.1 at 100 ns with
+    cuPotential; A2A with theophylline −33.3 to −4.0 and −38.9 to 2.9; the 18 ligands of the
+    benchmark sets: intervals 18 to 121 wide);
+  - the benchmark sets with the cuPotential back end or at 100 ns: every report is from OpenMM's
+    own forces at 40 ns;
   - settings chosen for accuracy (walkers in the defaults, bias): deferred by the
     owner; reading HILLS with PLUMED itself; the publish workflow; a walker added on the GPU.
 - Known gaps: ligand protonation is taken from the SDF as drawn (R5); unresolved loops are not
@@ -106,18 +105,22 @@ driver 610); details in the plan.
   directory prepared before 2026-11-16 keeps periodic funnel walls and must be prepared again;
   the scatter over seeds of the gate `toy_free_energy` (10 ns, estimate from the samples) is
   not measured: the gate's seed gives 0.19 kJ/mol with OpenMM and 0.59 with cuPotential (FM-D12).
-- GPUs (owner, 2026-11-16: all 8 are for this task): the 5 × 100 ns runs of PR #5 (owner
-  2026-11-26: all 8 GPUs, MPS where it helps): TYK2 ended on three GPUs with MPS (2/2/1); A2A
-  runs one replica per GPU on five; the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
+- GPUs (owner, 2026-11-16: all 8 are for this task): idle, nothing of this task runs on them;
+  the MPS daemon is stopped. Stock OpenMM, ns/day on one GPU: in the image of
   `main` 88k atoms 606 alone, 1283 / 1541 / 1620 with 4 / 6 / 8 replicas under MPS; in the new
   image (M2, with the bias) the TYK2 example 628 alone, 1425 / 1569 / 1609 with 4 / 6 / 8, the
-  A2A example 302 alone, 526 / 528 / 524.
-- Blockers: the WSL2 host (RTX 5090, Windows driver 610.88 = CUDA 13.3) cannot run the CUDA of
-  the image until its Windows driver is R615 or newer (owner action; FM-D13, fifth amendment).
-  The 8-GPU host: none; MPS works there with driver 595.99.02 and the MPS programs of the image
+  A2A example 302 alone, 526 / 528 / 524; in the image of b3a4a26 (2 ns copies, with the bias)
+  TYK2 572 alone and 470–480 each with 2 under MPS, A2A 304 alone.
+- Blockers: none for the 8-GPU host. The WSL2 host (RTX 5090, Windows driver 610.88 = CUDA
+  13.3) cannot run the CUDA of the image until its Windows driver is R615 or newer (FM-D13,
+  fifth amendment); it is not pursued (owner, 2026-11-26). On the 8-GPU host MPS works there with driver 595.99.02 and the MPS programs of the image
   (protocol 3; FM-D13, amendments of 2026-11-17); its driver is not raised (owner).
 
 ## Change Log
+
+### 2026-11-26 — [progress] TYK2 and A2A at 100 ns with the default back end; GPU gates of b3a4a26 with both back ends
+- What: on the 8-GPU machine, on clean b3a4a26 in image d8b9c513… (rebuilt for the new entry): the GPU gates passed with both back ends (f52d66e); both examples by their READMEs with the defaults, 5 × 100 ns, every replica cuPotential without a fallback reason, 100 000 hills, return code 0, containers exit 0, `fmeta analyze` exit 0 at 100 ns and on copies cut at 40, 60 and 80 ns. TYK2: dG0 −25.63 kJ/mol, 95% −47.12 to −4.13 (experiment −47.3, 0.2 below the interval). A2A: −17.99, −38.91 to 2.92 (measurements −33.0 to −27.0, inside). At 40 ns of the same runs −28.52 and −9.72, against −14.85 and −18.64 of the OpenMM runs of 40 ns (differences −13.67 ± 7.04 and +8.92 ± 5.91; image, build and random numbers differ too). Interval width 40 → 100 ns: 31.3 → 43.0 and 14.7 → 41.8. Speeds of the plugin are in `bench/private/` only. Owner 2026-11-26: section C done in this session; all 8 GPUs, each example started as soon as it was built, A2A one replica per GPU on five, TYK2 on three with MPS 2/2/1; the WSL2 host is not pursued.
+- Refs: plan `docs/plans/2026-11-25-cupotential-100ns-examples.md` (complete); FM-D18 (`docs/design/engine.md`); `examples/tyk2_ejm46/README.md`, `examples/a2a_theophylline/README.md`, `README.md`, `docs/roadmap.md` (R11); `bench/results/2026-11-25-b3a4a26d1-*gpu-gates.json`; PR #5.
 
 ### 2026-11-25 — [amendment] FM-D13, fifth: under WSL2 the image loads the driver library of Windows
 - What: owner request to run on the Windows machine with an RTX 5090 as well, in Docker. There (WSL2, NVIDIA Container Toolkit 1.17.8, `cuda-compat-mode = "ldconfig"`, Windows driver 610.88 = CUDA 13.3) the toolkit put the image's compatibility `libcuda` 615.71.10 first, and CUDA found no device. `docker/entrypoint.sh` now puts the driver library of Windows first when `/dev/dxg` exists (alone in a directory of its own; no MPS under WSL2); other hosts are unchanged. Verified on that host: the image rebuilt; CUDA now reaches the driver and stops at the next condition, OpenMM's PTX of NVRTC 13.4 on a CUDA 13.3 driver (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`). So the host needs a Windows driver of the R615 branch (owner action). `fmeta doctor` there selects CPU without saying why (unchanged). Not run on this code: the GPU gates (the 8-GPU session, on the head of PR #5).

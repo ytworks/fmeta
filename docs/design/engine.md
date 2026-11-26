@@ -37,7 +37,9 @@ review of PR #3 (2026-11-17: the constraints that the plugin's integrator solves
 of `auto`; the walkers of a replica are made with one back end), and the GPU gates of the code
 with these amendments passed with both back ends (80d7dc7, one record each); FM-D16 amended a
 fourth time (2026-11-25, owner: the limit of 40 ns is removed and `run.length_ns` is 100); FM-D13
-amended a fifth time (2026-11-25: under WSL2 the entry of the image loads the driver of Windows).
+amended a fifth time (2026-11-25: under WSL2 the entry of the image loads the driver of Windows);
+FM-D18: the GPU gates of b3a4a26 passed with both back ends and the two examples ran 5 × 100 ns
+with the default back end (2026-11-25, PR #5).
 Applies to: `src/fmeta/` (all of it), `examples/`, the official image and how the project is run.
 
 ## Requirements (owner, 2026-11-15)
@@ -1181,7 +1183,14 @@ The GPU gates of the final code 80d7dc7 (2026-11-17) passed with both back ends,
 (`--backend openmm`). That commit holds the amendments from the review of PR #3 (2026-11-17, at
 the end of this decision); the records of 1c09775, the code before them, passed in the same way
 (`bench/results/2026-11-17-1c0977590-cupotential-gpu-gates.json`,
-`bench/results/2026-11-17-1c0977590-gpu-gates.json`).
+`bench/results/2026-11-17-1c0977590-gpu-gates.json`). On b3a4a26 (PR #5, the default length
+100 ns; 2026-11-25) the gates passed again with both back ends
+(`bench/results/2026-11-25-b3a4a26d1-cupotential-gpu-gates.json`,
+`bench/results/2026-11-25-b3a4a26d1-gpu-gates.json`), and both examples ran 5 × 100 ns with the
+defaults, every replica with cuPotential to its end: dG0 of TYK2 with ejm_46 −25.63 kJ/mol (95%
+interval −47.12 to −4.13; experiment −47.3), of A2A with theophylline −17.99 kJ/mol (−38.91 to
+2.92; measurements −33.0 to −27.0). That is a measurement of real systems at full length, not
+a gate: no criterion depends on it (the READMEs of the examples).
 `run.backend` names what computes the nonbonded forces and moves the atoms of a production run:
 `openmm` (OpenMM's `NonbondedForce` and `LangevinMiddleIntegrator`), `cupotential` (the classes
 of `nv_openmm_plugin`, NVIDIA's plugin of OpenMM's CUDA platform, in their place) or `auto`
