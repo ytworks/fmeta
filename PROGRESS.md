@@ -38,10 +38,10 @@ D5, D6, D7 and D9 to D18 amended since, see the Change Log). Merged: PR #1 (d404
 `docs/plans/2026-11-15-gpu-validation-modes-benchmarks.md`) and PR #3 (c163eb2, `src/` as
 80d7dc7 with the three review fixes; cuPotential as the default back end, owner request
 2026-11-17, plan `docs/plans/2026-11-17-cupotential-backend.md`, roadmap R11; both examples ran
-with it on 1c09775, before the fixes). PR #5 (branch `claude/cupotential-100ns`, plan
-`docs/plans/2026-11-25-cupotential-100ns-examples.md`, complete): default length 100 ns (FM-D16,
-fourth amendment); on its code b3a4a26 the GPU gates passed with both back ends and both
-examples ran 5 × 100 ns with the default back end (rows M5 and M6, the example READMEs).
+with it on 1c09775, before the fixes) and PR #5 (plan
+`docs/plans/2026-11-25-cupotential-100ns-examples.md`): default length 100 ns (FM-D16, fourth
+amendment); on its code b3a4a26 the GPU gates passed with both back ends and both examples ran
+5 × 100 ns with the default back end (rows M5 and M6, the example READMEs).
 
 | Milestone | Status |
 |---|---|
